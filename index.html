@@ -1,0 +1,969 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#8EC8F2">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="スタディきち">
+<title>スタディきち｜そら＆ふう</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --sky-bg:#EAF4FC; --sky-deep:#CDE5F7;
+  --ink:#2B3A55; --ink-soft:#6B7C99;
+  --blue:#3E8FD8; --blue-d:#2F6FB0;
+  --orange:#FF8A5C; --orange-d:#F0703F;
+  --gold:#FFC53D; --green:#58C08A;
+  --card:#FFFFFF; --line:#D8E6F2;
+  --danger:#E86A6A;
+  --r:20px;
+  --disp:'M PLUS Rounded 1c',sans-serif;
+  --body:'Zen Kaku Gothic New',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{
+  font-family:var(--body);color:var(--ink);
+  background:linear-gradient(180deg,#BBDDF5 0%,#EAF4FC 40%);
+  background-attachment:fixed;
+}
+#shell{max-width:480px;margin:0 auto;min-height:100dvh;background:var(--sky-bg);
+  box-shadow:0 0 40px rgba(62,143,216,.15);position:relative;padding-bottom:84px}
+/* ---------- sky header ---------- */
+.sky{position:relative;overflow:hidden;padding:18px 18px 22px;
+  background:linear-gradient(180deg,#8EC8F2 0%,#B9DFF8 70%,var(--sky-bg) 100%);
+  border-radius:0 0 28px 28px}
+.cloud{position:absolute;background:#fff;border-radius:50px;opacity:.85;filter:blur(1px)}
+.cloud::before,.cloud::after{content:"";position:absolute;background:#fff;border-radius:50%}
+.c1{width:90px;height:26px;top:16px;left:-100px;animation:drift 46s linear infinite}
+.c1::before{width:38px;height:38px;top:-18px;left:14px}
+.c1::after{width:26px;height:26px;top:-12px;left:46px}
+.c2{width:64px;height:20px;top:58px;left:-80px;animation:drift 68s linear 8s infinite;opacity:.6}
+.c2::before{width:28px;height:28px;top:-13px;left:10px}
+.c2::after{width:18px;height:18px;top:-8px;left:34px}
+@keyframes drift{from{transform:translateX(0)}to{transform:translateX(620px)}}
+@media (prefers-reduced-motion:reduce){.cloud{animation:none;left:20%}.c2{left:60%}}
+.sky h1{font-family:var(--disp);font-weight:800;font-size:20px;letter-spacing:.02em;position:relative}
+.sky .sub{font-size:12px;color:#2F6FB0;margin-top:2px;position:relative}
+.profile-row{display:flex;gap:10px;margin-top:14px;position:relative}
+.pf{flex:1;display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.75);
+  border:2px solid transparent;border-radius:16px;padding:8px 10px;cursor:pointer;
+  font-family:var(--disp);font-weight:700;font-size:14px;transition:.15s}
+.pf.on{border-color:var(--blue);background:#fff;box-shadow:0 4px 12px rgba(62,143,216,.25)}
+.pf .em{font-size:22px}
+.pf .g{font-size:10px;color:var(--ink-soft);font-weight:500}
+/* ---------- common ---------- */
+main{padding:16px 16px 8px}
+.card{background:var(--card);border-radius:var(--r);padding:16px;margin-bottom:14px;
+  box-shadow:0 2px 10px rgba(43,58,85,.06)}
+h2{font-family:var(--disp);font-weight:800;font-size:15px;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.muted{color:var(--ink-soft);font-size:12px}
+.btn{display:block;width:100%;border:none;border-radius:16px;padding:14px;cursor:pointer;
+  font-family:var(--disp);font-weight:800;font-size:16px;color:#fff;
+  background:linear-gradient(180deg,var(--orange),var(--orange-d));
+  box-shadow:0 4px 0 #D65E30;transition:.1s}
+.btn:active{transform:translateY(3px);box-shadow:0 1px 0 #D65E30}
+.btn.blue{background:linear-gradient(180deg,var(--blue),var(--blue-d));box-shadow:0 4px 0 #245A92}
+.btn.blue:active{box-shadow:0 1px 0 #245A92}
+.btn.ghost{background:#fff;color:var(--blue-d);border:2px solid var(--line);box-shadow:none;font-weight:700}
+.btn.sm{padding:9px;font-size:13px;border-radius:12px}
+.btn:disabled{opacity:.5}
+.row{display:flex;gap:10px}
+.row>*{flex:1}
+input,textarea,select{width:100%;border:2px solid var(--line);border-radius:12px;padding:10px;
+  font-family:var(--body);font-size:14px;background:#fff;color:var(--ink)}
+input:focus,textarea:focus,select:focus{outline:2px solid var(--blue);border-color:var(--blue)}
+label{font-size:12px;font-weight:700;color:var(--ink-soft);display:block;margin:10px 0 4px}
+/* ---------- home ---------- */
+.stats{display:flex;gap:10px;margin-bottom:14px}
+.stat{flex:1;background:#fff;border-radius:16px;padding:10px;text-align:center;box-shadow:0 2px 8px rgba(43,58,85,.05)}
+.stat .n{font-family:var(--disp);font-weight:800;font-size:20px;color:var(--blue-d)}
+.stat .l{font-size:10px;color:var(--ink-soft);font-weight:700}
+.bases{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.base{background:#fff;border:2px solid var(--line);border-radius:18px;padding:14px 10px;text-align:center;cursor:pointer;transition:.12s}
+.base:active{transform:scale(.96)}
+.base .em{font-size:30px}
+.base .nm{font-family:var(--disp);font-weight:700;font-size:13px;margin-top:4px}
+.base .cnt{font-size:10px;color:var(--ink-soft);margin-top:2px}
+.base .ttl{display:inline-block;font-size:10px;font-weight:700;color:#B07800;background:#FFF3D1;border-radius:8px;padding:1px 7px;margin-top:4px}
+/* ---------- timer ---------- */
+.timer-wrap{text-align:center;padding:26px 0 10px}
+.timer-base{font-family:var(--disp);font-weight:700;color:var(--blue-d);font-size:14px}
+.timer-num{font-family:var(--disp);font-weight:800;font-size:64px;letter-spacing:.02em;margin:6px 0}
+.timer-num.over{color:var(--green)}
+.cheer{min-height:20px;font-size:13px;color:var(--ink-soft)}
+.ring{width:190px;height:190px;margin:10px auto;position:relative}
+.ring svg{transform:rotate(-90deg)}
+.ring .mid{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+/* ---------- chips ---------- */
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:2px solid var(--line);background:#fff;border-radius:999px;padding:7px 14px;
+  font-family:var(--disp);font-weight:700;font-size:13px;cursor:pointer}
+.chip.on{background:var(--blue);border-color:var(--blue);color:#fff}
+/* ---------- slot ---------- */
+.slot-box{background:linear-gradient(180deg,#2B3A55,#1D2A42);border-radius:24px;padding:22px 16px;text-align:center;color:#fff}
+.slot-title{font-family:var(--disp);font-weight:800;font-size:16px;color:var(--gold)}
+.reels{display:flex;justify-content:center;gap:10px;margin:16px 0}
+.reel{width:76px;height:86px;background:#fff;border-radius:14px;display:flex;align-items:center;justify-content:center;
+  font-size:44px;box-shadow:inset 0 -6px 0 #E4EDF6}
+.reel.spin{animation:shake .12s linear infinite}
+@keyframes shake{0%{transform:translateY(-3px)}50%{transform:translateY(3px)}100%{transform:translateY(-3px)}}
+.slot-result{font-family:var(--disp);font-weight:800;font-size:17px;min-height:26px;color:var(--gold)}
+/* ---------- grass ---------- */
+.grass{display:grid;grid-template-rows:repeat(7,12px);grid-auto-flow:column;grid-auto-columns:12px;gap:3px;overflow-x:auto;padding-bottom:4px}
+.g0{background:#E4EDF6}.g1{background:#BCE3CB}.g2{background:#7FD0A0}.g3{background:#43A96F}
+.grass i{border-radius:3px;display:block}
+.streak-flame{font-size:26px}
+/* ---------- session list ---------- */
+.sess{display:flex;gap:10px;align-items:center;padding:10px 0;border-bottom:1px dashed var(--line)}
+.sess:last-child{border-bottom:none}
+.sess .em{font-size:22px}
+.sess .info{flex:1;font-size:12px}
+.sess .info b{font-family:var(--disp);font-size:13px}
+.badge{font-size:10px;font-weight:700;border-radius:8px;padding:2px 8px}
+.b-pend{background:#FFF3D1;color:#B07800}
+.b-ok{background:#DDF3E6;color:#2C7A4E}
+.b-ng{background:#FBE1E1;color:#B04040}
+.thumb{width:42px;height:42px;object-fit:cover;border-radius:10px;cursor:pointer;border:2px solid var(--line)}
+/* ---------- goals ---------- */
+.goal-card{background:linear-gradient(135deg,#FFF6E3,#FFEAC2);border:2px solid #FFD98A;border-radius:var(--r);padding:14px;margin-bottom:12px}
+.goal-card .rw{font-family:var(--disp);font-weight:800;font-size:15px;color:#9A6B00}
+.goal-card .tt{font-size:12px;color:#B07800;font-weight:700}
+.chart-wrap{overflow-x:auto}
+/* ---------- chat ---------- */
+.chat-log{display:flex;flex-direction:column;gap:10px;min-height:200px;max-height:52vh;overflow-y:auto;padding:4px 0}
+.msg{max-width:82%;padding:10px 13px;border-radius:16px;font-size:14px;line-height:1.6;white-space:pre-wrap;word-break:break-word}
+.msg.me{align-self:flex-end;background:var(--blue);color:#fff;border-bottom-right-radius:4px}
+.msg.ai{align-self:flex-start;background:#fff;border:2px solid var(--line);border-bottom-left-radius:4px}
+.msg.ai .who{font-size:10px;font-weight:700;color:var(--blue-d);margin-bottom:2px}
+.chat-input{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.chat-input textarea{flex:1 1 100%;resize:none;height:96px;font-size:16px}
+.chat-input .send-btn{flex:1;min-height:46px;border:none;border-radius:14px;background:var(--blue);color:#fff;font-family:var(--disp);font-weight:800;font-size:15px;cursor:pointer}
+.typing{font-size:12px;color:var(--ink-soft)}
+.day-sep{display:flex;align-items:center;gap:8px;margin:2px 0}
+.day-sep::before,.day-sep::after{content:"";flex:1;height:1px;background:var(--line)}
+.day-sep span{font-size:10px;color:var(--ink-soft);font-weight:700}
+/* ---------- メモボード ---------- */
+.bd-tools{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.bd-pen{width:32px;height:32px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 2px var(--line);cursor:pointer;padding:0}
+.bd-tl{width:38px;height:38px;border-radius:10px;border:2px solid var(--line);background:#fff;font-size:16px;cursor:pointer}
+.bd-pen.on,.bd-tl.on{box-shadow:0 0 0 3px var(--blue)}
+#board{width:100%;background:#fff;border:2px solid var(--line);border-radius:14px;touch-action:none;display:block}
+/* ---------- nav ---------- */
+nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;
+  background:#fff;border-top:1px solid var(--line);display:flex;z-index:50;
+  padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;border:none;background:none;padding:9px 0 7px;cursor:pointer;color:var(--ink-soft);
+  font-family:var(--disp);font-weight:700;font-size:10px}
+nav button .i{display:block;font-size:20px;margin-bottom:1px}
+nav button.on{color:var(--blue-d)}
+/* ---------- modal ---------- */
+.overlay{position:fixed;inset:0;background:rgba(30,42,66,.5);z-index:100;display:flex;align-items:flex-end;justify-content:center}
+.modal{background:#fff;width:100%;max-width:480px;border-radius:24px 24px 0 0;padding:20px 18px 26px;max-height:88dvh;overflow-y:auto;animation:up .2s ease}
+@keyframes up{from{transform:translateY(40px);opacity:0}to{transform:translateY(0);opacity:1}}
+@media (prefers-reduced-motion:reduce){.modal{animation:none}}
+.modal h3{font-family:var(--disp);font-weight:800;font-size:16px;margin-bottom:12px}
+.close-x{float:right;border:none;background:#EEF4FA;border-radius:50%;width:30px;height:30px;font-size:14px;cursor:pointer;color:var(--ink-soft)}
+.photo-view{max-width:100%;border-radius:14px}
+/* confetti */
+.confetti{position:fixed;top:-10px;font-size:18px;z-index:200;animation:fall 2.4s linear forwards;pointer-events:none}
+@keyframes fall{to{transform:translateY(105vh) rotate(540deg);opacity:.7}}
+.ticket-item{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px dashed var(--line);font-size:14px}
+.ticket-item button{border:none;background:#FBE1E1;color:#B04040;border-radius:8px;padding:4px 10px;font-size:11px;cursor:pointer}
+.won-ticket{background:linear-gradient(90deg,#FFF6E3,#FFEFD0);border:2px dashed var(--gold);border-radius:14px;padding:10px 12px;margin-bottom:8px;font-weight:700;font-size:14px;display:flex;justify-content:space-between;align-items:center}
+.won-ticket button{border:none;background:var(--green);color:#fff;border-radius:10px;padding:6px 12px;font-family:var(--disp);font-weight:700;cursor:pointer;font-size:12px}
+/* ---------- chat photo / quick ---------- */
+.chat-quick{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.qchip{border:2px solid var(--line);background:#fff;border-radius:999px;padding:7px 12px;font-family:var(--disp);font-weight:700;font-size:12px;color:var(--blue-d);cursor:pointer}
+.qchip:active{transform:scale(.96)}
+.attach-btn{flex:0 0 auto;width:46px;min-height:46px;border:2px solid var(--line);background:#fff;border-radius:14px;font-size:20px;cursor:pointer}
+.attach-btn:active{background:#EEF4FA}
+.attach-btn.rec{background:#FBE1E1;border-color:var(--danger);animation:pulse 1s ease infinite}
+@keyframes pulse{50%{opacity:.6}}
+.chat-photo{display:block;max-width:180px;border-radius:12px;margin-bottom:6px}
+.photo-chip{display:flex;align-items:center;gap:8px;background:#EEF4FA;border:2px solid var(--line);border-radius:12px;padding:6px 8px;margin-top:8px;font-size:12px;font-weight:700;color:var(--ink-soft)}
+.photo-chip img{width:44px;height:44px;object-fit:cover;border-radius:8px}
+.photo-chip button{margin-left:auto;border:none;background:#FBE1E1;color:#B04040;border-radius:8px;width:26px;height:26px;font-size:12px;cursor:pointer}
+</style>
+</head>
+<body>
+<div id="shell">
+  <header class="sky">
+    <div class="cloud c1"></div><div class="cloud c2"></div>
+    <h1 id="hd-title">スタディきち ☁️</h1>
+    <div class="sub" id="hd-sub"></div>
+    <div class="profile-row" id="profile-row"></div>
+  </header>
+  <main id="app"></main>
+  <nav id="nav"></nav>
+</div>
+<div id="modal-root"></div>
+<script>
+/* ============================================================
+   スタディきち — 空花＆風花のための自習出撃アプリ
+   データはこの端末の中だけに保存されます（localStorage / IndexedDB）
+   ============================================================ */
+/* ---------- マスタ ---------- */
+const DEFAULT_BASES=[
+ {id:'solid',name:'ソリッドスクエア',em:'🏢'},
+ {id:'mcd',name:'マクドナルド',em:'🍟'},
+ {id:'light',name:'ライトハウス自習室',em:'📚'},
+ {id:'gakudo',name:'学童',em:'🎒'},
+ {id:'home',name:'おうち机',em:'🏠'},
+];
+const TITLES=[[40,'ぬし'],[20,'たつじん'],[10,'じょうれん'],[3,'かよいはじめ']];
+const SUBJECTS=['算数','国語','理科','社会','英語','その他'];
+/* AI相棒へのワンタップ質問 */
+const QUICKS=[
+ {id:'hint',label:'💡ヒントちょうだい',text:'この問題のヒントを、答えは言わずにひとつだけ教えて。'},
+ {id:'think',label:'🤔考え方おしえて',text:'この問題の考え方や、どこから手をつければいいかを教えて。答えはまだ言わないでね。'},
+ {id:'check',label:'✅答え合わせして',text:'わたしが解いた内容が合っているか答え合わせして。まちがいがあれば、どこが惜しいか教えて。'},
+ {id:'explain',label:'📖解説して',text:'この問題の解き方を、さいごまでやさしく解説して。'},
+];
+
+/* ---------- 状態 ---------- */
+function mkProfile(name,em,grade){return{
+ name,em,grade,points:0,sessions:[],exams:[],chat:[],chatArchive:[],
+ aiName:'そらとも',
+ examTarget:{label:'次の模試の目標',value:''},
+ bigGoals:[
+  {title:'模試で目標クリア!',reward:'すきなレストランへGO 🍽️'},
+  {title:'中学ごうかく!!',reward:'スペシャル沖縄旅行 ✈️🌺'},
+ ],
+ pool:[{name:'小籠包ディナー券 🥟',price:800},{name:'魚だしごはんリクエスト券 🐟',price:400},{name:'パパと30分あそぶ券 🎮',price:300}],
+ tickets:[],
+ lastGoldenMilestone:0,
+};}
+const DEFAULT_STATE={
+v:3, tab:'home', currentProfile:'sora', parentPin:null,
+ bases:JSON.parse(JSON.stringify(DEFAULT_BASES)),
+ gemini:{key:'',model:'gemini-2.5-flash'}, // ※お使いの有効なモデル名、または 'gemini-1.5-flash' に必要に応じて変更してください
+ profiles:{ sora:mkProfile('空花','🌸','小5'), fuka:mkProfile('風花','🍃','小3') },
+ activeSession:null,
+};
+let S=load();
+function load(){
+ try{const raw=localStorage.getItem('studykichi_v1');
+  if(raw){const s=JSON.parse(raw);const st=Object.assign(JSON.parse(JSON.stringify(DEFAULT_STATE)),s);migrate(st);return st;}
+ }catch(e){}
+ return JSON.parse(JSON.stringify(DEFAULT_STATE));
+}
+/* v1→v3 移行:券の値札・チャットアーカイブ・編集可能な基地 */
+function migrate(st){
+ Object.values(st.profiles||{}).forEach(pr=>{
+  if(Array.isArray(pr.pool))pr.pool=pr.pool.map(t=>typeof t==='string'?{name:t,price:500}:t);
+  if(pr.lastGoldenMilestone==null)pr.lastGoldenMilestone=0;
+  if(!Array.isArray(pr.chatArchive))pr.chatArchive=[];
+ });
+ if(!Array.isArray(st.bases)||!st.bases.length)st.bases=JSON.parse(JSON.stringify(DEFAULT_BASES));
+ if(!st.currentProfile||!st.profiles[st.currentProfile])st.currentProfile=Object.keys(st.profiles)[0];
+ st.v=3;
+}
+function save(){
+ try{localStorage.setItem('studykichi_v1',JSON.stringify(S));}
+ catch(e){ // ほぼ写真での容量オーバー。各プロフィールの古い写真をはがして再試行
+  try{Object.values(S.profiles).forEach(pr=>{
+    const imgs=(pr.chat||[]).filter(m=>m.img);
+    imgs.slice(0,Math.max(0,imgs.length-2)).forEach(m=>{m.img=null;});
+    (pr.chatArchive||[]).forEach(a=>(a.msgs||[]).forEach(m=>{if(m.img)m.img=null;}));
+  });
+  localStorage.setItem('studykichi_v1',JSON.stringify(S));}catch(_){}}
+}
+function P(){return S.profiles[S.currentProfile];}
+
+/* ---------- 写真ストレージ (IndexedDB) ---------- */
+let _db=null;
+function idb(){return new Promise((res,rej)=>{
+ if(_db)return res(_db);
+ const r=indexedDB.open('studykichi',1);
+ r.onupgradeneeded=e=>{e.target.result.createObjectStore('photos');};
+ r.onsuccess=e=>{_db=e.target.result;res(_db);};
+ r.onerror=()=>rej(r.error);
+});}
+async function putPhoto(id,dataUrl){const d=await idb();return new Promise((res,rej)=>{
+ const t=d.transaction('photos','readwrite');t.objectStore('photos').put(dataUrl,id);
+ t.oncomplete=res;t.onerror=()=>rej(t.error);});}
+async function getPhoto(id){const d=await idb();return new Promise(res=>{
+ const q=d.transaction('photos').objectStore('photos').get(id);
+ q.onsuccess=()=>res(q.result||null);q.onerror=()=>res(null);});}
+
+/* ---------- ユーティリティ ---------- */
+const $=s=>document.querySelector(s);
+function esc(t){return String(t==null?'':t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function fmtDate(ts){const d=new Date(ts);return (d.getMonth()+1)+'/'+d.getDate();}
+function dayKey(ts){const d=new Date(ts);return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();}
+function todayKey(){return dayKey(Date.now());}
+function minutesByDay(p){const m={};p.sessions.forEach(s=>{
+ if(s.status!=='rejected'){const k=dayKey(s.endTs||s.startTs);m[k]=(m[k]||0)+(s.minutes||0);}});return m;}
+function calcStreak(p){const m=minutesByDay(p);let streak=0;const d=new Date();
+ if(!m[dayKey(d.getTime())]){d.setDate(d.getDate()-1);}
+ while(m[dayKey(d.getTime())]){streak++;d.setDate(d.getDate()-1);}
+ return streak;}
+/* --- スロット経済のルール --- */
+const MILESTONES=[3,7,14,30,50,100,200];
+function coefFor(min){return min<15?0.3:min<45?1:1.5;} // 時間係数
+function dayTotal(p,ts){const k=dayKey(ts);let t=0;
+ p.sessions.forEach(s=>{if(s.status!=='rejected'&&dayKey(s.endTs||s.startTs)===k)t+=(s.minutes||0);});
+ return t;}
+function spinQueue(p){return p.sessions.filter(s=>s.status==='approved'&&!s.spin);}
+function goldenAvailable(p){const st=calcStreak(p);
+ if(st<(p.lastGoldenMilestone||0))p.lastGoldenMilestone=0; // 連続が途切れたらリセット
+ let m=0;MILESTONES.forEach(x=>{if(st>=x)m=x;});
+ return (m>0&&m>(p.lastGoldenMilestone||0))?m:0;}
+function nextMilestone(p){const st=calcStreak(p);
+ for(const x of MILESTONES){if(st<x)return x;}return null;}
+
+/* ---------- 画面制御 ---------- */
+const NAV=[['home','🏠','きち'],['rec','🌱','きろく'],['goal','🏆','もくひょう'],['ai','🤖','AI相棒'],['set','⚙️','せってい']];
+function render(){
+ renderHeader();renderNav();
+ const app=$('#app');
+ if(S.activeSession&&S.tab==='home'){app.innerHTML=timerHTML();startTick();return;}
+ stopTick();
+ if(S.tab==='home')app.innerHTML=homeHTML();
+ else if(S.tab==='rec'){app.innerHTML=recHTML();loadThumbs();}
+ else if(S.tab==='goal')app.innerHTML=goalHTML();
+ else if(S.tab==='ai'){app.innerHTML=aiHTML();scrollChat();}
+ else app.innerHTML=setHTML();
+}
+function renderHeader(){const p=P();
+ $('#hd-sub').textContent='きょうも しゅつげき しよう、'+p.name+'さん!';
+ $('#profile-row').innerHTML=Object.entries(S.profiles).map(([id,pr])=>
+  '<div class="pf '+(id===S.currentProfile?'on':'')+'" onclick="switchProfile(\''+id+'\')">'+
+  '<span class="em">'+pr.em+'</span><span>'+esc(pr.name)+'<div class="g">'+esc(pr.grade)+'</div></span></div>').join('');}
+function switchProfile(id){S.currentProfile=id;save();render();}
+function renderNav(){$('#nav').innerHTML=NAV.map(([id,i,l])=>
+ '<button class="'+(S.tab===id?'on':'')+'" onclick="go(\''+id+'\')"><span class="i">'+i+'</span>'+l+'</button>').join('');}
+function go(t){S.tab=t;save();render();}
+
+/* ---------- モーダル ---------- */
+function openModal(html,closable=true){
+ $('#modal-root').innerHTML='<div class="overlay" '+(closable?'onclick="if(event.target===this)closeModal()"':'')+'>'+
+ '<div class="modal">'+(closable?'<button class="close-x" onclick="closeModal()">✕</button>':'')+html+'</div></div>';}
+function closeModal(){$('#modal-root').innerHTML='';}
+async function viewPhotoInline(id){const d=await getPhoto(id);if(!d)return;
+ const el=document.createElement('div');el.className='overlay';el.style.zIndex=300;
+ el.onclick=()=>el.remove();
+ el.innerHTML='<div class="modal" style="border-radius:24px;margin:auto;max-width:440px"><img src="'+d+'" class="photo-view"></div>';
+ document.body.appendChild(el);}
+
+/* ---------- ホーム ---------- */
+function baseCount(p,baseId){return p.sessions.filter(s=>s.base===baseId&&s.status!=='rejected').length;}
+function titleFor(n){for(const[th,t]of TITLES){if(n>=th)return t;}return null;}
+function homeHTML(){const p=P();const m=minutesByDay(p);
+ const today=m[todayKey()]||0;const streak=calcStreak(p);
+ /* 承認ずみでまだ回していないスロット */
+ let slotCard='';const q=spinQueue(p);const gm=goldenAvailable(p);
+ if(q.length){slotCard='<div class="card" style="background:linear-gradient(135deg,#FFF6E3,#FFE9C0);border:2px solid var(--gold)">'+
+  '<h2>🎰 スロットが まわせるよ!</h2>'+
+  '<div class="muted">パパ・ママが「がんばったね」って承認してくれたよ✨ <b>'+q.length+'回</b> まわせる!</div>'+
+  (gm?'<div style="font-family:var(--disp);font-weight:800;color:#B07800;font-size:13px;margin-top:4px">🔥れんぞく'+gm+'日たっせい!さいしょの1回は ゴールデンスロット!!</div>':'')+
+  '<button class="btn" style="margin-top:10px" onclick="openSlots()">まわす! 🎰</button></div>';}
+ let tix='';
+ if(p.tickets.length){tix='<div class="card"><h2>🎟️ もっている券</h2>'+
+  p.tickets.map((t,i)=>'<div class="won-ticket"><span>'+esc(t)+'</span><button onclick="useTicket('+i+')">つかう</button></div>').join('')+
+  '<div class="muted">「つかう」はパパ・ママといっしょにおしてね</div></div>';}
+ /* ⭐こうかんじょ */
+ let shop='';
+ if(p.pool.length){shop='<div class="card"><h2>⭐ こうかんじょ</h2>'+
+  p.pool.map((t,i)=>{const can=p.points>=t.price;
+   return '<div class="ticket-item"><span style="flex:1">'+esc(t.name)+'</span>'+
+   '<b style="font-family:var(--disp);color:#B07800;font-size:13px">'+t.price+'pt</b>'+
+   '<button style="background:'+(can?'#DDF3E6;color:#2C7A4E':'#EEF4FA;color:#9AA9BE')+'"'+(can?'':' disabled')+' onclick="buyTicket('+i+')">こうかん</button></div>';}).join('')+
+  '<div class="muted" style="margin-top:6px">スロットでためたポイントで、すきな券とこうかんできるよ!</div></div>';}
+ /* ゴールデンスロット予告 */
+ const nm=nextMilestone(p);
+ let teaser='';
+ if(!m[todayKey()]&&nm&&streak===nm-1)teaser='<br>🔥きょう べんきょうすると れんぞく'+nm+'日 → ゴールデンスロットのチャンス!';
+ return '<div class="stats">'+
+  '<div class="stat"><div class="n">🔥'+streak+'</div><div class="l">れんぞく日</div></div>'+
+  '<div class="stat"><div class="n">'+today+'<span style="font-size:12px">分</span></div><div class="l">きょうの勉強</div></div>'+
+  '<div class="stat"><div class="n">⭐'+p.points+'</div><div class="l">ポイント</div></div></div>'+
+  slotCard+tix+
+  '<div class="card"><h2>🚀 きょうの基地(きち)をえらぼう!</h2><div class="bases">'+
+  S.bases.map(b=>{const n=baseCount(p,b.id);const t=titleFor(n);
+   return '<div class="base" onclick="pickBase(\''+b.id+'\')"><div class="em">'+b.em+'</div>'+
+   '<div class="nm">'+b.name+'</div><div class="cnt">しゅつげき '+n+'回</div>'+
+   (t?'<div class="ttl">'+b.name.slice(0,5)+'の'+t+'</div>':'')+'</div>';}).join('')+
+  '</div><div class="muted" style="margin-top:10px">💡 まずは「5分だけ」でOK!はじめるのが いちばんえらい!'+teaser+'</div></div>'+
+  shop;}
+function buyTicket(i){const p=P();const t=p.pool[i];
+ if(!t||p.points<t.price)return;
+ if(confirm('⭐'+t.price+'ポイントで「'+t.name+'」とこうかんする?')){
+  p.points-=t.price;p.tickets.push(t.name);save();confetti();render();}}
+function useTicket(i){const p=P();
+ if(confirm('「'+p.tickets[i]+'」をつかう?(おうちの人といっしょにね)')){p.tickets.splice(i,1);save();render();}}
+
+/* ---------- 出撃(セッション) ---------- */
+let pendingBase=null;
+function pickBase(id){pendingBase=id;const b=S.bases.find(x=>x.id===id);
+ openModal('<h3>'+b.em+' '+b.name+' で しゅつげき!</h3><div class="muted">なんぷん やる?</div>'+
+ '<div class="chips" style="margin-top:10px">'+
+ [5,15,25,45,60].map(m=>'<div class="chip" onclick="startSession('+m+')">'+m+'分'+(m===5?' 🐣まずはこれ':'')+'</div>').join('')+
+ '</div>');}
+function startSession(min){closeModal();
+ S.activeSession={base:pendingBase,plannedMin:min,startTs:Date.now(),boards:[]};save();S.tab='home';render();}
+
+let tickI=null;
+const CHEERS=['いいちょうし!','しゅうちゅう〜🧘','その1問がミライをつくる','おわったらスロットだ🎰','天才のかおしてる😎','雲より上をとんでるよ☁️'];
+function timerHTML(){const a=S.activeSession;const b=S.bases.find(x=>x.id===a.base);
+ return '<div class="card"><div class="timer-wrap">'+
+ '<div class="timer-base">'+b.em+' '+b.name+' に しゅつげき中</div>'+
+ '<div class="ring"><svg width="190" height="190"><circle cx="95" cy="95" r="84" fill="none" stroke="#E4EDF6" stroke-width="12"/>'+
+ '<circle id="ring-fg" cx="95" cy="95" r="84" fill="none" stroke="#3E8FD8" stroke-width="12" stroke-linecap="round" stroke-dasharray="527.8" stroke-dashoffset="527.8"/></svg>'+
+ '<div class="mid"><div class="timer-num" id="t-num">--:--</div><div class="muted" id="t-goal">めやす '+a.plannedMin+'分</div></div></div>'+
+ '<div class="cheer" id="cheer">がんばれ〜!</div>'+
+ '<button class="btn blue" style="margin-top:14px" onclick="openBoard()">✏️ 計算メモボード'+((a.boards&&a.boards.length)?'('+a.boards.length+'まい)':'')+'</button>'+
+ '<button class="btn" style="margin-top:8px" onclick="finishSession()">✅ べんきょう おわり!</button>'+
+ '<button class="btn ghost sm" style="margin-top:8px" onclick="cancelSession()">やめる(きろくしない)</button>'+
+ '</div></div>';}
+function startTick(){stopTick();tick();tickI=setInterval(tick,1000);}
+function stopTick(){if(tickI){clearInterval(tickI);tickI=null;}}
+function tick(){const a=S.activeSession;if(!a)return;
+ const el=$('#t-num');if(!el)return;
+ const sec=Math.floor((Date.now()-a.startTs)/1000);const plan=a.plannedMin*60;
+ const mm=String(Math.floor(sec/60)).padStart(2,'0'),ss=String(sec%60).padStart(2,'0');
+ el.textContent=mm+':'+ss;
+ const fg=$('#ring-fg');if(fg){fg.style.strokeDashoffset=String(527.8*(1-Math.min(sec/plan,1)));
+  if(sec>=plan){el.classList.add('over');fg.style.stroke='#58C08A';
+   const g=$('#t-goal');if(g)g.textContent='もくひょう達成!すきなだけどうぞ🎉';}}
+ if(sec%20===0){const c=$('#cheer');if(c)c.textContent=CHEERS[Math.floor(sec/20)%CHEERS.length];}}
+function cancelSession(){if(confirm('きろくせずに やめる?')){S.activeSession=null;save();render();}}
+
+let endPhotoData=null;
+let chatPhotoData=null; // AIチャットに添付する写真(dataURL)
+function finishSession(){const a=S.activeSession;
+ const min=Math.max(1,Math.round((Date.now()-a.startTs)/60000));
+ endPhotoData=null;
+ openModal('<h3>おつかれさま!🎉 '+min+'分 がんばった!</h3>'+
+ ((a.boards&&a.boards.length)?'<div class="muted">✏️ 計算メモ '+a.boards.length+'まいも いっしょに きろくするよ</div>':'')+
+ '<label>なにを べんきょうした?</label>'+
+ '<div class="chips" id="subj-chips">'+SUBJECTS.map(s=>'<div class="chip" onclick="this.classList.toggle(\'on\')">'+s+'</div>').join('')+'</div>'+
+ '<label>メモ(テキストのページなど)</label><input id="end-memo" placeholder="例:予習シリーズ P.42〜45">'+
+ '<label>📸 ノートやテキストの写真(しょうこ写真!パパが見るよ)</label>'+
+ '<input type="file" accept="image/*" capture="environment" onchange="onPhoto(this)">'+
+ '<div id="photo-prev" style="margin-top:8px"></div>'+
+ '<button class="btn" style="margin-top:16px" onclick="saveSession('+min+')">きろくする ✍️</button>',false);}
+function onPhoto(inp){const f=inp.files&&inp.files[0];if(!f)return;
+ compressImage(f).then(d=>{endPhotoData=d;
+  $('#photo-prev').innerHTML='<img src="'+d+'" class="photo-view" style="max-height:160px">';});}
+function compressImage(file){return new Promise(res=>{
+ const img=new Image();
+ img.onload=()=>{const max=900;let w=img.width,h=img.height;
+  if(w>max||h>max){const r=max/Math.max(w,h);w=Math.round(w*r);h=Math.round(h*r);}
+  const c=document.createElement('canvas');c.width=w;c.height=h;
+  c.getContext('2d').drawImage(img,0,0,w,h);
+  URL.revokeObjectURL(img.src);res(c.toDataURL('image/jpeg',.6));};
+ img.src=URL.createObjectURL(file);});}
+async function saveSession(min){const a=S.activeSession;
+ const subs=[...document.querySelectorAll('#subj-chips .chip.on')].map(c=>c.textContent);
+ const id='s'+Date.now();let photoId=null;
+ if(endPhotoData){photoId='p'+Date.now();
+  try{await putPhoto(photoId,endPhotoData);}catch(e){photoId=null;}}
+ P().sessions.unshift({id,base:a.base,plannedMin:a.plannedMin,startTs:a.startTs,endTs:Date.now(),
+  minutes:min,subjects:subs,memo:$('#end-memo').value.trim(),photoId,boards:(a.boards||[]),status:'pending',spin:null});
+ S.activeSession=null;save();closeModal();render();
+ openModal('<h3>きろくしたよ! ✍️</h3>'+
+ '<div class="muted">パパ・ママが「がんばったね」って承認してくれたら、つぎにアプリをひらいたときに 🎰スロットがまわせるよ。たのしみにまっててね!</div>'+
+ '<button class="btn" style="margin-top:14px" onclick="closeModal()">OK!</button>');}
+
+/* ---------- 計算メモボード ---------- */
+let bd={};
+function openBoard(){
+ openModal('<h3>✏️ 計算メモボード</h3>'+
+ '<div class="bd-tools">'+
+  ['#2B3A55','#3E8FD8','#E86A6A'].map((c,i)=>'<button class="bd-pen'+(i===0?' on':'')+'" data-c="'+c+'" style="background:'+c+'"></button>').join('')+
+  '<button class="bd-tl" id="bd-eraser">🧽</button>'+
+  '<button class="bd-tl" onclick="bdUndo()">↩️</button>'+
+  '<button class="bd-tl" onclick="bdClear()">🗑️</button></div>'+
+ '<canvas id="board"></canvas>'+
+ '<div class="row" style="margin-top:10px"><button class="btn sm" onclick="saveBoard()">💾 ほぞんする</button>'+
+ '<button class="btn ghost sm" onclick="closeBoard()">とじる</button></div>'+
+ '<div class="muted" style="margin-top:6px">ほぞんすると「きろく」にのこって、あとから見かえせるよ</div>',false);
+ initBoard();}
+function initBoard(){const cv=$('#board');
+ const dpr=Math.min(2,window.devicePixelRatio||1);
+ const w=cv.clientWidth||320,h=440;
+ cv.width=w*dpr;cv.height=h*dpr;cv.style.height=h+'px';
+ const ctx=cv.getContext('2d');ctx.scale(dpr,dpr);
+ ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);
+ ctx.lineCap='round';ctx.lineJoin='round';
+ bd={cv,ctx,w,h,color:'#2B3A55',eraser:false,drawing:false,dirty:false,undo:[]};
+ cv.addEventListener('pointerdown',bdDown);
+ cv.addEventListener('pointermove',bdMove);
+ window.addEventListener('pointerup',bdUp);
+ document.querySelectorAll('.bd-pen').forEach(b=>b.onclick=()=>{
+  bd.color=b.dataset.c;bd.eraser=false;bdMark(b);});
+ $('#bd-eraser').onclick=()=>{bd.eraser=true;bdMark($('#bd-eraser'));};}
+function bdMark(btn){document.querySelectorAll('.bd-pen,.bd-tl').forEach(b=>b.classList.remove('on'));btn.classList.add('on');}
+function bdPos(e){const r=bd.cv.getBoundingClientRect();return[e.clientX-r.left,e.clientY-r.top];}
+function bdDown(e){e.preventDefault();
+ if(bd.cv.setPointerCapture)try{bd.cv.setPointerCapture(e.pointerId);}catch(_){ }
+ bdSnap();bd.drawing=true;bd.dirty=true;
+ const[x,y]=bdPos(e);bd.ctx.beginPath();bd.ctx.moveTo(x,y);bdStroke(x+0.1,y+0.1);}
+function bdMove(e){if(!bd.drawing)return;e.preventDefault();const[x,y]=bdPos(e);bdStroke(x,y);}
+function bdStroke(x,y){const c=bd.ctx;
+ c.strokeStyle=bd.eraser?'#fff':bd.color;c.lineWidth=bd.eraser?26:3;
+ c.lineTo(x,y);c.stroke();}
+function bdUp(){if(bd)bd.drawing=false;}
+function bdSnap(){if(!bd.cv)return;bd.undo.push(bd.cv.toDataURL());if(bd.undo.length>10)bd.undo.shift();}
+function bdUndo(){const d=bd.undo.pop();if(!d)return;
+ const img=new Image();img.onload=()=>{bd.ctx.drawImage(img,0,0,bd.w,bd.h);};img.src=d;}
+function bdClear(){bdSnap();bd.ctx.fillStyle='#fff';bd.ctx.fillRect(0,0,bd.w,bd.h);}
+async function saveBoard(){if(!bd.cv)return;
+ const d=bd.cv.toDataURL('image/jpeg',.7);
+ const id='m'+Date.now();
+ try{await putPhoto(id,d);}catch(e){alert('ほぞんできなかった…もういちど ためしてね');return;}
+ if(S.activeSession){(S.activeSession.boards=S.activeSession.boards||[]).push(id);save();}
+ bd.dirty=false;
+ window.removeEventListener('pointerup',bdUp);
+ closeModal();render();}
+function closeBoard(){
+ if(bd.dirty){if(!confirm('ほぞんしていないメモは きえちゃうよ。とじる?'))return;}
+ window.removeEventListener('pointerup',bdUp);
+ closeModal();}
+
+/* ---------- スロット(承認後にまとめて回せる) ----------
+   確率(通常):  3% 券ジャックポット / 9% 👑+100pt / 25% ⭐+50pt / 63% 🍀+10〜30pt
+   確率(ゴールデン): 8% / 20% / 35% / 37%
+   ポイントには時間係数がかかる: 15分未満×0.3 / 15〜44分×1.0 / 45分以上×1.5
+   券ジャックポットは「その日の合計25分以上」のセッションだけ抽選対象 */
+const EMO=['🍀','⭐','🥟','🐟','🌸','🍃','👑'];
+let slotQueue=[];let goldenM=0;
+function openSlots(){const p=P();
+ slotQueue=spinQueue(p).map(s=>s.id);
+ if(!slotQueue.length)return;
+ goldenM=goldenAvailable(p);
+ showSlotModal();}
+function showSlotModal(){const golden=goldenM>0;
+ openModal('<div class="slot-box"'+(golden?' style="background:linear-gradient(180deg,#6E4E00,#2E2300);outline:3px solid var(--gold)"':'')+'>'+
+ '<div class="slot-title">'+(golden?'🔥 ゴールデンスロット 🔥':'🎰 がんばりスロット 🎰')+'</div>'+
+ (golden?'<div style="font-size:12px;color:#FFE9A8;margin-top:2px">れんぞく'+goldenM+'日たっせいのごほうび!大当たりしやすいよ✨</div>':'')+
+ '<div class="reels"><div class="reel" id="r0">❔</div><div class="reel" id="r1">❔</div><div class="reel" id="r2">❔</div></div>'+
+ '<div class="slot-result" id="slot-res"></div>'+
+ '<button class="btn" id="spin-btn" style="margin-top:10px">まわす!(あと'+slotQueue.length+'回)</button></div>',false);
+ $('#spin-btn').onclick=spinNext;}
+function spinNext(){const p=P();const id=slotQueue[0];
+ const s=p.sessions.find(x=>x.id===id);
+ if(!s){closeModal();render();return;}
+ const golden=goldenM>0;
+ const c=coefFor(s.minutes||0);
+ const btn=$('#spin-btn');btn.disabled=true;
+ const reels=[$('#r0'),$('#r1'),$('#r2')];
+ reels.forEach(r=>r.classList.add('spin'));
+ const spinI=setInterval(()=>reels.forEach(r=>{r.textContent=EMO[Math.floor(Math.random()*EMO.length)];}),80);
+ const roll=Math.random();
+ const dayOk=dayTotal(p,s.endTs||s.startTs)>=25;
+ const pT=golden?.08:.03, pG=golden?.20:.09, pM=golden?.35:.25;
+ let res;
+ if(roll<pT&&p.pool.length&&dayOk){const t=p.pool[Math.floor(Math.random()*p.pool.length)];
+  res={pts:0,ticket:t.name,face:['🎟️','🎟️','🎟️'],msg:'🌈けんジャックポット!!「'+t.name+'」をタダでゲット!!',big:true};}
+ else if(roll<pT+pG){res={pts:Math.max(1,Math.round(100*c)),face:['👑','👑','👑'],big:true};}
+ else if(roll<pT+pG+pM){res={pts:Math.max(1,Math.round(50*c)),face:['⭐','⭐','⭐']};}
+ else{const v=10+Math.floor(Math.random()*3)*10;
+  res={pts:Math.max(1,Math.round(v*c)),face:['🍀','⭐','🌸'].sort(()=>Math.random()-.5)};}
+ if(!res.msg)res.msg=(res.big?'✨大当たり!! ':'')+'+'+res.pts+'ポイント!'+(c!==1?'(べんきょう時間ボーナス ×'+c+')':'');
+ setTimeout(()=>{clearInterval(spinI);
+  reels.forEach((r,i)=>{r.classList.remove('spin');r.textContent=res.face[i];});
+  $('#slot-res').textContent=res.msg;
+  p.points+=res.pts;
+  if(res.ticket)p.tickets.push(res.ticket);
+  s.spin=(golden?'🔥':'')+res.msg;
+  if(golden){p.lastGoldenMilestone=goldenM;goldenM=0;}
+  slotQueue.shift();save();
+  if(res.big)confetti();
+  btn.disabled=false;
+  if(slotQueue.length){btn.textContent='つぎのスロットへ(あと'+slotQueue.length+'回)🎰';btn.onclick=showSlotModal;}
+  else{btn.textContent='とじる';btn.onclick=()=>{closeModal();render();};}
+ },1600);}
+function confetti(){const em=['🎉','⭐','🌸','✨','🥟','🐟'];
+ for(let i=0;i<28;i++){const s=document.createElement('span');s.className='confetti';
+  s.textContent=em[i%em.length];s.style.left=(Math.random()*100)+'vw';
+  s.style.animationDelay=(Math.random()*.6)+'s';document.body.appendChild(s);
+  setTimeout(()=>s.remove(),3200);}}
+/* ---------- きろく ---------- */
+function recHTML(){const p=P();const m=minutesByDay(p);
+ const cells=[];const today=new Date();today.setHours(0,0,0,0);
+ const end=new Date(today);end.setDate(end.getDate()+(6-end.getDay()));
+ const start=new Date(end);start.setDate(start.getDate()-7*15+1);
+ for(let d=new Date(start);d<=end;d.setDate(d.getDate()+1)){
+  const k=dayKey(d.getTime());const v=m[k]||0;const fut=d>today;
+  const cls=fut||v===0?'g0':v<20?'g1':v<45?'g2':'g3';
+  cells.push('<i class="'+cls+'" title="'+k+' '+v+'分"'+(fut?' style="opacity:.35"':'')+'></i>');}
+ const streak=calcStreak(p);
+ const total=p.sessions.filter(s=>s.status!=='rejected').reduce((a,s)=>a+(s.minutes||0),0);
+ return '<div class="card"><h2>🌱 しゅうかんの草はら</h2>'+
+ '<div class="grass">'+cells.join('')+'</div>'+
+ '<div class="muted" style="margin-top:8px">🔥れんぞく '+streak+'日 ／ るいけい '+total+'分。まい日ちょっとずつで草がそだつよ!</div></div>'+
+ '<div class="card"><h2>📖 しゅつげき きろく</h2>'+
+ (p.sessions.length?p.sessions.slice(0,30).map(sessRow).join(''):
+  '<div class="muted">まだ きろくがないよ。きょう、さいしょの1回をやってみよう!</div>')+'</div>';}
+function sessRow(s){const b=S.bases.find(x=>x.id===s.base)||{em:"📍",name:"(まえの基地)"};
+ const badge=s.status==='approved'?(s.spin?'<span class="badge b-ok">承認ずみ✓</span>':'<span class="badge b-ok">承認ずみ✓ 🎰まわせる!</span>'):
+  s.status==='rejected'?'<span class="badge b-ng">やりなおし</span>':
+  '<span class="badge b-pend">パパの承認まち</span>';
+ return '<div class="sess"><span class="em">'+b.em+'</span><div class="info">'+
+ '<b>'+fmtDate(s.startTs)+' '+b.name+' '+s.minutes+'分</b><br>'+
+ esc((s.subjects||[]).join('・'))+' '+esc(s.memo||'')+'<br>'+badge+
+ ' <span class="muted">'+esc(s.spin||'')+'</span></div>'+
+ (s.photoId?'<img class="thumb" data-photo="'+s.photoId+'" onclick="viewPhotoInline(\''+s.photoId+'\')" alt="写真">':'')+
+ (s.boards||[]).map(b=>'<img class="thumb" data-photo="'+b+'" onclick="viewPhotoInline(\''+b+'\')" alt="メモ">').join('')+
+ '</div>';}
+async function loadThumbs(){
+ for(const img of document.querySelectorAll('img[data-photo]')){
+  const d=await getPhoto(img.dataset.photo);if(d)img.src=d;}}
+
+/* ---------- もくひょう ---------- */
+function goalHTML(){const p=P();
+ return p.bigGoals.map(g=>'<div class="goal-card"><div class="tt">🏆 '+esc(g.title)+'</div>'+
+  '<div class="rw">'+esc(g.reward)+'</div></div>').join('')+
+ '<div class="card"><h2>📈 模試(もし)のせいせき</h2>'+
+ (p.examTarget.value?'<div class="muted">🎯 目標:'+esc(p.examTarget.value)+'('+esc(p.examTarget.label)+')'+nearGoal(p)+'</div>':
+  '<div class="muted">目標はパパ・ママモードで設定できるよ</div>')+
+ '<div class="chart-wrap" style="margin-top:8px">'+examChart(p)+'</div>'+
+ p.exams.slice().reverse().map(e=>'<div class="sess"><span class="em">📝</span><div class="info">'+
+  '<b>'+esc(e.date)+' '+esc(e.name)+'</b><br>スコア:'+esc(e.score)+' '+esc(e.memo||'')+'</div></div>').join('')+
+ '<button class="btn blue sm" style="margin-top:10px" onclick="addExamForm()">＋ 模試のけっかを記録</button></div>';}
+function nearGoal(p){const tgt=Number(p.examTarget.value);
+ if(!p.exams.length||!tgt)return '';
+ const last=Number(p.exams[p.exams.length-1].score)||0;const diff=tgt-last;
+ return diff<=0?' → 達成中!!🎉':' → あと <b>'+diff+'</b> !';}
+function examChart(p){const ex=p.exams;
+ if(!ex.length)return '<div class="muted">模試のけっかを入れると グラフになるよ</div>';
+ const W=Math.max(320,ex.length*64),H=170,pad=30;
+ const vals=ex.map(e=>Number(e.score)||0);const tgt=Number(p.examTarget.value)||null;
+ let min=Math.min.apply(null,vals),max=Math.max.apply(null,vals);
+ if(tgt!==null&&tgt>0){min=Math.min(min,tgt);max=Math.max(max,tgt);}
+ if(min===max){min-=5;max+=5;}
+ const padV=(max-min)*.18;min-=padV;max+=padV;
+ const x=i=>pad+i*((W-pad*2)/Math.max(1,ex.length-1));
+ const y=v=>H-pad-((v-min)/(max-min))*(H-pad*2);
+ let svg='<svg width="'+W+'" height="'+H+'">';
+ if(tgt!==null&&tgt>0){svg+='<line x1="'+pad+'" y1="'+y(tgt)+'" x2="'+(W-pad)+'" y2="'+y(tgt)+'" stroke="#FFC53D" stroke-width="2" stroke-dasharray="6 4"/>'+
+  '<text x="'+(W-pad)+'" y="'+(y(tgt)-6)+'" text-anchor="end" font-size="10" fill="#B07800">目標 '+tgt+'</text>';}
+ svg+='<polyline points="'+vals.map((v,i)=>x(i)+','+y(v)).join(' ')+'" fill="none" stroke="#3E8FD8" stroke-width="3" stroke-linejoin="round"/>';
+ vals.forEach((v,i)=>{svg+='<circle cx="'+x(i)+'" cy="'+y(v)+'" r="5" fill="#fff" stroke="#3E8FD8" stroke-width="3"/>'+
+  '<text x="'+x(i)+'" y="'+(y(v)-10)+'" text-anchor="middle" font-size="11" font-weight="700" fill="#2B3A55">'+v+'</text>';});
+ return svg+'</svg>';}
+function addExamForm(){openModal('<h3>📝 模試のけっか</h3>'+
+ '<label>模試のなまえ</label><input id="ex-name" placeholder="例:合不合判定テスト">'+
+ '<label>日づけ</label><input id="ex-date" type="date">'+
+ '<label>スコア(点数 or 偏差値)</label><input id="ex-score" type="number" inputmode="decimal">'+
+ '<label>メモ</label><input id="ex-memo" placeholder="算数がのびた!など">'+
+ '<button class="btn" style="margin-top:14px" onclick="addExam()">きろくする</button>');}
+function addExam(){const sc=$('#ex-score').value;
+ if(!sc){alert('スコアをいれてね');return;}
+ P().exams.push({name:$('#ex-name').value.trim()||'模試',date:$('#ex-date').value||todayKey(),
+  score:Number(sc),memo:$('#ex-memo').value.trim()});
+ save();closeModal();render();}
+
+/* ---------- AI相棒 ---------- */
+function chatLogHTML(msgs,aiName){let out='';let lastDay='';
+ msgs.forEach(m=>{
+  if(m.ts){const k=fmtDate(m.ts);
+   if(k!==lastDay){out+='<div class="day-sep"><span>'+k+'</span></div>';lastDay=k;}}
+  out+='<div class="msg '+(m.r==='user'?'me':'ai')+'">'+
+   (m.r==='model'?'<div class="who">'+esc(aiName)+'</div>':'')+
+   (m.img?'<img src="'+m.img+'" class="chat-photo">':'')+esc(m.t)+'</div>';});
+ return out;}
+function aiHTML(){const p=P();const hasKey=!!S.gemini.key;
+ const hello='<div class="msg ai"><div class="who">'+esc(p.aiName)+'</div>こんにちは、'+esc(p.name)+
+  'さん!わからない問題があったら、まず「どこまで考えたか」もいっしょに おしえてね。いっしょに考えよう💪</div>';
+ const arch=p.chatArchive||[];
+ return '<div class="card"><h2>🤖 AI相棒「'+esc(p.aiName)+'」</h2>'+
+ (hasKey?'':'<div class="muted" style="background:#FFF3D1;padding:10px;border-radius:12px;margin-bottom:8px">まだ ねむっています…。パパに「せってい → パパ・ママモード」でカギ(APIキー)を入れてもらってね🔑</div>')+
+ '<div class="chat-log" id="chat-log">'+
+ (p.chat.length?chatLogHTML(p.chat,p.aiName):hello)+
+ '</div><div class="typing" id="typing"></div>'+
+ '<div class="chat-quick">'+QUICKS.map(q=>'<button class="qchip" onclick="quickAsk(\''+q.id+'\')">'+q.label+'</button>').join('')+'</div>'+
+ '<div id="chat-photo-prev"></div>'+
+ '<div class="chat-input">'+
+  '<textarea id="chat-in" placeholder="例:この算数、線分図までかいたけど次がわからない…"></textarea>'+
+  '<button class="attach-btn" onclick="document.getElementById(\'chat-cam\').click()" title="カメラでとる">📷</button>'+
+  '<button class="attach-btn" onclick="document.getElementById(\'chat-file\').click()" title="写真をえらぶ">🖼️</button>'+
+  (voiceSupported()?'<button class="attach-btn" id="mic-btn" onclick="toggleVoice()" title="こえで入力">🎤</button>':'')+
+  '<button class="send-btn" onclick="sendChat()">おくる ✉️</button></div>'+
+ '<input type="file" id="chat-cam" accept="image/*" capture="environment" style="display:none" onchange="onChatPhoto(this)">'+
+ '<input type="file" id="chat-file" accept="image/*" style="display:none" onchange="onChatPhoto(this)">'+
+ '<div class="muted" style="margin-top:6px">📷テキストの写真をつけて、上のボタンで「ヒント」や「解説」を えらべるよ'+
+ (voiceSupported()?'。🎤をおすと こえで入力できるよ(もういちどおすと ストップ)':'')+'</div>'+
+ '<div class="row" style="margin-top:8px">'+
+  '<button class="btn ghost sm" onclick="newChat()">🗂 新しい会話をはじめる</button>'+
+  '<button class="btn ghost sm" onclick="openArchive()">📚 まえの会話'+(arch.length?'('+arch.length+')':'')+'</button></div></div>';}
+function newChat(){const p=P();
+ if(!p.chat.length){alert('まだ会話がないよ');return;}
+ if(confirm('いまの会話を「まえの会話」にしまって、新しい会話をはじめる?')){
+  (p.chatArchive=p.chatArchive||[]).push({ts:Date.now(),msgs:p.chat});
+  p.chat=[];save();render();}}
+function openArchive(){const p=P();const arch=p.chatArchive||[];
+ if(!arch.length){openModal('<h3>📚 まえの会話</h3><div class="muted">アーカイブはまだないよ。「新しい会話をはじめる」をおすと、それまでの会話がここにたまっていくよ。</div>');return;}
+ openModal('<h3>📚 まえの会話</h3>'+
+ arch.map((a,i)=>{const first=a.msgs.find(m=>m.r==='user');
+  return '<div class="sess" style="cursor:pointer" onclick="viewArchive('+i+')"><span class="em">💬</span>'+
+  '<div class="info"><b>'+fmtDate(a.ts)+'</b>('+a.msgs.length+'メッセージ)<br>'+
+  '<span class="muted">'+esc((first?first.t:'').slice(0,28))+'…</span></div>'+
+  '<button class="btn ghost sm" style="width:52px;flex:0 0 auto;color:#B04040" onclick="event.stopPropagation();delArchive('+i+')">けす</button></div>';
+ }).reverse().join(''));}
+function viewArchive(i){const p=P();const a=(p.chatArchive||[])[i];if(!a)return;
+ openModal('<h3>💬 '+fmtDate(a.ts)+' の会話</h3>'+
+ '<div class="chat-log" style="max-height:60vh">'+chatLogHTML(a.msgs,p.aiName)+'</div>'+
+ '<button class="btn ghost sm" style="margin-top:10px" onclick="openArchive()">← いちらんに もどる</button>');}
+function delArchive(i){const p=P();
+ if(confirm('この会話をけす?(もどせないよ)')){p.chatArchive.splice(i,1);save();openArchive();}}
+/* --- 音声入力 (Web Speech API / 対応ブラウザのみ) --- */
+let recog=null,recOn=false;
+function voiceSupported(){return ('SpeechRecognition' in window)||('webkitSpeechRecognition' in window);}
+function toggleVoice(){const ta=$('#chat-in');const btn=$('#mic-btn');
+ if(!ta||!btn)return;
+ if(recOn){try{recog.stop();}catch(e){}return;}
+ const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+ try{recog=new SR();}catch(e){alert('この端末では音声入力がつかえないみたい…');return;}
+ recog.lang='ja-JP';recog.interimResults=true;recog.continuous=true;
+ const base=ta.value?ta.value+' ':'';
+ recog.onresult=e=>{let t='';
+  for(let i=0;i<e.results.length;i++)t+=e.results[i][0].transcript;
+  ta.value=base+t;};
+ recog.onend=()=>{recOn=false;
+  const b=$('#mic-btn');if(b){b.textContent='🎤';b.classList.remove('rec');}};
+ recog.onerror=()=>{};
+ try{recog.start();recOn=true;btn.textContent='⏹';btn.classList.add('rec');}
+ catch(e){alert('マイクがつかえないみたい。ブラウザのマイクきょかを見てね');}}
+function scrollChat(){const l=$('#chat-log');if(l)l.scrollTop=l.scrollHeight;}
+function sysPrompt(p){return 'あなたは小学生の勉強パートナー「'+p.aiName+'」です。相手は'+p.name+'さん('+p.grade+')。中学受験や学校の勉強に向けた自習を手伝います。\n'+
+ 'ルール:\n'+
+ '1. 答えをすぐに教えない。ヒントと問いかけで本人に考えさせる(ソクラテス式)。\n'+
+ '2. 1回の返事は3〜5文で短く、小学生にわかる言葉とやさしい漢字で。\n'+
+ '3. 良い質問・良い考え方をしたら「いい質問!」「その考え方すごい!」と具体的にほめて、なぜ良い質問なのかも一言そえる。\n'+
+ '4. まちがいを責めない。考え方のどこが惜しいかを示す。\n'+
+ '5. 本人が2回以上しっかり考えたやりとりの後なら、答えと解説を教えてよい。\n'+
+ '6. 勉強と関係ない雑談は少しなら付き合ってよいが、危険・不適切な話題はやさしく勉強にもどす。\n'+
+ '7. 写真がおくられたら、それは問題やノートの画像です。まず何の問題かを短く確かめてから、上のルールにそってヒントや解説をする。\n'+
+ '8. 絵文字はときどき少しだけ使う。';}
+async function sendChat(forceText){const p=P();const ta=$('#chat-in');
+ const t=(forceText!=null?forceText:(ta?ta.value.trim():''));
+ const img=chatPhotoData;
+ if(!t&&!img)return;
+ if(!S.gemini.key){alert('パパ・ママモードでAPIキーを設定してもらってね');return;}
+ p.chat.push({r:'user',t:t||'（この写真を見てね）',img:img||null,ts:Date.now()});
+ chatPhotoData=null;save();render();scrollChat();
+ const ty=$('#typing');if(ty)ty.textContent=p.aiName+' がかんがえ中…';
+ try{
+  const hist=p.chat.slice(-20).map(m=>{const parts=[{text:m.t}];
+   if(m.img){parts.push({inline_data:{mime_type:'image/jpeg',data:m.img.split(',')[1]}});}
+   return {role:m.r,parts};});
+  const res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+
+   encodeURIComponent(S.gemini.model)+':generateContent?key='+encodeURIComponent(S.gemini.key),{
+   method:'POST',headers:{'Content-Type':'application/json'},
+   body:JSON.stringify({systemInstruction:{parts:[{text:sysPrompt(p)}]},contents:hist,
+    generationConfig:{maxOutputTokens:600,temperature:.7}})});
+  const data=await res.json();
+  let txt;
+  if(data.error){txt='エラーみたい:'+(data.error.message||'')+'\nパパにカギ(APIキー)やモデル名を見てもらってね。';}
+  else{txt=(data.candidates&&data.candidates[0]&&data.candidates[0].content&&data.candidates[0].content.parts||[])
+   .map(x=>x.text||'').join('')||'(うまく へんじできなかった…もういちど ためしてね)';}
+  p.chat.push({r:'model',t:txt,ts:Date.now()});
+ }catch(e){p.chat.push({r:'model',t:'つうしんエラーだよ。でんぱのあるところで もういちど ためしてね📡',ts:Date.now()});}
+ save();render();scrollChat();}
+function quickAsk(id){const q=QUICKS.find(x=>x.id===id);if(!q)return;sendChat(q.text);}
+function onChatPhoto(inp){const f=inp.files&&inp.files[0];if(!f)return;
+ compressImage(f).then(d=>{chatPhotoData=d;
+  const el=$('#chat-photo-prev');
+  if(el)el.innerHTML='<div class="photo-chip"><img src="'+d+'"><span>写真をつけたよ!ボタンかメッセージでおくってね</span><button onclick="clearChatPhoto()">✕</button></div>';});
+ inp.value='';}
+function clearChatPhoto(){chatPhotoData=null;const el=$('#chat-photo-prev');if(el)el.innerHTML='';}
+
+/* ---------- せってい ---------- */
+function setHTML(){const p=P();
+ const pend=p.sessions.filter(s=>s.status==='pending').length;
+ return '<div class="card"><h2>🤖 AI相棒のなまえ</h2>'+
+ '<input id="ai-name" value="'+esc(p.aiName)+'">'+
+ '<button class="btn blue sm" style="margin-top:8px" onclick="saveAiName()">きめた!</button></div>'+
+ '<div class="card"><h2>👥 メンバー</h2>'+
+ '<div class="muted">アイコン(絵文字)・なまえ・学年をかえられるよ</div>'+
+ Object.entries(S.profiles).map(([id,pr])=>'<div class="row" style="margin-top:6px">'+
+  '<input data-pf-em="'+id+'" value="'+esc(pr.em)+'" maxlength="4" style="flex:0 0 56px;text-align:center;font-size:20px">'+
+  '<input data-pf-nm="'+id+'" value="'+esc(pr.name)+'">'+
+  '<input data-pf-gr="'+id+'" value="'+esc(pr.grade)+'" style="flex:0 0 64px">'+
+  (Object.keys(S.profiles).length>1?'<button class="btn ghost sm" style="flex:0 0 44px;color:#B04040" onclick="delProfile(\''+id+'\')">✕</button>':'')+
+ '</div>').join('')+
+ '<div class="row" style="margin-top:8px"><button class="btn blue sm" onclick="saveProfiles()">保存する</button>'+
+ '<button class="btn ghost sm" onclick="addProfile()">＋ メンバーついか</button></div></div>'+
+ '<div class="card"><h2>🗺️ きち(基地)の編集</h2>'+
+ '<div class="muted">アイコンとなまえをかえられるよ。けしても、まえのきろくは のこるよ</div>'+
+ S.bases.map((b,i)=>'<div class="row" style="margin-top:6px">'+
+  '<input data-bs-em="'+i+'" value="'+esc(b.em)+'" maxlength="4" style="flex:0 0 56px;text-align:center;font-size:20px">'+
+  '<input data-bs-nm="'+i+'" value="'+esc(b.name)+'">'+
+  (S.bases.length>1?'<button class="btn ghost sm" style="flex:0 0 44px;color:#B04040" onclick="delBase('+i+')">✕</button>':'')+
+ '</div>').join('')+
+ '<div class="row" style="margin-top:8px"><button class="btn blue sm" onclick="saveBases()">保存する</button>'+
+ '<button class="btn ghost sm" onclick="addBase()">＋ きちついか</button></div></div>'+
+ '<div class="card"><h2>👨 パパ・ママモード'+(pend?' <span class="badge b-pend">承認まち '+pend+'</span>':'')+'</h2>'+
+ '<div class="muted">承認・ごほうび券・APIキー・目標の設定はこちら</div>'+
+ '<button class="btn sm" style="margin-top:10px" onclick="parentGate()">🔐 ひらく</button></div>'+
+ '<div class="card"><h2>📱 アプリとしてつかう</h2>'+
+ '<div class="muted">ホーム画面についかすると、アプリみたいに全画面でつかえるよ。<br>'+
+ '・Android(Chrome):右上の⋮メニュー →「ホーム画面に追加」<br>'+
+ '・iPhone(Safari):共有ボタン →「ホーム画面に追加」</div>'+
+ (window.deferredPrompt?'<button class="btn sm" style="margin-top:10px" onclick="installApp()">📲 インストールする</button>':'')+'</div>'+
+ '<div class="card"><h2>💾 データ</h2>'+
+ '<div class="muted">データはこの端末の中にだけ保存されます。ときどきバックアップしてね(写真・メモボードはふくまれません)。</div>'+
+ '<button class="btn ghost sm" style="margin-top:10px" onclick="exportData()">バックアップを保存(JSON)</button>'+
+ '<div class="muted" style="margin-top:8px;text-align:right">スタディきち v6</div></div>';}
+function saveAiName(){P().aiName=$('#ai-name').value.trim()||'そらとも';save();render();}
+/* --- メンバー編集 --- */
+function saveProfiles(){
+ document.querySelectorAll('[data-pf-em]').forEach(i=>{const pr=S.profiles[i.dataset.pfEm];if(pr&&i.value.trim())pr.em=i.value.trim();});
+ document.querySelectorAll('[data-pf-nm]').forEach(i=>{const pr=S.profiles[i.dataset.pfNm];if(pr&&i.value.trim())pr.name=i.value.trim();});
+ document.querySelectorAll('[data-pf-gr]').forEach(i=>{const pr=S.profiles[i.dataset.pfGr];if(pr)pr.grade=i.value.trim();});
+ save();render();}
+function addProfile(){const id='p'+Date.now();
+ S.profiles[id]=mkProfile('あたらしい人','🙂','小1');save();render();}
+function delProfile(id){const pr=S.profiles[id];if(!pr)return;
+ if(Object.keys(S.profiles).length<=1)return;
+ if(!confirm('「'+pr.name+'」をけす?きろく・ポイント・券もぜんぶ消えて、もどせないよ!'))return;
+ if(!confirm('ほんとうに いい?(さいごの確認)'))return;
+ delete S.profiles[id];
+ if(S.currentProfile===id)S.currentProfile=Object.keys(S.profiles)[0];
+ save();render();}
+/* --- きち編集 --- */
+function saveBases(){
+ document.querySelectorAll('[data-bs-em]').forEach(i=>{const b=S.bases[Number(i.dataset.bsEm)];if(b&&i.value.trim())b.em=i.value.trim();});
+ document.querySelectorAll('[data-bs-nm]').forEach(i=>{const b=S.bases[Number(i.dataset.bsNm)];if(b&&i.value.trim())b.name=i.value.trim();});
+ save();render();}
+function addBase(){S.bases.push({id:'b'+Date.now(),name:'あたらしい基地',em:'📍'});save();render();}
+function delBase(i){const b=S.bases[i];if(!b||S.bases.length<=1)return;
+ if(!confirm('「'+b.name+'」をけす?(まえのきろくは のこるよ)'))return;
+ S.bases.splice(i,1);save();render();}
+function installApp(){if(!window.deferredPrompt)return;
+ window.deferredPrompt.prompt();window.deferredPrompt=null;render();}
+
+/* ---------- パパ・ママモード ---------- */
+function parentGate(){
+ if(!S.parentPin){openModal('<h3>はじめまして、保護者さま</h3>'+
+  '<div class="muted">4けたの暗証番号(PIN)を決めてください。承認やごほうび管理に使います。※簡易ロックです。</div>'+
+  '<label>PIN(4けたの数字)</label><input id="pin-new" type="password" inputmode="numeric" maxlength="4">'+
+  '<button class="btn" style="margin-top:12px" onclick="setPin()">決定</button>');return;}
+ openModal('<h3>🔐 パパ・ママモード</h3><label>PIN</label>'+
+ '<input id="pin-in" type="password" inputmode="numeric" maxlength="4">'+
+ '<button class="btn" style="margin-top:12px" onclick="checkPin()">ひらく</button>');}
+function setPin(){const v=$('#pin-new').value;
+ if(!/^\d{4}$/.test(v)){alert('4けたの数字で!');return;}
+ S.parentPin=v;save();closeModal();openParent();}
+function checkPin(){if($('#pin-in').value===S.parentPin){closeModal();openParent();}else alert('ちがうみたい…');}
+function openParent(){const p=P();const pend=p.sessions.filter(s=>s.status==='pending');
+ openModal('<h3>👨 パパ・ママモード('+esc(p.name)+')</h3>'+
+ '<h2 style="margin-top:6px">✅ 承認まちのセッション('+pend.length+')</h2>'+
+ '<div class="muted">写真やメモを見て「がんばったね承認」を。承認すると、お子さんが次にアプリをひらいたときにスロットが回せるようになります(なるべく1〜2日以内の承認がおすすめ)。</div>'+
+ '<div id="pend-list">'+(pend.length?pend.map(parentSessRow).join(''):'<div class="muted">承認まちはありません</div>')+'</div>'+
+ '<h2 style="margin-top:16px">🎟️ ごほうび券とポイント価格</h2>'+
+ '<div class="muted">価格は「⭐こうかんじょ」の値段になります。スロットの券ジャックポット(3%)では無料で当たります(当たっても一覧からは消えません)。</div>'+
+ '<div style="margin-top:6px">'+p.pool.map((t,i)=>'<div class="ticket-item">'+
+  '<input data-pool-n="'+i+'" value="'+esc(t.name)+'" style="flex:1;min-width:0">'+
+  '<input data-pool-p="'+i+'" type="number" value="'+esc(t.price)+'" style="flex:0 0 74px">'+
+  '<button onclick="delPool('+i+')">削除</button></div>').join('')+'</div>'+
+ '<div class="row" style="margin-top:8px"><input id="pool-new" placeholder="例:回転ずし券 🍣">'+
+ '<input id="pool-price" type="number" placeholder="pt" style="flex:0 0 74px">'+
+ '<button class="btn blue sm" style="flex:0 0 70px" onclick="addPool()">追加</button></div>'+
+ '<h2 style="margin-top:16px">🎯 模試の目標</h2>'+
+ '<div class="row"><input id="tgt-label" placeholder="例:○○模試 偏差値" value="'+esc(p.examTarget.label)+'">'+
+ '<input id="tgt-value" type="number" placeholder="60" value="'+esc(p.examTarget.value)+'" style="flex:0 0 90px"></div>'+
+ '<h2 style="margin-top:16px">🏆 大きなごほうび</h2>'+
+ p.bigGoals.map((g,i)=>'<div class="row" style="margin-bottom:6px">'+
+  '<input data-bg-t="'+i+'" value="'+esc(g.title)+'"><input data-bg-r="'+i+'" value="'+esc(g.reward)+'"></div>').join('')+
+ '<h2 style="margin-top:16px">🔑 Gemini APIキー</h2>'+
+ '<div class="muted">キーはこの端末のブラウザ内にだけ保存され、Googleとの通信にのみ使われます。コードには書かれません。</div>'+
+ '<button class="btn ghost sm" style="margin-top:6px" onclick="keyGuide()">📖 キーのかんたん取得ガイド(無料・約5分)</button>'+
+ '<input id="gm-key" type="password" placeholder="AIza..." value="'+esc(S.gemini.key)+'" style="margin-top:6px">'+
+ '<label>モデル</label><input id="gm-model" value="'+esc(S.gemini.model)+'">'+
+ '<h2 style="margin-top:16px">🔐 暗証番号(PIN)の変更</h2>'+
+ '<div class="row"><input id="pin-chg" type="password" inputmode="numeric" maxlength="4" placeholder="新しい4けたの数字">'+
+ '<button class="btn blue sm" style="flex:0 0 90px" onclick="changePin()">変更</button></div>'+
+ '<h2 style="margin-top:16px">💾 バックアップから復元</h2>'+
+ '<input type="file" accept=".json" onchange="importData(this)">'+
+ '<button class="btn" style="margin-top:18px" onclick="saveParent()">まとめて保存</button>');
+ loadThumbs();}
+function parentSessRow(s){const b=S.bases.find(x=>x.id===s.base)||{em:"📍",name:"(まえの基地)"};
+ return '<div class="sess" id="ps-'+s.id+'"><span class="em">'+b.em+'</span>'+
+ '<div class="info"><b>'+fmtDate(s.startTs)+' '+b.name+' '+s.minutes+'分</b><br>'+
+ esc((s.subjects||[]).join('・'))+' '+esc(s.memo||'')+'</div>'+
+ (s.photoId?'<img class="thumb" data-photo="'+s.photoId+'" onclick="viewPhotoInline(\''+s.photoId+'\')">':'')+
+ (s.boards||[]).map(b=>'<img class="thumb" data-photo="'+b+'" onclick="viewPhotoInline(\''+b+'\')" alt="メモ">').join('')+
+ '<button class="btn blue sm" style="width:56px;flex:0 0 auto" onclick="judge(\''+s.id+'\',\'approved\')">承認</button>'+
+ '<button class="btn ghost sm" style="width:60px;flex:0 0 auto;color:#B04040" onclick="judge(\''+s.id+'\',\'rejected\')">却下</button></div>';}
+function judge(id,st){const s=P().sessions.find(x=>x.id===id);if(!s)return;
+ s.status=st;save();
+ const row=$('#ps-'+id);if(row)row.remove();}
+function addPool(){const v=$('#pool-new').value.trim();if(!v)return;
+ const pr=Math.max(0,Number($('#pool-price').value)||500);
+ P().pool.push({name:v,price:pr});save();openParent();}
+function delPool(i){P().pool.splice(i,1);save();openParent();}
+function changePin(){const v=$('#pin-chg').value;
+ if(!/^\d{4}$/.test(v)){alert('4けたの数字で!');return;}
+ S.parentPin=v;save();$('#pin-chg').value='';alert('PINを変更しました🔐');}
+/* --- APIキー取得ガイド --- */
+function keyGuide(){openModal('<h3>🔑 AI相棒のカギ(APIキー)のもらいかた</h3>'+
+ '<div class="muted" style="margin-bottom:10px">GoogleのAI「Gemini」の無料キーを使います。クレジットカード登録は不要で、個人利用なら無料枠で十分です。保護者の方が操作してください。</div>'+
+ '<div class="sess"><span class="em">1️⃣</span><div class="info">下のボタンから <b>Google AI Studio</b> を開き、お手持ちの<b>Googleアカウント</b>でログインします。</div></div>'+
+ '<div class="sess"><span class="em">2️⃣</span><div class="info">画面の <b>「Get API key(APIキーを取得)」</b> → <b>「Create API key(APIキーを作成)」</b> を押します。</div></div>'+
+ '<div class="sess"><span class="em">3️⃣</span><div class="info"><b>AIza…</b> ではじまる長い文字列が出るので<b>コピー</b>します。</div></div>'+
+ '<div class="sess"><span class="em">4️⃣</span><div class="info">このアプリにもどって、パパ・ママモードの<b>APIキー欄に貼り付け</b>、「まとめて保存」を押せば完了です🎉</div></div>'+
+ '<a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" style="display:block;text-decoration:none;margin-top:12px">'+
+ '<span class="btn blue sm" style="display:block;text-align:center">Google AI Studio をひらく ↗</span></a>'+
+ '<div class="muted" style="margin-top:10px">⚠️ 注意:キーは<b>お子さんには教えず</b>、他の人と共有しないでください。キーはこの端末の中にだけ保存されます。無料枠を超える心配はほぼありませんが、Googleアカウントの管理画面からいつでもキーを削除(無効化)できます。</div>'+
+ '<button class="btn ghost sm" style="margin-top:12px" onclick="closeModal();openParent()">← パパ・ママモードにもどる</button>');}
+function saveParent(){
+ const p=P();
+ 
+ // 入力された値を確実に取得して状態(S)に保存
+ if($('#tgt-label')) p.examTarget.label=$('#tgt-label').value.trim();
+ if($('#tgt-value')) p.examTarget.value=$('#tgt-value').value.trim();
+ 
+ document.querySelectorAll('[data-bg-t]').forEach(inp=>{p.bigGoals[Number(inp.dataset.bgT)].title=inp.value;});
+ document.querySelectorAll('[data-bg-r]').forEach(inp=>{p.bigGoals[Number(inp.dataset.bgR)].reward=inp.value;});
+ 
+ // ごほうび券の名前と価格
+ document.querySelectorAll('[data-pool-n]').forEach(inp=>{const i=Number(inp.dataset.poolN);
+  if(p.pool[i]&&inp.value.trim())p.pool[i].name=inp.value.trim();});
+ document.querySelectorAll('[data-pool-p]').forEach(inp=>{const i=Number(inp.dataset.poolP);
+  if(p.pool[i])p.pool[i].price=Math.max(0,Number(inp.value)||0);});
+ 
+ if($('#gm-key')) S.gemini.key=$('#gm-key').value.trim();
+ if($('#gm-model')) S.gemini.model=$('#gm-model').value.trim()||'gemini-2.5-flash';
+ 
+ save();      // localStorageへ保存
+ closeModal(); // モーダルを閉じる
+ render();     // 画面を再描画
+ alert('保存しました！これでお子様もAI相棒と話せますよ🤖✨');
+}
+/* ---------- バックアップ ---------- */
+function exportData(){const blob=new Blob([JSON.stringify(S,null,1)],{type:'application/json'});
+ const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+ a.download='studykichi-backup.json';a.click();}
+function importData(inp){const f=inp.files&&inp.files[0];if(!f)return;
+ const r=new FileReader();
+ r.onload=()=>{try{const s=JSON.parse(r.result);if(!s.profiles)throw 0;
+  if(confirm('今のデータを上書きして復元しますか?')){
+   S=Object.assign(JSON.parse(JSON.stringify(DEFAULT_STATE)),s);migrate(S);save();closeModal();render();}}
+  catch(e){alert('ファイルが読めませんでした');}};
+ r.readAsText(f);}
+
+/* ---------- PWA ---------- */
+if('serviceWorker' in navigator&&location.protocol==='https:'){
+ window.addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').catch(()=>{});});}
+window.deferredPrompt=null;
+window.addEventListener('beforeinstallprompt',e=>{
+ e.preventDefault();window.deferredPrompt=e;
+ if(S.tab==='set')render();});
+
+/* ---------- 起動 ---------- */
+render();
+
+</script>
+</body>
+</html>
