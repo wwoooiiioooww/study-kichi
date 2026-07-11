@@ -243,7 +243,7 @@ function mkProfile(name,em,grade){return{
 const DEFAULT_STATE={
 v:3, tab:'home', currentProfile:'sora', parentPin:null,
  bases:JSON.parse(JSON.stringify(DEFAULT_BASES)),
- gemini:{key:'',model:'gemini-2.5-flash'}, // ※お使いの有効なモデル名、または 'gemini-1.5-flash' に必要に応じて変更してください
+ gemini:{key:'',model:'gemini-3.5-flash'}, // ※Googleの現行モデル名。エラーになる場合は最新のモデル名に変更してください
  profiles:{ sora:mkProfile('空花','🌸','小5'), fuka:mkProfile('風花','🍃','小3') },
  activeSession:null,
 };
@@ -263,6 +263,7 @@ function migrate(st){
  });
  if(!Array.isArray(st.bases)||!st.bases.length)st.bases=JSON.parse(JSON.stringify(DEFAULT_BASES));
  if(!st.currentProfile||!st.profiles[st.currentProfile])st.currentProfile=Object.keys(st.profiles)[0];
+ if(st.gemini&&(!st.gemini.model||st.gemini.model==='gemini-2.5-flash'))st.gemini.model='gemini-3.5-flash';
  st.v=3;
 }
 function save(){
@@ -340,7 +341,7 @@ function renderHeader(){const p=P();
 function switchProfile(id){S.currentProfile=id;save();render();}
 function renderNav(){$('#nav').innerHTML=NAV.map(([id,i,l])=>
  '<button class="'+(S.tab===id?'on':'')+'" onclick="go(\''+id+'\')"><span class="i">'+i+'</span>'+l+'</button>').join('');}
-function go(t){S.tab=t;save();render();}
+function go(t){if(recOn)try{recog.stop();}catch(e){} S.tab=t;save();render();}
 
 /* ---------- モーダル ---------- */
 function openModal(html,closable=true){
@@ -364,7 +365,8 @@ function homeHTML(){const p=P();const m=minutesByDay(p);
   '<h2>🎰 スロットが まわせるよ!</h2>'+
   '<div class="muted">パパ・ママが「がんばったね」って承認してくれたよ✨ <b>'+q.length+'回</b> まわせる!</div>'+
   (gm?'<div style="font-family:var(--disp);font-weight:800;color:#B07800;font-size:13px;margin-top:4px">🔥れんぞく'+gm+'日たっせい!さいしょの1回は ゴールデンスロット!!</div>':'')+
-  '<button class="btn" style="margin-top:10px" onclick="openSlots()">まわす! 🎰</button></div>';}
+  '<button class="btn" style="margin-top:10px" onclick="openSlots()">まわす! 🎰</button>'+
+  '<div style="text-align:center;margin-top:6px"><span class="muted" style="text-decoration:underline;cursor:pointer" onclick="slotRules()">❓なにが当たるの?</span></div></div>';}
  let tix='';
  if(p.tickets.length){tix='<div class="card"><h2>🎟️ もっている券</h2>'+
   p.tickets.map((t,i)=>'<div class="won-ticket"><span>'+esc(t)+'</span><button onclick="useTicket('+i+')">つかう</button></div>').join('')+
@@ -391,8 +393,18 @@ function homeHTML(){const p=P();const m=minutesByDay(p);
    return '<div class="base" onclick="pickBase(\''+b.id+'\')"><div class="em">'+b.em+'</div>'+
    '<div class="nm">'+b.name+'</div><div class="cnt">しゅつげき '+n+'回</div>'+
    (t?'<div class="ttl">'+b.name.slice(0,5)+'の'+t+'</div>':'')+'</div>';}).join('')+
-  '</div><div class="muted" style="margin-top:10px">💡 まずは「5分だけ」でOK!はじめるのが いちばんえらい!'+teaser+'</div></div>'+
+  '</div><div class="muted" style="margin-top:10px">💡 まずは「5分だけ」でOK!はじめるのが いちばんえらい!'+teaser+
+  '<br><span style="text-decoration:underline;cursor:pointer;color:var(--blue-d)" onclick="slotRules()">❓スロットとポイントのルール</span></div></div>'+
   shop;}
+function slotRules(){openModal('<h3>🎰 スロットのルール</h3>'+
+ '<div class="sess"><span class="em">🎟️</span><div class="info"><b>🎟️🎟️🎟️ 券ジャックポット(超レア🌈)</b><br>こうかんじょの券が1まい<b>タダ</b>でもらえる!その日ぜんぶで<b>25分いじょう</b>勉強した日だけチャンスがあるよ</div></div>'+
+ '<div class="sess"><span class="em">👑</span><div class="info"><b>👑👑👑 大当たり(レア)</b><br>+100ポイント!</div></div>'+
+ '<div class="sess"><span class="em">⭐</span><div class="info"><b>⭐⭐⭐ 当たり(ときどき)</b><br>+50ポイント!</div></div>'+
+ '<div class="sess"><span class="em">🍀</span><div class="info"><b>🍀 ふつう(よくでる)</b><br>+10〜30ポイント</div></div>'+
+ '<div class="sess"><span class="em">⏱️</span><div class="info"><b>じかんボーナス</b><br>1回の勉強が <b>45分いじょう→ポイント1.5倍!</b> ふつう(15〜44分)→そのまま。<b>15分より みじかいと×0.3</b> に へっちゃうよ。じっくりやるのが おトク!</div></div>'+
+ '<div class="sess"><span class="em">🔥</span><div class="info"><b>ゴールデンスロット</b><br>れんぞく<b>3・7・14・30日</b>…をたっせいすると、さいしょの1回が金ピカスロットに!大当たりが でやすくなるよ</div></div>'+
+ '<div class="sess"><span class="em">⭐</span><div class="info"><b>ポイントのつかいみち</b><br>たまったポイントは「⭐こうかんじょ」で すきなごほうび券と こうかんできるよ</div></div>'+
+ '<div class="muted" style="margin-top:8px">スロットは、パパ・ママが勉強を承認してくれると まわせるようになるよ✅</div>');}
 function buyTicket(i){const p=P();const t=p.pool[i];
  if(!t||p.points<t.price)return;
  if(confirm('⭐'+t.price+'ポイントで「'+t.name+'」とこうかんする?')){
@@ -687,7 +699,7 @@ function aiHTML(){const p=P();const hasKey=!!S.gemini.key;
   '<textarea id="chat-in" placeholder="例:この算数、線分図までかいたけど次がわからない…"></textarea>'+
   '<button class="attach-btn" onclick="document.getElementById(\'chat-cam\').click()" title="カメラでとる">📷</button>'+
   '<button class="attach-btn" onclick="document.getElementById(\'chat-file\').click()" title="写真をえらぶ">🖼️</button>'+
-  (voiceSupported()?'<button class="attach-btn" id="mic-btn" onclick="toggleVoice()" title="こえで入力">🎤</button>':'')+
+  (voiceSupported()?'<button class="attach-btn'+(recOn?' rec':'')+'" id="mic-btn" onclick="toggleVoice()" title="こえで入力">'+(recOn?'⏹':'🎤')+'</button>':'')+
   '<button class="send-btn" onclick="sendChat()">おくる ✉️</button></div>'+
  '<input type="file" id="chat-cam" accept="image/*" capture="environment" style="display:none" onchange="onChatPhoto(this)">'+
  '<input type="file" id="chat-file" accept="image/*" style="display:none" onchange="onChatPhoto(this)">'+
@@ -746,6 +758,7 @@ function sysPrompt(p){return 'あなたは小学生の勉強パートナー「'+
  '7. 写真がおくられたら、それは問題やノートの画像です。まず何の問題かを短く確かめてから、上のルールにそってヒントや解説をする。\n'+
  '8. 絵文字はときどき少しだけ使う。';}
 async function sendChat(forceText){const p=P();const ta=$('#chat-in');
+ if(recOn)try{recog.stop();}catch(e){}
  const t=(forceText!=null?forceText:(ta?ta.value.trim():''));
  const img=chatPhotoData;
  if(!t&&!img)return;
@@ -761,7 +774,7 @@ async function sendChat(forceText){const p=P();const ta=$('#chat-in');
    encodeURIComponent(S.gemini.model)+':generateContent?key='+encodeURIComponent(S.gemini.key),{
    method:'POST',headers:{'Content-Type':'application/json'},
    body:JSON.stringify({systemInstruction:{parts:[{text:sysPrompt(p)}]},contents:hist,
-    generationConfig:{maxOutputTokens:600,temperature:.7}})});
+    generationConfig:{maxOutputTokens:4096}})});
   const data=await res.json();
   let txt;
   if(data.error){txt='エラーみたい:'+(data.error.message||'')+'\nパパにカギ(APIキー)やモデル名を見てもらってね。';}
@@ -784,27 +797,8 @@ function setHTML(){const p=P();
  return '<div class="card"><h2>🤖 AI相棒のなまえ</h2>'+
  '<input id="ai-name" value="'+esc(p.aiName)+'">'+
  '<button class="btn blue sm" style="margin-top:8px" onclick="saveAiName()">きめた!</button></div>'+
- '<div class="card"><h2>👥 メンバー</h2>'+
- '<div class="muted">アイコン(絵文字)・なまえ・学年をかえられるよ</div>'+
- Object.entries(S.profiles).map(([id,pr])=>'<div class="row" style="margin-top:6px">'+
-  '<input data-pf-em="'+id+'" value="'+esc(pr.em)+'" maxlength="4" style="flex:0 0 56px;text-align:center;font-size:20px">'+
-  '<input data-pf-nm="'+id+'" value="'+esc(pr.name)+'">'+
-  '<input data-pf-gr="'+id+'" value="'+esc(pr.grade)+'" style="flex:0 0 64px">'+
-  (Object.keys(S.profiles).length>1?'<button class="btn ghost sm" style="flex:0 0 44px;color:#B04040" onclick="delProfile(\''+id+'\')">✕</button>':'')+
- '</div>').join('')+
- '<div class="row" style="margin-top:8px"><button class="btn blue sm" onclick="saveProfiles()">保存する</button>'+
- '<button class="btn ghost sm" onclick="addProfile()">＋ メンバーついか</button></div></div>'+
- '<div class="card"><h2>🗺️ きち(基地)の編集</h2>'+
- '<div class="muted">アイコンとなまえをかえられるよ。けしても、まえのきろくは のこるよ</div>'+
- S.bases.map((b,i)=>'<div class="row" style="margin-top:6px">'+
-  '<input data-bs-em="'+i+'" value="'+esc(b.em)+'" maxlength="4" style="flex:0 0 56px;text-align:center;font-size:20px">'+
-  '<input data-bs-nm="'+i+'" value="'+esc(b.name)+'">'+
-  (S.bases.length>1?'<button class="btn ghost sm" style="flex:0 0 44px;color:#B04040" onclick="delBase('+i+')">✕</button>':'')+
- '</div>').join('')+
- '<div class="row" style="margin-top:8px"><button class="btn blue sm" onclick="saveBases()">保存する</button>'+
- '<button class="btn ghost sm" onclick="addBase()">＋ きちついか</button></div></div>'+
  '<div class="card"><h2>👨 パパ・ママモード'+(pend?' <span class="badge b-pend">承認まち '+pend+'</span>':'')+'</h2>'+
- '<div class="muted">承認・ごほうび券・APIキー・目標の設定はこちら</div>'+
+ '<div class="muted">承認・ごほうび券・目標・APIキー・メンバーやきちの編集はこちら(おうちの人せんよう)</div>'+
  '<button class="btn sm" style="margin-top:10px" onclick="parentGate()">🔐 ひらく</button></div>'+
  '<div class="card"><h2>📱 アプリとしてつかう</h2>'+
  '<div class="muted">ホーム画面についかすると、アプリみたいに全画面でつかえるよ。<br>'+
@@ -814,34 +808,32 @@ function setHTML(){const p=P();
  '<div class="card"><h2>💾 データ</h2>'+
  '<div class="muted">データはこの端末の中にだけ保存されます。ときどきバックアップしてね(写真・メモボードはふくまれません)。</div>'+
  '<button class="btn ghost sm" style="margin-top:10px" onclick="exportData()">バックアップを保存(JSON)</button>'+
- '<div class="muted" style="margin-top:8px;text-align:right">スタディきち v6</div></div>';}
+ '<div class="muted" style="margin-top:8px;text-align:right">スタディきち v7</div></div>';}
 function saveAiName(){P().aiName=$('#ai-name').value.trim()||'そらとも';save();render();}
-/* --- メンバー編集 --- */
-function saveProfiles(){
- document.querySelectorAll('[data-pf-em]').forEach(i=>{const pr=S.profiles[i.dataset.pfEm];if(pr&&i.value.trim())pr.em=i.value.trim();});
- document.querySelectorAll('[data-pf-nm]').forEach(i=>{const pr=S.profiles[i.dataset.pfNm];if(pr&&i.value.trim())pr.name=i.value.trim();});
- document.querySelectorAll('[data-pf-gr]').forEach(i=>{const pr=S.profiles[i.dataset.pfGr];if(pr)pr.grade=i.value.trim();});
- save();render();}
+/* --- メンバー編集(パパ・ママモード内) --- */
 function addProfile(){const id='p'+Date.now();
- S.profiles[id]=mkProfile('あたらしい人','🙂','小1');save();render();}
+ S.profiles[id]=mkProfile('あたらしい人','🙂','小1');save();openParent();}
 function delProfile(id){const pr=S.profiles[id];if(!pr)return;
  if(Object.keys(S.profiles).length<=1)return;
  if(!confirm('「'+pr.name+'」をけす?きろく・ポイント・券もぜんぶ消えて、もどせないよ!'))return;
  if(!confirm('ほんとうに いい?(さいごの確認)'))return;
  delete S.profiles[id];
  if(S.currentProfile===id)S.currentProfile=Object.keys(S.profiles)[0];
- save();render();}
-/* --- きち編集 --- */
-function saveBases(){
- document.querySelectorAll('[data-bs-em]').forEach(i=>{const b=S.bases[Number(i.dataset.bsEm)];if(b&&i.value.trim())b.em=i.value.trim();});
- document.querySelectorAll('[data-bs-nm]').forEach(i=>{const b=S.bases[Number(i.dataset.bsNm)];if(b&&i.value.trim())b.name=i.value.trim();});
- save();render();}
-function addBase(){S.bases.push({id:'b'+Date.now(),name:'あたらしい基地',em:'📍'});save();render();}
+ save();openParent();}
+/* --- きち編集(パパ・ママモード内) --- */
+function addBase(){S.bases.push({id:'b'+Date.now(),name:'あたらしい基地',em:'📍'});save();openParent();}
 function delBase(i){const b=S.bases[i];if(!b||S.bases.length<=1)return;
  if(!confirm('「'+b.name+'」をけす?(まえのきろくは のこるよ)'))return;
- S.bases.splice(i,1);save();render();}
+ S.bases.splice(i,1);save();openParent();}
 function installApp(){if(!window.deferredPrompt)return;
  window.deferredPrompt.prompt();window.deferredPrompt=null;render();}
+/* --- 初期化 --- */
+function factoryReset(){
+ if(!confirm('すべてのデータ(全メンバーのきろく・ポイント・券・会話・写真・PIN・APIキー)を消して、はじめての状態にもどします。よろしいですか?'))return;
+ if(!confirm('この操作は もどせません。本当に初期化しますか?'))return;
+ try{localStorage.removeItem('studykichi_v1');}catch(e){}
+ try{indexedDB.deleteDatabase('studykichi');}catch(e){}
+ location.reload();}
 
 /* ---------- パパ・ママモード ---------- */
 function parentGate(){
@@ -876,6 +868,23 @@ function openParent(){const p=P();const pend=p.sessions.filter(s=>s.status==='pe
  '<h2 style="margin-top:16px">🏆 大きなごほうび</h2>'+
  p.bigGoals.map((g,i)=>'<div class="row" style="margin-bottom:6px">'+
   '<input data-bg-t="'+i+'" value="'+esc(g.title)+'"><input data-bg-r="'+i+'" value="'+esc(g.reward)+'"></div>').join('')+
+ '<h2 style="margin-top:16px">👥 メンバーの編集</h2>'+
+ '<div class="muted">なまえ・学年をかえても、きろくやポイントはそのまま引きつがれます。削除はもどせません。</div>'+
+ Object.entries(S.profiles).map(([id,pr])=>'<div class="row" style="margin-top:6px">'+
+  '<input data-pf-em="'+id+'" value="'+esc(pr.em)+'" maxlength="4" style="flex:0 0 56px;text-align:center;font-size:20px">'+
+  '<input data-pf-nm="'+id+'" value="'+esc(pr.name)+'">'+
+  '<input data-pf-gr="'+id+'" value="'+esc(pr.grade)+'" style="flex:0 0 64px">'+
+  (Object.keys(S.profiles).length>1?'<button class="btn ghost sm" style="flex:0 0 44px;color:#B04040" onclick="delProfile(\''+id+'\')">✕</button>':'')+
+ '</div>').join('')+
+ '<button class="btn ghost sm" style="margin-top:8px" onclick="addProfile()">＋ メンバーついか</button>'+
+ '<h2 style="margin-top:16px">🗺️ きちの編集</h2>'+
+ '<div class="muted">なまえをかえても出撃回数は引きつがれます。けしても、まえのきろくはのこります。</div>'+
+ S.bases.map((b,i)=>'<div class="row" style="margin-top:6px">'+
+  '<input data-bs-em="'+i+'" value="'+esc(b.em)+'" maxlength="4" style="flex:0 0 56px;text-align:center;font-size:20px">'+
+  '<input data-bs-nm="'+i+'" value="'+esc(b.name)+'">'+
+  (S.bases.length>1?'<button class="btn ghost sm" style="flex:0 0 44px;color:#B04040" onclick="delBase('+i+')">✕</button>':'')+
+ '</div>').join('')+
+ '<button class="btn ghost sm" style="margin-top:8px" onclick="addBase()">＋ きちついか</button>'+
  '<h2 style="margin-top:16px">🔑 Gemini APIキー</h2>'+
  '<div class="muted">キーはこの端末のブラウザ内にだけ保存され、Googleとの通信にのみ使われます。コードには書かれません。</div>'+
  '<button class="btn ghost sm" style="margin-top:6px" onclick="keyGuide()">📖 キーのかんたん取得ガイド(無料・約5分)</button>'+
@@ -886,6 +895,9 @@ function openParent(){const p=P();const pend=p.sessions.filter(s=>s.status==='pe
  '<button class="btn blue sm" style="flex:0 0 90px" onclick="changePin()">変更</button></div>'+
  '<h2 style="margin-top:16px">💾 バックアップから復元</h2>'+
  '<input type="file" accept=".json" onchange="importData(this)">'+
+ '<h2 style="margin-top:16px">🧨 初期化</h2>'+
+ '<div class="muted">全メンバーのきろく・ポイント・券・会話・写真・PIN・APIキーをすべて消して、はじめての状態にもどします。</div>'+
+ '<button class="btn ghost sm" style="margin-top:6px;color:#B04040" onclick="factoryReset()">初期設定にもどす</button>'+
  '<button class="btn" style="margin-top:18px" onclick="saveParent()">まとめて保存</button>');
  loadThumbs();}
 function parentSessRow(s){const b=S.bases.find(x=>x.id===s.base)||{em:"📍",name:"(まえの基地)"};
@@ -933,8 +945,16 @@ function saveParent(){
  document.querySelectorAll('[data-pool-p]').forEach(inp=>{const i=Number(inp.dataset.poolP);
   if(p.pool[i])p.pool[i].price=Math.max(0,Number(inp.value)||0);});
  
+ // メンバー
+ document.querySelectorAll('[data-pf-em]').forEach(i=>{const pr=S.profiles[i.dataset.pfEm];if(pr&&i.value.trim())pr.em=i.value.trim();});
+ document.querySelectorAll('[data-pf-nm]').forEach(i=>{const pr=S.profiles[i.dataset.pfNm];if(pr&&i.value.trim())pr.name=i.value.trim();});
+ document.querySelectorAll('[data-pf-gr]').forEach(i=>{const pr=S.profiles[i.dataset.pfGr];if(pr)pr.grade=i.value.trim();});
+ // きち
+ document.querySelectorAll('[data-bs-em]').forEach(i=>{const b=S.bases[Number(i.dataset.bsEm)];if(b&&i.value.trim())b.em=i.value.trim();});
+ document.querySelectorAll('[data-bs-nm]').forEach(i=>{const b=S.bases[Number(i.dataset.bsNm)];if(b&&i.value.trim())b.name=i.value.trim();});
+ 
  if($('#gm-key')) S.gemini.key=$('#gm-key').value.trim();
- if($('#gm-model')) S.gemini.model=$('#gm-model').value.trim()||'gemini-2.5-flash';
+ if($('#gm-model')) S.gemini.model=$('#gm-model').value.trim()||'gemini-3.5-flash';
  
  save();      // localStorageへ保存
  closeModal(); // モーダルを閉じる
