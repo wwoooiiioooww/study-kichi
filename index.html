@@ -242,6 +242,9 @@ function mkProfile(name,em,grade){return{
  tickets:[],
  lastGoldenMilestone:0,
  pin:null,
+ weeks:{},
+ bonusSpins:[],
+ books:[],
 };}
 const DEFAULT_STATE={
 v:3, tab:'home', currentProfile:'sora', parentPin:null,
@@ -264,6 +267,12 @@ function migrate(st){
   if(pr.lastGoldenMilestone==null)pr.lastGoldenMilestone=0;
   if(!Array.isArray(pr.chatArchive))pr.chatArchive=[];
   if(pr.pin===undefined)pr.pin=null;
+  if(!pr.weeks)pr.weeks={};
+  if(!Array.isArray(pr.bonusSpins))pr.bonusSpins=[];
+  pr.bonusSpins.forEach(b=>{if(!b.id)b.id='bs'+Math.random().toString(36).slice(2);
+   if(!b.status)b.status='approved';});
+  if(!Array.isArray(pr.books))pr.books=[];
+  Object.values(pr.weeks).forEach(wx=>{if(!Array.isArray(wx.items))wx.items=[];});
   (pr.exams||[]).forEach(e=>{
    if(!e.scores){e.scores={'総合':Number(e.score)||0};delete e.score;}});
  });
@@ -325,6 +334,34 @@ function goldenAvailable(p){const st=calcStreak(p);
  return (m>0&&m>(p.lastGoldenMilestone||0))?m:0;}
 function nextMilestone(p){const st=calcStreak(p);
  for(const x of MILESTONES){if(st<x)return x;}return null;}
+/* --- 週(日曜はじまり・土曜おわり)ユーティリティ --- */
+const WEEK_MS=[2,4,8,12,20,30,50]; // パーフェクトウィーク連続のふしめ
+function weekKeyFor(ts){const d=new Date(ts);d.setHours(0,0,0,0);
+ d.setDate(d.getDate()+(6-d.getDay()));return dayKey(d.getTime());} // その週の土曜
+function prevWeekKey(key){const[y,m,dd]=key.split('-').map(Number);
+ return dayKey(new Date(y,m-1,dd-7).getTime());}
+function weekRangeLabel(key){const[y,m,dd]=key.split('-').map(Number);
+ const sat=new Date(y,m-1,dd);const sun=new Date(y,m-1,dd-6);
+ return (sun.getMonth()+1)+'/'+sun.getDate()+'〜'+(sat.getMonth()+1)+'/'+sat.getDate();}
+function planTargetKey(){const d=new Date();
+ return d.getDay()===6?weekKeyFor(Date.now()+864e5):weekKeyFor(Date.now());} // 土曜は「来週」の作戦
+function testTargetKey(){const d=new Date();
+ return d.getDay()===0?weekKeyFor(Date.now()-864e5):weekKeyFor(Date.now());} // 日曜は「きのう終わった週」のバトル
+function getWeek(p,key){if(!p.weeks[key])p.weeks[key]={subjects:[],range:'',goal:'',planTs:null,test:null,reviews:[],granted:{}};
+ if(!p.weeks[key].granted)p.weeks[key].granted={};return p.weeks[key];}
+function grantBonus(p,wk,kind,reason,golden){if(wk.granted[kind])return false;
+ wk.granted[kind]=1;
+ p.bonusSpins.push({id:'bs'+Date.now()+Math.floor(Math.random()*1e4),reason,golden:!!golden,status:'pending'});
+ return true;}
+function approvedBonus(p){return (p.bonusSpins||[]).filter(b=>b.status==='approved');}
+function pendingBonus(p){return (p.bonusSpins||[]).filter(b=>b.status==='pending');}
+function weekLoopStreak(p,key){let n=0,k=key;
+ while(true){const w=p.weeks[k];if(w&&w.planTs&&w.test){n++;k=prevWeekKey(k);}else break;}
+ return n;}
+function checkWeekLoop(p,key){const wk=p.weeks[key];if(!wk||!wk.planTs||!wk.test)return;
+ if(wk.granted.loopChecked)return;wk.granted.loopChecked=1;
+ const st=weekLoopStreak(p,key);
+ if(WEEK_MS.indexOf(st)>=0)grantBonus(p,wk,'wstreak','🔥パーフェクトウィーク'+st+'週れんぞく!!',true);}
 
 /* ---------- 画面制御 ---------- */
 const NAV=[['home','🏠','きち'],['rec','🌱','きろく'],['goal','🏆','もくひょう'],['ai','🤖','AI相棒'],['set','⚙️','せってい']];
@@ -396,11 +433,14 @@ function titleFor(n){for(const[th,t]of TITLES){if(n>=th)return t;}return null;}
 function homeHTML(){const p=P();const m=minutesByDay(p);
  const today=m[todayKey()]||0;const streak=calcStreak(p);
  /* 承認ずみでまだ回していないスロット */
- let slotCard='';const q=spinQueue(p);const gm=goldenAvailable(p);
- if(q.length){slotCard='<div class="card" style="background:linear-gradient(135deg,#FFF6E3,#FFE9C0);border:2px solid var(--gold)">'+
+ let slotCard='';const q=spinQueue(p);const bs=approvedBonus(p);const gm=goldenAvailable(p);
+ const totalSpins=q.length+bs.length;
+ if(totalSpins){slotCard='<div class="card" style="background:linear-gradient(135deg,#FFF6E3,#FFE9C0);border:2px solid var(--gold)">'+
   '<h2>🎰 スロットが まわせるよ!</h2>'+
-  '<div class="muted">パパ・ママが「がんばったね」って承認してくれたよ✨ <b>'+q.length+'回</b> まわせる!</div>'+
-  (gm?'<div style="font-family:var(--disp);font-weight:800;color:#B07800;font-size:13px;margin-top:4px">🔥れんぞく'+gm+'日たっせい!さいしょの1回は ゴールデンスロット!!</div>':'')+
+  '<div class="muted">'+(q.length?'パパ・ママが「がんばったね」って承認してくれたよ✨ ':'')+'<b>'+totalSpins+'回</b> まわせる!'+
+  (q.length&&bs.length?'(しゅつげき'+q.length+'回+ボーナス'+bs.length+'回)':'')+'</div>'+
+  (bs.length?'<div style="font-size:12px;font-weight:700;color:#B07800;margin-top:4px">🎁 '+bs.map(b=>esc(b.reason)).join(' ／ ')+'</div>':'')+
+  (gm&&q.length?'<div style="font-family:var(--disp);font-weight:800;color:#B07800;font-size:13px;margin-top:4px">🔥れんぞく'+gm+'日たっせい!さいしょの1回はゴールデンスロット!!</div>':'')+
   '<button class="btn" style="margin-top:10px" onclick="openSlots()">まわす! 🎰</button>'+
   '<div style="text-align:center;margin-top:6px"><span class="muted" style="text-decoration:underline;cursor:pointer" onclick="slotRules()">❓なにが当たるの?</span></div></div>';}
  let tix='';
@@ -419,6 +459,13 @@ function homeHTML(){const p=P();const m=minutesByDay(p);
  const nm=nextMilestone(p);
  let teaser='';
  if(!m[todayKey()]&&nm&&streak===nm-1)teaser='<br>🔥きょう べんきょうすると れんぞく'+nm+'日 → ゴールデンスロットのチャンス!';
+ const cwk=p.weeks[weekKeyFor(Date.now())];
+ let planLine='';
+ if(cwk&&(cwk.subjects.length||cwk.range))planLine='<br>📅 こんしゅうの作戦: '+esc(cwk.subjects.join('・'))+(cwk.range?' ／ '+esc(cwk.range):'');
+ if(new Date().getDay()===6&&!(p.weeks[planTargetKey()]&&p.weeks[planTargetKey()].planTs))
+  planLine+='<br>⚔️ きょうは<b>さくせん会議</b>の日!もくひょうタブで らいしゅうの作戦をたてよう';
+ if(new Date().getDay()===0){const rw=p.weeks[testTargetKey()];
+  if(rw&&(rw.planTs||rw.test)&&!rw.report)planLine+='<br>🤖 1週間おつかれさま!もくひょうタブで<b>レポート</b>をつくってみよう';}
  return '<div class="stats">'+
   '<div class="stat"><div class="n">🔥'+streak+'</div><div class="l">れんぞく日</div></div>'+
   '<div class="stat"><div class="n">'+today+'<span style="font-size:12px">分</span></div><div class="l">きょうの勉強</div></div>'+
@@ -429,7 +476,7 @@ function homeHTML(){const p=P();const m=minutesByDay(p);
    return '<div class="base" onclick="pickBase(\''+b.id+'\')"><div class="em">'+b.em+'</div>'+
    '<div class="nm">'+b.name+'</div><div class="cnt">しゅつげき '+n+'回</div>'+
    (t?'<div class="ttl">'+b.name.slice(0,5)+'の'+t+'</div>':'')+'</div>';}).join('')+
-  '</div><div class="muted" style="margin-top:10px">💡 まずは「5分だけ」でOK!はじめるのが いちばんえらい!'+teaser+
+  '</div><div class="muted" style="margin-top:10px">💡 まずは「5分だけ」でOK!はじめるのが いちばんえらい!'+teaser+planLine+
   '<br><span style="text-decoration:underline;cursor:pointer;color:var(--blue-d)" onclick="slotRules()">❓スロットとポイントのルール</span></div></div>'+
   shop;}
 function slotRules(){openModal('<h3>🎰 スロットのルール</h3>'+
@@ -439,6 +486,7 @@ function slotRules(){openModal('<h3>🎰 スロットのルール</h3>'+
  '<div class="sess"><span class="em">🍀</span><div class="info"><b>🍀 ふつう(よくでる)</b><br>+10〜30ポイント</div></div>'+
  '<div class="sess"><span class="em">⏱️</span><div class="info"><b>じかんボーナス</b><br>1回の勉強が <b>45分いじょう→ポイント1.5倍!</b> ふつう(15〜44分)→そのまま。<b>15分より みじかいと×0.3</b> に へっちゃうよ。じっくりやるのが おトク!</div></div>'+
  '<div class="sess"><span class="em">🔥</span><div class="info"><b>ゴールデンスロット</b><br>れんぞく<b>3・7・14・30日</b>…をたっせいすると、さいしょの1回が金ピカスロットに!大当たりが でやすくなるよ</div></div>'+
+ '<div class="sess"><span class="em">🎁</span><div class="info"><b>ボーナススロット</b><br>📅作戦をたてる/⚔️ボスバトルをきろく/🔁リベンジぜんぶクリアで それぞれ+1回!💯まんてんや、🔥パーフェクトウィーク(作戦+バトル)の2・4・8週れんぞくは ゴールデンスロット!どれもパパ・ママの承認で とどくよ</div></div>'+
  '<div class="sess"><span class="em">⭐</span><div class="info"><b>ポイントのつかいみち</b><br>たまったポイントは「⭐こうかんじょ」で すきなごほうび券と こうかんできるよ</div></div>'+
  '<div class="muted" style="margin-top:8px">スロットは、パパ・ママが勉強を承認してくれると まわせるようになるよ✅</div>');}
 function buyTicket(i){const p=P();const t=p.pool[i];
@@ -513,11 +561,14 @@ function finishSession(){const a=S.activeSession;
  ((a.boards&&a.boards.length)?'<div class="muted">✏️ 計算メモ '+a.boards.length+'まいも いっしょに きろくするよ</div>':'')+
  '<label>なにを べんきょうした?</label>'+
  '<div class="chips" id="subj-chips">'+SUBJECTS.map(s=>'<div class="chip" onclick="this.classList.toggle(\'on\')">'+s+'</div>').join('')+'</div>'+
+ '<label>きょうの しゅうちゅうどは?(しょうじきにね)</label>'+
+ '<div class="chips" id="focus-chips">'+[['hi','🔥ばっちり'],['mid','🙂ふつう'],['lo','😪いまいち']].map(x=>'<div class="chip" data-f="'+x[0]+'" onclick="pickFocus(this)">'+x[1]+'</div>').join('')+'</div>'+
  '<label>メモ(テキストのページなど)</label><input id="end-memo" placeholder="例:予習シリーズ P.42〜45">'+
  '<label>📸 ノートやテキストの写真(しょうこ写真!パパが見るよ)</label>'+
  '<input type="file" accept="image/*" capture="environment" onchange="onPhoto(this)">'+
  '<div id="photo-prev" style="margin-top:8px"></div>'+
  '<button class="btn" style="margin-top:16px" onclick="saveSession('+min+')">きろくする ✍️</button>',false);}
+function pickFocus(el){document.querySelectorAll('#focus-chips .chip').forEach(c=>c.classList.remove('on'));el.classList.add('on');}
 function onPhoto(inp){const f=inp.files&&inp.files[0];if(!f)return;
  compressImage(f).then(d=>{endPhotoData=d;
   $('#photo-prev').innerHTML='<img src="'+d+'" class="photo-view" style="max-height:160px">';});}
@@ -535,7 +586,9 @@ async function saveSession(min){const a=S.activeSession;
  if(endPhotoData){photoId='p'+Date.now();
   try{await putPhoto(photoId,endPhotoData);}catch(e){photoId=null;}}
  P().sessions.unshift({id,base:a.base,plannedMin:a.plannedMin,startTs:a.startTs,endTs:Date.now(),
-  minutes:min,subjects:subs,memo:$('#end-memo').value.trim(),photoId,boards:(a.boards||[]),status:'pending',spin:null});
+  minutes:min,subjects:subs,memo:$('#end-memo').value.trim(),photoId,boards:(a.boards||[]),
+  focus:(document.querySelector('#focus-chips .chip.on')||{dataset:{}}).dataset.f||null,
+  status:'pending',spin:null});
  S.activeSession=null;save();closeModal();render();
  openModal('<h3>きろくしたよ! ✍️</h3>'+
  '<div class="muted">パパ・ママが「がんばったね」って承認してくれたら、つぎにアプリをひらいたときに 🎰スロットがまわせるよ。たのしみにまっててね!</div>'+
@@ -605,30 +658,39 @@ function closeBoard(){
 const EMO=['🍀','⭐','🥟','🐟','🌸','🍃','👑'];
 let slotQueue=[];let goldenM=0;
 function openSlots(){const p=P();
- slotQueue=spinQueue(p).map(s=>s.id);
+ slotQueue=spinQueue(p).map(s=>({t:'s',id:s.id}));
+ approvedBonus(p).forEach(b=>slotQueue.push({t:'b',bid:b.id,reason:b.reason,golden:b.golden}));
  if(!slotQueue.length)return;
  goldenM=goldenAvailable(p);
  showSlotModal();}
-function showSlotModal(){const golden=goldenM>0;
+function showSlotModal(){const item=slotQueue[0];
+ if(!item){closeModal();render();return;}
+ const golden=item.t==='b'?!!item.golden:goldenM>0;
+ const title=item.t==='b'?'🎁 ボーナススロット':(golden?'🔥 ゴールデンスロット 🔥':'🎰 がんばりスロット 🎰');
+ const sub=item.t==='b'
+  ?'<div style="font-size:12px;color:#FFE9A8;margin-top:2px">'+esc(item.reason)+(golden?' 🔥大当たりしやすいよ!':'')+'</div>'
+  :(golden?'<div style="font-size:12px;color:#FFE9A8;margin-top:2px">れんぞく'+goldenM+'日たっせいのごほうび!大当たりしやすいよ✨</div>':'');
  openModal('<div class="slot-box"'+(golden?' style="background:linear-gradient(180deg,#6E4E00,#2E2300);outline:3px solid var(--gold)"':'')+'>'+
- '<div class="slot-title">'+(golden?'🔥 ゴールデンスロット 🔥':'🎰 がんばりスロット 🎰')+'</div>'+
- (golden?'<div style="font-size:12px;color:#FFE9A8;margin-top:2px">れんぞく'+goldenM+'日たっせいのごほうび!大当たりしやすいよ✨</div>':'')+
+ '<div class="slot-title">'+title+'</div>'+sub+
  '<div class="reels"><div class="reel" id="r0">❔</div><div class="reel" id="r1">❔</div><div class="reel" id="r2">❔</div></div>'+
  '<div class="slot-result" id="slot-res"></div>'+
  '<button class="btn" id="spin-btn" style="margin-top:10px">まわす!(あと'+slotQueue.length+'回)</button></div>',false);
  $('#spin-btn').onclick=spinNext;}
-function spinNext(){const p=P();const id=slotQueue[0];
- const s=p.sessions.find(x=>x.id===id);
- if(!s){closeModal();render();return;}
- const golden=goldenM>0;
- const c=coefFor(s.minutes||0);
+function spinNext(){const p=P();const item=slotQueue[0];
+ if(!item){closeModal();render();return;}
+ let golden,c,dayOk,sess=null;
+ if(item.t==='s'){sess=p.sessions.find(x=>x.id===item.id);
+  if(!sess){slotQueue.shift();showSlotModal();return;}
+  golden=goldenM>0;
+  c=coefFor(sess.minutes||0);
+  dayOk=dayTotal(p,sess.endTs||sess.startTs)>=25;}
+ else{golden=!!item.golden;c=1;dayOk=true;} // ボーナスは時間係数なし・ジャックポット対象
  const btn=$('#spin-btn');btn.disabled=true;
  const reels=[$('#r0'),$('#r1'),$('#r2')];
  reels.forEach(r=>r.classList.add('spin'));
  const spinI=setInterval(()=>reels.forEach(r=>{r.textContent=EMO[Math.floor(Math.random()*EMO.length)];}),80);
  const roll=Math.random();
- const dayOk=dayTotal(p,s.endTs||s.startTs)>=25;
- const pT=golden?.08:.03, pG=golden?.20:.09, pM=golden?.35:.25;
+ const pT=golden?.04:.01, pG=golden?.20:.09, pM=golden?.35:.25;
  let res;
  if(roll<pT&&p.pool.length&&dayOk){const t=p.pool[Math.floor(Math.random()*p.pool.length)];
   res={pts:0,ticket:t.name,face:['🎟️','🎟️','🎟️'],msg:'🌈けんジャックポット!!「'+t.name+'」をタダでゲット!!',big:true};}
@@ -636,14 +698,15 @@ function spinNext(){const p=P();const id=slotQueue[0];
  else if(roll<pT+pG+pM){res={pts:Math.max(1,Math.round(50*c)),face:['⭐','⭐','⭐']};}
  else{const v=10+Math.floor(Math.random()*3)*10;
   res={pts:Math.max(1,Math.round(v*c)),face:['🍀','⭐','🌸'].sort(()=>Math.random()-.5)};}
- if(!res.msg)res.msg=(res.big?'✨大当たり!! ':'')+'+'+res.pts+'ポイント!'+(c!==1?'(べんきょう時間ボーナス ×'+c+')':'');
+ if(!res.msg)res.msg=(res.big?'✨大当たり!! ':'')+'+'+res.pts+'ポイント!'+(item.t==='s'&&c!==1?'(べんきょう時間ボーナス ×'+c+')':'');
  setTimeout(()=>{clearInterval(spinI);
   reels.forEach((r,i)=>{r.classList.remove('spin');r.textContent=res.face[i];});
   $('#slot-res').textContent=res.msg;
   p.points+=res.pts;
   if(res.ticket)p.tickets.push(res.ticket);
-  s.spin=(golden?'🔥':'')+res.msg;
-  if(golden){p.lastGoldenMilestone=goldenM;goldenM=0;}
+  if(sess){sess.spin=(golden?'🔥':'')+res.msg;
+   if(golden){p.lastGoldenMilestone=goldenM;goldenM=0;}}
+  else{p.bonusSpins=p.bonusSpins.filter(b=>b.id!==item.bid);}
   slotQueue.shift();save();
   if(res.big)confetti();
   btn.disabled=false;
@@ -708,7 +771,7 @@ function sessRow(s){const b=S.bases.find(x=>x.id===s.base)||{em:"📍",name:"(�
   s.status==='rejected'?'<span class="badge b-ng">やりなおし</span>':
   '<span class="badge b-pend">パパの承認まち</span>';
  return '<div class="sess"><span class="em">'+b.em+'</span><div class="info">'+
- '<b>'+fmtDate(s.startTs)+' '+b.name+' '+s.minutes+'分</b><br>'+
+ '<b>'+fmtDate(s.startTs)+' '+b.name+' '+s.minutes+'分</b>'+({hi:' 🔥',mid:' 🙂',lo:' 😪'}[s.focus]||'')+'<br>'+
  esc((s.subjects||[]).join('・'))+' '+esc(s.memo||'')+'<br>'+badge+
  ' <span class="muted">'+esc(s.spin||'')+'</span></div>'+
  (s.photoId?'<img class="thumb" data-photo="'+s.photoId+'" onclick="viewPhotoInline(\''+s.photoId+'\')" alt="写真">':'')+
@@ -719,12 +782,212 @@ async function loadThumbs(){
   const d=await getPhoto(img.dataset.photo);if(d)img.src=d;}}
 
 /* ---------- もくひょう(教科別・編集可) ---------- */
+const PLAN_SUBJ=['算数','国語','理科','社会','英語'];
+let planDraft=null;
+function ensureDraft(p){const key=planTargetKey();
+ if(planDraft&&planDraft.key===key&&planDraft.pid===S.currentProfile)return planDraft;
+ const wk=p.weeks[key]||{};
+ planDraft={key,pid:S.currentProfile,
+  subjects:(wk.subjects||[]).slice(),
+  items:JSON.parse(JSON.stringify(wk.items||[])),
+  range:wk.range||''};
+ return planDraft;}
+function togglePlanSubj(sj){const p=P();const d=ensureDraft(p);
+ const i=d.subjects.indexOf(sj);
+ if(i>=0)d.subjects.splice(i,1);
+ else{d.subjects.push(sj);
+  if(!d.items.find(x=>x.subj===sj)){
+   const bk=(p.books||[])[0]||'';
+   d.items.push({subj:sj,text:'',from:1,to:1});}}
+ render();}
+function pdSet(sj,field,val){const d=planDraft;if(!d)return;
+ const it=d.items.find(x=>x.subj===sj);if(!it)return;
+ it[field]=(field==='text')?val:Math.max(1,Number(val)||1);}
+function pdRange(v){if(planDraft)planDraft.range=v;}
+function pgStep(sj,field,delta){const d=planDraft;if(!d)return;
+ const it=d.items.find(x=>x.subj===sj);if(!it)return;
+ it[field]=Math.max(1,(Number(it[field])||1)+delta);
+ if(it.to<it.from){if(field==='from')it.to=it.from;else it.from=it.to;}
+ render();}
+function planItemsLabel(wk){
+ if(wk.items&&wk.items.length)return wk.items.map(it=>it.subj+(it.text?'『'+it.text+'』P'+it.from+'〜'+it.to:'')).join(' ／ ');
+ return wk.range||'';}
+function weeklyHTML(p){
+ const d=ensureDraft(p);const pKey=d.key;const isNext=(new Date().getDay()===6);
+ const wk=p.weeks[pKey]||{planTs:null};
+ const hasBooks=(p.books||[]).length>0;
+ /* さくせん会議 */
+ let rows='';
+ d.subjects.forEach(sj=>{const it=d.items.find(x=>x.subj===sj)||{text:'',from:1,to:1};
+  rows+='<div style="margin-top:8px;padding:8px;background:#F4F9FE;border-radius:12px">'+
+  '<div style="font-weight:800;font-family:var(--disp);font-size:13px;margin-bottom:4px">'+sj+'</div>'+
+  (hasBooks?
+   '<select onchange="pdSet(\''+sj+'\',\'text\',this.value)" style="margin-bottom:6px">'+
+   '<option value="">テキストをえらぶ…</option>'+
+   p.books.map(b=>'<option value="'+esc(b)+'"'+(it.text===b?' selected':'')+'>'+esc(b)+'</option>').join('')+'</select>'+
+   '<div class="row" style="align-items:center">'+
+   '<span class="muted" style="flex:0 0 30px">P</span>'+
+   '<button class="bd-tl" style="flex:0 0 38px" onclick="pgStep(\''+sj+'\',\'from\',-1)">−</button>'+
+   '<input type="number" min="1" value="'+it.from+'" oninput="pdSet(\''+sj+'\',\'from\',this.value)" style="text-align:center">'+
+   '<button class="bd-tl" style="flex:0 0 38px" onclick="pgStep(\''+sj+'\',\'from\',1)">＋</button>'+
+   '<span style="flex:0 0 18px;text-align:center">〜</span>'+
+   '<button class="bd-tl" style="flex:0 0 38px" onclick="pgStep(\''+sj+'\',\'to\',-1)">−</button>'+
+   '<input type="number" min="1" value="'+it.to+'" oninput="pdSet(\''+sj+'\',\'to\',this.value)" style="text-align:center">'+
+   '<button class="bd-tl" style="flex:0 0 38px" onclick="pgStep(\''+sj+'\',\'to\',1)">＋</button></div>'
+  :'')+'</div>';});
+ let out='<div class="card" style="border:2px solid #CDE5F7"><h2>📅 '+(isNext?'らいしゅう':'こんしゅう')+'の作戦('+weekRangeLabel(pKey)+')'+
+  (wk.planTs?' <span class="badge b-ok">作戦ずみ✓</span>':'')+'</h2>'+
+  (isNext?'<div class="muted">きょうは さくせん会議の日!先生やおうちの人と、らいしゅうの作戦をきめよう⚔️</div>':'')+
+  '<label>がんばる教科</label><div class="chips">'+
+  PLAN_SUBJ.map(sj=>'<div class="chip'+(d.subjects.indexOf(sj)>=0?' on':'')+'" onclick="togglePlanSubj(\''+sj+'\')">'+sj+'</div>').join('')+'</div>'+
+  rows+
+  (!hasBooks?'<label>やるところ(メモ)</label><input id="pl-range" value="'+esc(d.range)+'" oninput="pdRange(this.value)" placeholder="例:予習シリーズ 算数P42〜50">'+
+   '<div class="muted" style="margin-top:4px">💡パパ・ママモードで「テキスト」を登録すると、えらぶだけ&ページ指定で作戦がたてられるよ</div>':'')+
+  '<button class="btn blue sm" style="margin-top:10px" onclick="savePlan()">'+(wk.planTs?'作戦をなおす':'作戦けってい! 🎁')+'</button>'+
+  (wk.planTs?'':'<div class="muted" style="margin-top:4px">ぜんぶ入力してから「作戦けってい!」。パパ・ママが承認すると🎁ボーナススロットになるよ</div>')+
+  '</div>';
+ /* ボスバトル+週の履歴 */
+ const bKey=testTargetKey();const bwk=p.weeks[bKey]||{};
+ const loopSt=weekLoopStreak(p,(bwk.planTs&&bwk.test)?bKey:prevWeekKey(bKey));
+ const hist=Object.keys(p.weeks).sort().reverse()
+  .filter(k=>{const w2=p.weeks[k];return w2&&(w2.planTs||w2.test);}).slice(0,8);
+ out+='<div class="card" style="border:2px solid #FFD98A"><h2>⚔️ しゅうまつボスバトル'+
+  (loopSt>0?' <span class="badge b-ok">🔥'+loopSt+'週れんぞく</span>':'')+'</h2>'+
+  '<div class="muted">週まつに、おうちの人がテキストから えらんだ問題にちょうせん(30分くらい)。💯まんてんなら🔥ゴールデンスロット!</div>'+
+  '<button class="btn sm" style="margin-top:8px" onclick="battleForm()">'+(bwk.test?'✏️ こんしゅうのけっかをなおす':'⚔️ バトルのけっかをきろく 🎁')+'</button>'+
+  revengeHTML(p)+
+  (hist.length?'<h2 style="margin-top:14px">📖 まいしゅうの きろく</h2>'+
+   hist.map(k=>{const w2=p.weeks[k];
+    return '<div class="sess" style="cursor:pointer" onclick="weekDetail(\''+k+'\')"><span class="em">🗓️</span><div class="info">'+
+    '<b>'+weekRangeLabel(k)+'</b> <span class="muted">タップでくわしく</span><br>'+
+    '📅'+(w2.planTs?'作戦✓':'—')+' ⚔️'+(w2.test?w2.test.correct+'/'+w2.test.total+'問'+(w2.test.correct===w2.test.total?'💯':''):'—')+
+    ' 🔁'+((w2.reviews||[]).length?(w2.reviews.filter(r=>r.done).length+'/'+w2.reviews.length):'—')+
+    (w2.report?' 🤖':'')+'</div></div>';}).join(''):'')+
+  '</div>';
+ /* AIレポート */
+ out+='<div class="card"><h2>🤖 1週間レポート</h2>'+
+  '<div class="muted">'+esc(p.aiName)+'が、こんしゅうのがんばりをレポートにまとめてくれるよ。パパ・ママに じまんしよう!</div>'+
+  '<div class="row" style="margin-top:8px">'+
+  '<button class="btn sm" id="rep-btn" onclick="makeReport()">🤖 レポートをつくる</button>'+
+  (bwk.report?'<button class="btn ghost sm" onclick="showReport(\''+bKey+'\')">📖 よむ</button>':'')+
+  '</div></div>';
+ return out;}
+function savePlan(){const p=P();const d=ensureDraft(p);const key=d.key;
+ if(!d.subjects.length){alert('がんばる教科を えらんでね');return;}
+ const hasBooks=(p.books||[]).length>0;
+ if(hasBooks){for(const sj of d.subjects){const it=d.items.find(x=>x.subj===sj);
+  if(!it||!it.text){alert('「'+sj+'」のテキストを えらんでね(ぜんぶ入力してから 作戦けってい!)');return;}
+  if(!(Number(it.from)>=1&&Number(it.to)>=Number(it.from))){alert('「'+sj+'」のページばんごうを たしかめてね');return;}}}
+ else if(!d.range.trim()){alert('「やるところ」を かいてね');return;}
+ const wk=getWeek(p,key);
+ wk.subjects=d.subjects.slice();
+ wk.items=d.items.filter(x=>d.subjects.indexOf(x.subj)>=0);
+ wk.range=d.range;
+ let first=false;
+ if(!wk.planTs){wk.planTs=Date.now();
+  first=grantBonus(p,wk,'plan','📅作戦けってい ボーナス',false);}
+ checkWeekLoop(p,key);save();render();
+ if(first)alert('作戦けってい⚔️ パパ・ママが承認すると 🎁ボーナススロットが とどくよ!');}
+function battleForm(){const p=P();const key=testTargetKey();const wk=p.weeks[key]||{};const t=wk.test;
+ const marked=(wk.reviews||[]).map(r=>r.text);
+ openModal('<h3>⚔️ ボスバトルのけっか('+weekRangeLabel(key)+')</h3>'+
+ '<div class="row"><div><label>問題のかず</label><input id="bt-total" type="number" min="1" inputmode="numeric" value="'+esc(t?t.total:'')+'"></div>'+
+ '<div><label>せいかいのかず</label><input id="bt-ok" type="number" min="0" inputmode="numeric" value="'+esc(t?t.correct:'')+'"></div></div>'+
+ '<label>まちがえがあった教科(タップでえらぶ → 🔁リベンジリストになるよ)</label>'+
+ '<div class="chips" id="bt-wrong">'+PLAN_SUBJ.map(sj=>'<div class="chip'+(marked.indexOf(sj)>=0?' on':'')+'" onclick="this.classList.toggle(\'on\')">'+sj+'</div>').join('')+'</div>'+
+ '<button class="btn" style="margin-top:14px" onclick="battleSave()">きろくする!</button>');}
+function battleSave(){const p=P();const key=testTargetKey();const wk=getWeek(p,key);
+ const total=Math.floor(Number($('#bt-total').value)),ok=Math.floor(Number($('#bt-ok').value));
+ if(!(total>=1)||!(ok>=0)||ok>total){alert('問題のかず(1いじょう)と せいかいのかず(0〜問題のかず)を たしかめてね');return;}
+ const wrongs=[...document.querySelectorAll('#bt-wrong .chip.on')].map(c=>c.textContent);
+ const old=wk.reviews||[];
+ wk.reviews=wrongs.map(sj=>{const prev=old.find(r=>r.text===sj);return{text:sj,done:prev?prev.done:false};});
+ if(!wk.test)wk.test={};
+ wk.test.total=total;wk.test.correct=ok;if(!wk.test.ts)wk.test.ts=Date.now();
+ let got=grantBonus(p,wk,'test','⚔️ボスバトル ボーナス',false);
+ if(ok===total){if(grantBonus(p,wk,'perfect','💯まんてん!パーフェクトボーナス',true)){got=true;confetti();}}
+ checkWeekLoop(p,key);save();closeModal();render();
+ if(got)alert('きろくしたよ⚔️ パパ・ママが承認すると 🎁スロットが とどくよ!');}
+function revengeHTML(p){const items=[];
+ Object.keys(p.weeks).sort().reverse().forEach(k=>{
+  (p.weeks[k].reviews||[]).forEach((r,i)=>{
+   if(!r.done||k===testTargetKey())items.push({k,i,r});});});
+ if(!items.length)return '';
+ return '<h2 style="margin-top:12px">🔁 リベンジリスト</h2>'+
+ '<div class="muted">まちがえた教科に、リベンジテストで もういちど ちょうせん!できたらタップでチェック。ぜんぶクリアで🎁(承認でスロット+1)</div>'+
+ items.slice(0,20).map(x=>'<div class="ticket-item" style="cursor:pointer" onclick="revToggle(\''+x.k+'\','+x.i+')">'+
+  '<span style="font-size:17px">'+(x.r.done?'✅':'⬜')+'</span>'+
+  '<span style="flex:1;'+(x.r.done?'text-decoration:line-through;color:var(--ink-soft)':'')+'">'+esc(x.r.text)+' のリベンジ</span>'+
+  '<span class="muted" style="font-size:10px">'+weekRangeLabel(x.k)+'</span></div>').join('');}
+function revToggle(k,i){const p=P();const wk=p.weeks[k];
+ if(!wk||!wk.reviews||!wk.reviews[i])return;
+ wk.reviews[i].done=!wk.reviews[i].done;
+ if(wk.reviews.length&&wk.reviews.every(r=>r.done)){
+  if(grantBonus(p,wk,'review','🔁リベンジぜんぶクリア ボーナス',false))confetti();}
+ save();render();}
+function weekDetail(k){const p=P();const w2=p.weeks[k];if(!w2)return;
+ openModal('<h3>🗓️ '+weekRangeLabel(k)+' のきろく</h3>'+
+ '<div class="sess"><span class="em">📅</span><div class="info"><b>作戦</b><br>'+
+ (w2.planTs?esc(planItemsLabel(w2))||'(内容なし)':'たてなかった')+'</div></div>'+
+ '<div class="sess"><span class="em">⚔️</span><div class="info"><b>ボスバトル</b><br>'+
+ (w2.test?w2.test.correct+'/'+w2.test.total+'問 せいかい'+(w2.test.correct===w2.test.total?' 💯まんてん!':''):'やらなかった')+'</div></div>'+
+ ((w2.reviews||[]).length?'<div class="sess"><span class="em">🔁</span><div class="info"><b>リベンジ</b><br>'+
+  w2.reviews.map(r=>(r.done?'✅':'⬜')+esc(r.text)).join(' ')+'</div></div>':'')+
+ (w2.report?'<button class="btn ghost sm" style="margin-top:8px" onclick="showReport(\''+k+'\')">🤖 この週のレポートをよむ</button>':''));}
+/* --- AI週間レポート --- */
+async function makeReport(){const p=P();
+ if(!S.gemini.key){alert('パパ・ママモードでAPIキーを設定してもらってね');return;}
+ const key=testTargetKey();const wk=getWeek(p,key);
+ if(wk.report&&!confirm('もうレポートがあるよ。つくりなおす?'))return;
+ const[y,mo,dd]=key.split('-').map(Number);
+ const satEnd=new Date(y,mo-1,dd,23,59,59).getTime();
+ const sunStart=new Date(y,mo-1,dd-6,0,0,0).getTime();
+ const sess=p.sessions.filter(x=>x.status!=='rejected'&&(x.endTs||x.startTs)>=sunStart&&(x.endTs||x.startTs)<=satEnd);
+ const total=sess.reduce((a,x)=>a+(x.minutes||0),0);
+ const bySubj={};sess.forEach(x=>(x.subjects||[]).forEach(sj=>{bySubj[sj]=(bySubj[sj]||0)+(x.minutes||0);}));
+ const fc={hi:0,mid:0,lo:0};sess.forEach(x=>{if(x.focus)fc[x.focus]++;});
+ const days={};sess.forEach(x=>{days[dayKey(x.endTs||x.startTs)]=1;});
+ const info={対象週:weekRangeLabel(key),勉強した日数:Object.keys(days).length,合計勉強分:total,
+  教科別の分:bySubj,自己申告の集中度:{ばっちり:fc.hi,ふつう:fc.mid,いまいち:fc.lo},
+  現在の連続勉強日数:calcStreak(p),
+  週の作戦:wk.planTs?(planItemsLabel(wk)||'内容未記入'):'たてていない',
+  週末ボスバトル:wk.test?(wk.test.correct+'/'+wk.test.total+'問正解'+(wk.test.correct===wk.test.total?'(満点)':'')):'未実施',
+  リベンジ:(wk.reviews||[]).length?(wk.reviews.filter(r=>r.done).length+'/'+wk.reviews.length+'教科クリア'):'対象なし',
+  パーフェクトウィーク連続週数:weekLoopStreak(p,key)};
+ const btn=$('#rep-btn');if(btn){btn.disabled=true;btn.textContent='🤖 かんがえ中…';}
+ try{
+  const prompt='あなたは小学生の勉強コーチ「'+p.aiName+'」です。'+p.name+'さん('+p.grade+')の1週間レポートを日本語で書いてください。\n'+
+   'データ: '+JSON.stringify(info)+'\n'+
+   '次の4つの見出し(絵文字ごとそのまま使う)で構成:\n'+
+   '🌟こんしゅうのキラリ … データから具体的に2〜3個、たっぷりほめる(3〜4文)\n'+
+   '🔍つぎのチャレンジ … 作戦と実際のギャップをやさしく1つだけ。責めない(2文)\n'+
+   '💡らいしゅうのヒント … 具体的なコツを2つ(各1〜2文)\n'+
+   '👨‍👩‍👧パパ・ママにじまんしよう! … 親に見せる用。数字を使って客観的に、どれだけ頑張ったかを堂々と書く(3〜4文)\n'+
+   '小学生にわかる言葉で明るく、ぜんぶで400字ほど。#や*などの記号は使わない。';
+  const res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+
+   encodeURIComponent(S.gemini.model)+':generateContent?key='+encodeURIComponent(S.gemini.key),{
+   method:'POST',headers:{'Content-Type':'application/json'},
+   body:JSON.stringify({contents:[{role:'user',parts:[{text:prompt}]}],
+    generationConfig:{maxOutputTokens:4096}})});
+  const dj=await res.json();
+  if(dj.error){alert('エラーみたい: '+(dj.error.message||'')+'\nパパにAPIキーやモデル名を見てもらってね');}
+  else{const txt=(dj.candidates&&dj.candidates[0]&&dj.candidates[0].content&&dj.candidates[0].content.parts||[])
+   .map(x2=>x2.text||'').join('');
+   if(txt){wk.report={text:txt,ts:Date.now()};save();showReport(key);}
+   else alert('うまく つくれなかった…もういちど ためしてね');}
+ }catch(e){alert('つうしんエラーだよ。でんぱのあるところで もういちど ためしてね📡');}
+ render();}
+function showReport(key){const p=P();const wk=p.weeks[key];if(!wk||!wk.report)return;
+ openModal('<h3>🤖 '+weekRangeLabel(key)+' のレポート</h3>'+
+ '<div style="white-space:pre-wrap;line-height:1.9;font-size:14px">'+esc(wk.report.text)+'</div>'+
+ '<div class="muted" style="margin-top:10px">📣 パパ・ママに見せて じまんしよう!</div>');}
 const EX_SUBJECTS=['総合','算数','国語','理科','社会'];
 let examSubj='総合';
 function setExamSubj(sj){examSubj=sj;render();}
 function goalHTML(){const p=P();
  return p.bigGoals.map(g=>'<div class="goal-card"><div class="tt">🏆 '+esc(g.title)+'</div>'+
   '<div class="rw">'+esc(g.reward)+'</div></div>').join('')+
+ weeklyHTML(p)+
  '<div class="card"><h2>📈 模試(もし)のせいせき</h2>'+
  (p.examTarget.value?'<div class="muted">🎯 目標:'+esc(p.examTarget.value)+'('+esc(p.examTarget.label)+')'+nearGoal(p)+'</div>':
   '<div class="muted">目標はパパ・ママモードで設定できるよ</div>')+
@@ -907,7 +1170,7 @@ function clearChatPhoto(){chatPhotoData=null;const el=$('#chat-photo-prev');if(e
 
 /* ---------- せってい ---------- */
 function setHTML(){const p=P();
- const pend=p.sessions.filter(s=>s.status==='pending').length;
+ const pend=p.sessions.filter(s=>s.status==='pending').length+pendingBonus(p).length;
  return '<div class="card"><h2>🤖 AI相棒のなまえ</h2>'+
  '<input id="ai-name" value="'+esc(p.aiName)+'">'+
  '<button class="btn blue sm" style="margin-top:8px" onclick="saveAiName()">きめた!</button></div>'+
@@ -922,7 +1185,7 @@ function setHTML(){const p=P();
  '<div class="card"><h2>💾 データ</h2>'+
  '<div class="muted">データはこの端末の中にだけ保存されます。ときどきバックアップしてね(写真・メモボードはふくまれません)。</div>'+
  '<button class="btn ghost sm" style="margin-top:10px" onclick="exportData()">バックアップを保存(JSON)</button>'+
- '<div class="muted" style="margin-top:8px;text-align:right">スタディきち v8</div></div>';}
+ '<div class="muted" style="margin-top:8px;text-align:right">スタディきち v10</div></div>';}
 function saveAiName(){P().aiName=$('#ai-name').value.trim()||'そらとも';save();render();}
 /* --- メンバー編集(パパ・ママモード内) --- */
 function addProfile(){const id='p'+Date.now();
@@ -968,7 +1231,7 @@ function openParent(){const p=P();const pend=p.sessions.filter(s=>s.status==='pe
  '<div class="muted">写真やメモを見て「がんばったね承認」を。承認すると、お子さんが次にアプリをひらいたときにスロットが回せるようになります(なるべく1〜2日以内の承認がおすすめ)。</div>'+
  '<div id="pend-list">'+(pend.length?pend.map(parentSessRow).join(''):'<div class="muted">承認まちはありません</div>')+'</div>'+
  '<h2 style="margin-top:16px">🎟️ ごほうび券とポイント価格</h2>'+
- '<div class="muted">価格は「⭐こうかんじょ」の値段になります。スロットの券ジャックポット(3%)では無料で当たります(当たっても一覧からは消えません)。</div>'+
+ '<div class="muted">価格は「⭐こうかんじょ」の値段になります。スロットの券ジャックポット(超レア)では無料で当たります(当たっても一覧からは消えません)。</div>'+
  '<div style="margin-top:6px">'+p.pool.map((t,i)=>'<div class="ticket-item">'+
   '<input data-pool-n="'+i+'" value="'+esc(t.name)+'" style="flex:1;min-width:0">'+
   '<input data-pool-p="'+i+'" type="number" value="'+esc(t.price)+'" style="flex:0 0 74px">'+
@@ -982,6 +1245,19 @@ function openParent(){const p=P();const pend=p.sessions.filter(s=>s.status==='pe
  '<h2 style="margin-top:16px">🏆 大きなごほうび</h2>'+
  p.bigGoals.map((g,i)=>'<div class="row" style="margin-bottom:6px">'+
   '<input data-bg-t="'+i+'" value="'+esc(g.title)+'"><input data-bg-r="'+i+'" value="'+esc(g.reward)+'"></div>').join('')+
+ '<h2 style="margin-top:16px">🎁 ボーナス承認まち('+pendingBonus(p).length+')</h2>'+
+ '<div class="muted">作戦・ボスバトル・リベンジのボーナスです。内容を確認して承認してください。</div>'+
+ '<div>'+(pendingBonus(p).length?pendingBonus(p).map(b=>'<div class="sess" id="pb-'+b.id+'"><span class="em">🎁</span>'+
+  '<div class="info"><b>'+esc(b.reason)+'</b>'+(b.golden?' <span class="badge b-pend">🔥ゴールデン</span>':'')+'</div>'+
+  '<button class="btn blue sm" style="width:56px;flex:0 0 auto" onclick="judgeBonus(\''+b.id+'\',1)">承認</button>'+
+  '<button class="btn ghost sm" style="width:60px;flex:0 0 auto;color:#B04040" onclick="judgeBonus(\''+b.id+'\',0)">却下</button></div>').join(''):
+  '<div class="muted">承認まちのボーナスはありません</div>')+'</div>'+
+ '<h2 style="margin-top:16px">📚 テキストの登録('+esc(p.name)+')</h2>'+
+ '<div class="muted">さくせん会議で「やるところ」に使うテキストの一覧です。</div>'+
+ '<div>'+p.books.map((b,i)=>'<div class="ticket-item"><span style="flex:1">'+esc(b)+'</span>'+
+  '<button onclick="delBook('+i+')">削除</button></div>').join('')+'</div>'+
+ '<div class="row" style="margin-top:8px"><input id="book-new" placeholder="例:予習シリーズ 算数(上)">'+
+ '<button class="btn blue sm" style="flex:0 0 70px" onclick="addBook()">追加</button></div>'+
  '<h2 style="margin-top:16px">👥 メンバーの編集</h2>'+
  '<div class="muted">なまえ・学年をかえても、きろくやポイントはそのまま引きつがれます。削除はもどせません。<br>💡「こどもPIN」(4けた)を設定すると、アプリを開いたときに「だれがつかう?」画面が出て、本人しか入れなくなります(きょうだいのスロット回し防止!)。空欄にするとロックなしです。</div>'+
  Object.entries(S.profiles).map(([id,pr])=>'<div class="row" style="margin-top:6px">'+
@@ -1026,6 +1302,14 @@ function parentSessRow(s){const b=S.bases.find(x=>x.id===s.base)||{em:"📍",nam
 function judge(id,st){const s=P().sessions.find(x=>x.id===id);if(!s)return;
  s.status=st;save();
  const row=$('#ps-'+id);if(row)row.remove();}
+function judgeBonus(id,ok){const p=P();const i=p.bonusSpins.findIndex(b=>b.id===id);
+ if(i<0)return;
+ if(ok)p.bonusSpins[i].status='approved';
+ else p.bonusSpins.splice(i,1);
+ save();const row=$('#pb-'+id);if(row)row.remove();}
+function addBook(){const v=$('#book-new').value.trim();if(!v)return;
+ P().books.push(v);save();openParent();}
+function delBook(i){P().books.splice(i,1);save();openParent();}
 function addPool(){const v=$('#pool-new').value.trim();if(!v)return;
  const pr=Math.max(0,Number($('#pool-price').value)||500);
  P().pool.push({name:v,price:pr});save();openParent();}
