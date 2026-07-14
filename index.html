@@ -149,6 +149,13 @@ label{font-size:12px;font-weight:700;color:var(--ink-soft);display:block;margin:
 .day-sep{display:flex;align-items:center;gap:8px;margin:2px 0}
 .day-sep::before,.day-sep::after{content:"";flex:1;height:1px;background:var(--line)}
 .day-sep span{font-size:10px;color:var(--ink-soft);font-weight:700}
+/* ---------- ページ入力(作戦・バトル) ---------- */
+.pg-row{display:flex;gap:8px;align-items:center;margin-top:6px}
+.pg-row .lb{flex:0 0 68px;font-size:12px;font-weight:700;color:var(--ink-soft)}
+.pg-row input{flex:1;min-width:0;text-align:center;padding:10px 4px;font-size:16px}
+.pg-row button{flex:0 0 44px}
+input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+input[type=number]{-moz-appearance:textfield;appearance:textfield}
 /* ---------- メモボード ---------- */
 .bd-tools{display:flex;gap:8px;align-items:center;margin-bottom:8px}
 .bd-pen{width:32px;height:32px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 2px var(--line);cursor:pointer;padding:0}
@@ -275,6 +282,7 @@ function migrate(st){
   Object.values(pr.weeks).forEach(wx=>{if(!Array.isArray(wx.items))wx.items=[];});
   (pr.exams||[]).forEach(e=>{
    if(!e.scores){e.scores={'総合':Number(e.score)||0};delete e.score;}});
+  if(Array.isArray(pr.exams))pr.exams.sort((a,b)=>exSortKey(a)-exSortKey(b));
  });
  if(!Array.isArray(st.bases)||!st.bases.length)st.bases=JSON.parse(JSON.stringify(DEFAULT_BASES));
  if(!st.currentProfile||!st.profiles[st.currentProfile])st.currentProfile=Object.keys(st.profiles)[0];
@@ -825,15 +833,14 @@ function weeklyHTML(p){
    '<select onchange="pdSet(\''+sj+'\',\'text\',this.value)" style="margin-bottom:6px">'+
    '<option value="">テキストをえらぶ…</option>'+
    p.books.map(b=>'<option value="'+esc(b)+'"'+(it.text===b?' selected':'')+'>'+esc(b)+'</option>').join('')+'</select>'+
-   '<div class="row" style="align-items:center">'+
-   '<span class="muted" style="flex:0 0 30px">P</span>'+
-   '<button class="bd-tl" style="flex:0 0 38px" onclick="pgStep(\''+sj+'\',\'from\',-1)">−</button>'+
-   '<input type="number" min="1" value="'+it.from+'" oninput="pdSet(\''+sj+'\',\'from\',this.value)" style="text-align:center">'+
-   '<button class="bd-tl" style="flex:0 0 38px" onclick="pgStep(\''+sj+'\',\'from\',1)">＋</button>'+
-   '<span style="flex:0 0 18px;text-align:center">〜</span>'+
-   '<button class="bd-tl" style="flex:0 0 38px" onclick="pgStep(\''+sj+'\',\'to\',-1)">−</button>'+
-   '<input type="number" min="1" value="'+it.to+'" oninput="pdSet(\''+sj+'\',\'to\',this.value)" style="text-align:center">'+
-   '<button class="bd-tl" style="flex:0 0 38px" onclick="pgStep(\''+sj+'\',\'to\',1)">＋</button></div>'
+   '<div class="pg-row"><span class="lb">はじめ P</span>'+
+   '<button class="bd-tl" onclick="pgStep(\''+sj+'\',\'from\',-1)">−</button>'+
+   '<input type="number" min="1" value="'+it.from+'" oninput="pdSet(\''+sj+'\',\'from\',this.value)">'+
+   '<button class="bd-tl" onclick="pgStep(\''+sj+'\',\'from\',1)">＋</button></div>'+
+   '<div class="pg-row"><span class="lb">おわり P</span>'+
+   '<button class="bd-tl" onclick="pgStep(\''+sj+'\',\'to\',-1)">−</button>'+
+   '<input type="number" min="1" value="'+it.to+'" oninput="pdSet(\''+sj+'\',\'to\',this.value)">'+
+   '<button class="bd-tl" onclick="pgStep(\''+sj+'\',\'to\',1)">＋</button></div>'
   :'')+'</div>';});
  let out='<div class="card" style="border:2px solid #CDE5F7"><h2>📅 '+(isNext?'らいしゅう':'こんしゅう')+'の作戦('+weekRangeLabel(pKey)+')'+
   (wk.planTs?' <span class="badge b-ok">作戦ずみ✓</span>':'')+'</h2>'+
@@ -861,6 +868,7 @@ function weeklyHTML(p){
     return '<div class="sess" style="cursor:pointer" onclick="weekDetail(\''+k+'\')"><span class="em">🗓️</span><div class="info">'+
     '<b>'+weekRangeLabel(k)+'</b> <span class="muted">タップでくわしく</span><br>'+
     '📅'+(w2.planTs?'作戦✓':'—')+' ⚔️'+(w2.test?w2.test.correct+'/'+w2.test.total+'問'+(w2.test.correct===w2.test.total?'💯':''):'—')+
+    (w2.test&&w2.test.items?'<br><span class="muted">'+w2.test.items.map(x=>x.subj+' '+x.correct+'/'+x.total).join('・')+'</span>':'')+
     ' 🔁'+((w2.reviews||[]).length?(w2.reviews.filter(r=>r.done).length+'/'+w2.reviews.length):'—')+
     (w2.report?' 🤖':'')+'</div></div>';}).join(''):'')+
   '</div>';
@@ -888,25 +896,54 @@ function savePlan(){const p=P();const d=ensureDraft(p);const key=d.key;
   first=grantBonus(p,wk,'plan','📅作戦けってい ボーナス',false);}
  checkWeekLoop(p,key);save();render();
  if(first)alert('作戦けってい⚔️ パパ・ママが承認すると 🎁ボーナススロットが とどくよ!');}
-function battleForm(){const p=P();const key=testTargetKey();const wk=p.weeks[key]||{};const t=wk.test;
- const marked=(wk.reviews||[]).map(r=>r.text);
- openModal('<h3>⚔️ ボスバトルのけっか('+weekRangeLabel(key)+')</h3>'+
- '<div class="row"><div><label>問題のかず</label><input id="bt-total" type="number" min="1" inputmode="numeric" value="'+esc(t?t.total:'')+'"></div>'+
- '<div><label>せいかいのかず</label><input id="bt-ok" type="number" min="0" inputmode="numeric" value="'+esc(t?t.correct:'')+'"></div></div>'+
- '<label>まちがえがあった教科(タップでえらぶ → 🔁リベンジリストになるよ)</label>'+
- '<div class="chips" id="bt-wrong">'+PLAN_SUBJ.map(sj=>'<div class="chip'+(marked.indexOf(sj)>=0?' on':'')+'" onclick="this.classList.toggle(\'on\')">'+sj+'</div>').join('')+'</div>'+
+let btDraft=null;
+function btEnsure(p){const key=testTargetKey();
+ if(btDraft&&btDraft.key===key&&btDraft.pid===S.currentProfile)return btDraft;
+ const wk=p.weeks[key]||{};const t=wk.test||{};
+ const items={};(t.items||[]).forEach(it=>{items[it.subj]={total:it.total,correct:it.correct};});
+ btDraft={key,pid:S.currentProfile,subjects:(t.items||[]).map(it=>it.subj),items};
+ return btDraft;}
+function battleForm(){btDraft=null;btEnsure(P());battleModal();}
+function battleModal(){const d=btDraft;
+ openModal('<h3>⚔️ ボスバトルのけっか('+weekRangeLabel(d.key)+')</h3>'+
+ '<label>バトルした教科(タップでえらぶ)</label><div class="chips">'+
+ PLAN_SUBJ.map(sj=>'<div class="chip'+(d.subjects.indexOf(sj)>=0?' on':'')+'" onclick="btToggle(\''+sj+'\')">'+sj+'</div>').join('')+'</div>'+
+ d.subjects.map(sj=>{const it=d.items[sj]||{total:'',correct:''};
+  return '<div style="margin-top:8px;padding:8px;background:#FFF8EA;border-radius:12px">'+
+  '<div style="font-weight:800;font-family:var(--disp);font-size:13px;margin-bottom:2px">'+sj+'</div>'+
+  '<div class="pg-row"><span class="lb">問題のかず</span>'+
+  '<input type="number" min="1" inputmode="numeric" value="'+esc(it.total)+'" oninput="btSet(\''+sj+'\',\'total\',this.value)"></div>'+
+  '<div class="pg-row"><span class="lb">せいかい</span>'+
+  '<input type="number" min="0" inputmode="numeric" value="'+esc(it.correct)+'" oninput="btSet(\''+sj+'\',\'correct\',this.value)"></div></div>';}).join('')+
+ (d.subjects.length?'<div class="muted" style="margin-top:6px">まちがいがあった教科は、じどうで🔁リベンジリストに入るよ</div>':
+  '<div class="muted" style="margin-top:6px">まずは教科をタップしてね</div>')+
  '<button class="btn" style="margin-top:14px" onclick="battleSave()">きろくする!</button>');}
-function battleSave(){const p=P();const key=testTargetKey();const wk=getWeek(p,key);
- const total=Math.floor(Number($('#bt-total').value)),ok=Math.floor(Number($('#bt-ok').value));
- if(!(total>=1)||!(ok>=0)||ok>total){alert('問題のかず(1いじょう)と せいかいのかず(0〜問題のかず)を たしかめてね');return;}
- const wrongs=[...document.querySelectorAll('#bt-wrong .chip.on')].map(c=>c.textContent);
+function btToggle(sj){const d=btDraft;if(!d)return;
+ const i=d.subjects.indexOf(sj);
+ if(i>=0)d.subjects.splice(i,1);
+ else{d.subjects.push(sj);if(!d.items[sj])d.items[sj]={total:'',correct:''};}
+ battleModal();}
+function btSet(sj,f,v){const d=btDraft;if(!d)return;
+ if(!d.items[sj])d.items[sj]={};d.items[sj][f]=v;}
+function battleSave(){const p=P();const d=btDraft;if(!d)return;const key=d.key;
+ if(!d.subjects.length){alert('バトルした教科を えらんでね');return;}
+ const items=[];
+ for(const sj of d.subjects){const it=d.items[sj]||{};
+  const t=Math.floor(Number(it.total)),c=Math.floor(Number(it.correct));
+  if(!(t>=1)||!(c>=0)||c>t){alert('「'+sj+'」の問題のかず(1いじょう)と せいかい(0〜問題のかず)を たしかめてね');return;}
+  items.push({subj:sj,total:t,correct:c});}
+ const wk=getWeek(p,key);
+ const total=items.reduce((a,x)=>a+x.total,0);
+ const correct=items.reduce((a,x)=>a+x.correct,0);
  const old=wk.reviews||[];
- wk.reviews=wrongs.map(sj=>{const prev=old.find(r=>r.text===sj);return{text:sj,done:prev?prev.done:false};});
+ wk.reviews=items.filter(x=>x.correct<x.total).map(x=>{
+  const prev=old.find(r=>r.text===x.subj);return{text:x.subj,done:prev?prev.done:false};});
  if(!wk.test)wk.test={};
- wk.test.total=total;wk.test.correct=ok;if(!wk.test.ts)wk.test.ts=Date.now();
+ wk.test.total=total;wk.test.correct=correct;wk.test.items=items;
+ if(!wk.test.ts)wk.test.ts=Date.now();
  let got=grantBonus(p,wk,'test','⚔️ボスバトル ボーナス',false);
- if(ok===total){if(grantBonus(p,wk,'perfect','💯まんてん!パーフェクトボーナス',true)){got=true;confetti();}}
- checkWeekLoop(p,key);save();closeModal();render();
+ if(correct===total){if(grantBonus(p,wk,'perfect','💯まんてん!パーフェクトボーナス',true)){got=true;confetti();}}
+ checkWeekLoop(p,key);save();closeModal();btDraft=null;render();
  if(got)alert('きろくしたよ⚔️ パパ・ママが承認すると 🎁スロットが とどくよ!');}
 function revengeHTML(p){const items=[];
  Object.keys(p.weeks).sort().reverse().forEach(k=>{
@@ -930,7 +967,8 @@ function weekDetail(k){const p=P();const w2=p.weeks[k];if(!w2)return;
  '<div class="sess"><span class="em">📅</span><div class="info"><b>作戦</b><br>'+
  (w2.planTs?esc(planItemsLabel(w2))||'(内容なし)':'たてなかった')+'</div></div>'+
  '<div class="sess"><span class="em">⚔️</span><div class="info"><b>ボスバトル</b><br>'+
- (w2.test?w2.test.correct+'/'+w2.test.total+'問 せいかい'+(w2.test.correct===w2.test.total?' 💯まんてん!':''):'やらなかった')+'</div></div>'+
+ (w2.test?w2.test.correct+'/'+w2.test.total+'問 せいかい'+(w2.test.correct===w2.test.total?' 💯まんてん!':'')+
+  (w2.test.items?'<br>'+w2.test.items.map(x=>x.subj+' '+x.correct+'/'+x.total).join(' ／ '):''):'やらなかった')+'</div></div>'+
  ((w2.reviews||[]).length?'<div class="sess"><span class="em">🔁</span><div class="info"><b>リベンジ</b><br>'+
   w2.reviews.map(r=>(r.done?'✅':'⬜')+esc(r.text)).join(' ')+'</div></div>':'')+
  (w2.report?'<button class="btn ghost sm" style="margin-top:8px" onclick="showReport(\''+k+'\')">🤖 この週のレポートをよむ</button>':''));}
@@ -951,7 +989,7 @@ async function makeReport(){const p=P();
   教科別の分:bySubj,自己申告の集中度:{ばっちり:fc.hi,ふつう:fc.mid,いまいち:fc.lo},
   現在の連続勉強日数:calcStreak(p),
   週の作戦:wk.planTs?(planItemsLabel(wk)||'内容未記入'):'たてていない',
-  週末ボスバトル:wk.test?(wk.test.correct+'/'+wk.test.total+'問正解'+(wk.test.correct===wk.test.total?'(満点)':'')):'未実施',
+  週末ボスバトル:wk.test?(wk.test.correct+'/'+wk.test.total+'問正解'+(wk.test.correct===wk.test.total?'(満点)':'')+(wk.test.items?' 内訳:'+wk.test.items.map(x=>x.subj+x.correct+'/'+x.total).join(','):'')):'未実施',
   リベンジ:(wk.reviews||[]).length?(wk.reviews.filter(r=>r.done).length+'/'+wk.reviews.length+'教科クリア'):'対象なし',
   パーフェクトウィーク連続週数:weekLoopStreak(p,key)};
  const btn=$('#rep-btn');if(btn){btn.disabled=true;btn.textContent='🤖 かんがえ中…';}
@@ -1037,6 +1075,8 @@ function examForm(i){const e=(i!=null)?P().exams[i]:null;
  '<label>メモ</label><input id="ex-memo" value="'+esc(e?(e.memo||''):'')+'" placeholder="算数がのびた!など">'+
  '<button class="btn" style="margin-top:14px" onclick="examSave('+(i!=null?i:'null')+')">'+(e?'なおして保存':'きろくする')+'</button>'+
  (e?'<button class="btn ghost sm" style="margin-top:8px;color:#B04040" onclick="examDel('+i+')">🗑 このけっかを削除</button>':''));}
+function exSortKey(e){const a=String(e.date||'').split('-').map(Number);
+ return new Date(a[0]||2000,(a[1]||1)-1,a[2]||1).getTime();}
 function examSave(i){const scores={};let any=false;
  document.querySelectorAll('[data-ex-s]').forEach(inp=>{const v=inp.value.trim();
   if(v!==''){scores[inp.dataset.exS]=Number(v);any=true;}});
@@ -1044,6 +1084,7 @@ function examSave(i){const scores={};let any=false;
  const rec={name:$('#ex-name').value.trim()||'模試',date:$('#ex-date').value||todayKey(),
   scores,memo:$('#ex-memo').value.trim()};
  if(i==null)P().exams.push(rec);else P().exams[i]=rec;
+ P().exams.sort((a,b)=>exSortKey(a)-exSortKey(b)); // 日づけ順にならべる
  save();closeModal();render();}
 function examDel(i){if(confirm('このけっかを削除する?(もどせないよ)')){
  P().exams.splice(i,1);save();closeModal();render();}}
@@ -1185,7 +1226,7 @@ function setHTML(){const p=P();
  '<div class="card"><h2>💾 データ</h2>'+
  '<div class="muted">データはこの端末の中にだけ保存されます。ときどきバックアップしてね(写真・メモボードはふくまれません)。</div>'+
  '<button class="btn ghost sm" style="margin-top:10px" onclick="exportData()">バックアップを保存(JSON)</button>'+
- '<div class="muted" style="margin-top:8px;text-align:right">スタディきち v10</div></div>';}
+ '<div class="muted" style="margin-top:8px;text-align:right">スタディきち v11</div></div>';}
 function saveAiName(){P().aiName=$('#ai-name').value.trim()||'そらとも';save();render();}
 /* --- メンバー編集(パパ・ママモード内) --- */
 function addProfile(){const id='p'+Date.now();
