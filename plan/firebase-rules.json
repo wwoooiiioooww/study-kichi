@@ -1,0 +1,16 @@
+{
+  "rules": {
+    "families": {
+      "$fid": { ".read": "auth != null", ".write": "auth != null" }
+    },
+    "feedback": {
+      ".read": false,
+      "$id": {
+        ".write": "auth != null && !data.exists()",
+        ".validate": "newData.hasChildren(['text','ts']) && newData.child('text').isString() && newData.child('text').val().length <= 2000"
+      }
+    },
+    ".read": false,
+    ".write": false
+  }
+}

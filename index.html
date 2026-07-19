@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="スタディきち">
-<title>スタディきち｜そら＆ふう</title>
+<title>スタディきち</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
@@ -247,12 +247,14 @@ nav button.on .i{transform:scale(1.2)}
    データはこの端末の中だけに保存されます（localStorage / IndexedDB）
    ============================================================ */
 /* ---------- マスタ ---------- */
+const APP_VER='v15'; // せってい表示とフィードバックの共通バージョン。sw.js の CACHE と同時に上げること
+/* 汎用サンプル(配布用)。既存端末の保存済みデータは上書きされない */
 const DEFAULT_BASES=[
- {id:'solid',name:'ソリッドスクエア',em:'🏢'},
- {id:'mcd',name:'マクドナルド',em:'🍟'},
- {id:'light',name:'ライトハウス自習室',em:'📚'},
- {id:'gakudo',name:'学童',em:'🎒'},
+ {id:'lib',name:'としょかん',em:'📚'},
+ {id:'school',name:'図書室',em:'🏫'},
+ {id:'jido',name:'じどうかん',em:'🎨'},
  {id:'home',name:'おうち机',em:'🏠'},
+ {id:'cafe',name:'きちカフェ',em:'☕'},
 ];
 const TITLES=[[40,'ぬし'],[20,'たつじん'],[10,'じょうれん'],[3,'かよいはじめ']];
 const SUBJECTS=['算数','国語','理科','社会','英語','その他'];
@@ -281,9 +283,9 @@ function mkProfile(name,em,grade){return{
  examTarget:{label:'次の模試の目標',value:''},
  bigGoals:[
   {title:'模試で目標クリア!',reward:'すきなレストランへGO 🍽️'},
-  {title:'中学ごうかく!!',reward:'スペシャル沖縄旅行 ✈️🌺'},
+  {title:'中学ごうかく!!',reward:'スペシャル旅行 ✈️🌟'},
  ],
- pool:[{name:'小籠包ディナー券 🥟',price:800},{name:'魚だしごはんリクエスト券 🐟',price:400},{name:'パパと30分あそぶ券 🎮',price:300}],
+ pool:[{name:'すきなレストランでディナー券 🍽️',price:800},{name:'すきなおやつリクエスト券 🍩',price:400},{name:'パパ・ママと30分あそぶ券 🎮',price:300}],
  tickets:[],
  lastGoldenMilestone:0,
  pin:null,
@@ -301,7 +303,7 @@ const DEFAULT_STATE={
 v:5, tab:'home', currentProfile:'sora', parentPin:null,
  bases:JSON.parse(JSON.stringify(DEFAULT_BASES)),
  gemini:{key:'',model:'gemini-3.5-flash'}, // ※Googleの現行モデル名。エラーになる場合は最新のモデル名に変更してください
- profiles:{ sora:mkProfile('空花','🌸','小5'), fuka:mkProfile('風花','🍃','小3') },
+ profiles:{ sora:mkProfile('そら','🌸','小5'), fuka:mkProfile('ふう','🍃','小3') },
  activeSession:null,
  deleted:{}, basesMt:0, pinMt:0, /* v13: マージ用(きち・プロフィール削除の墓標 / bases・親PINの更新時刻) */
 };
@@ -861,7 +863,7 @@ function closeBoard(){
    確率(ゴールデン): 8% / 20% / 35% / 37%
    ポイントには時間係数がかかる: 15分未満×0.3 / 15〜44分×1.0 / 45分以上×1.5
    券ジャックポットは「その日の合計25分以上」のセッションだけ抽選対象 */
-const EMO=['🍀','⭐','🥟','🐟','🌸','🍃','👑'];
+const EMO=['🍀','⭐','🍩','🎈','🌸','🍃','👑'];
 let slotQueue=[];let goldenM=0;
 function openSlots(){const p=P();
  slotQueue=spinQueue(p).map(s=>({t:'s',id:s.id}));
@@ -922,6 +924,26 @@ function spinNext(){const p=P();const item=slotQueue[0];
   if(slotQueue.length){btn.textContent='つぎのスロットへ(あと'+slotQueue.length+'回)🎰';btn.onclick=showSlotModal;}
   else{btn.textContent='とじる';btn.onclick=()=>{closeModal();render();};}
  },1600);}
+/* ---------- 🎈はじめてガイド(初回だけ。せっていから再表示可) ---------- */
+const GUIDE_LS_KEY='studykichi_guide'; // 端末ローカル(同期・バックアップに混ぜない)
+const GUIDE_PAGES=[
+ {em:'🚀',t:'きちに しゅつげき!',b:'ホームで きょうの「きち(勉強ばしょ)」をタップして、タイマーで べんきょうスタート!<br>まずは<b>「5分だけ」</b>でOK。はじめるのが いちばんえらい!'},
+ {em:'🎰',t:'がんばりが スロットに!',b:'きろくを パパ・ママが「がんばったね」って承認すると、🎰スロットがまわせるよ。<br>⭐ポイントをためて「こうかんじょ」で ごほうび券や🎨きせかえと こうかんしよう!'},
+ {em:'⚔️',t:'週の さくせん と ボスバトル',b:'土曜は📅<b>さくせん会議</b>で らいしゅうの作戦をたてて、週まつは⚔️<b>ボスバトル</b>にちょうせん!<br>わからない問題は 🤖AI相棒に しつもんできるよ。'},
+ {em:'👨',t:'保護者の方へ',b:'「せってい → パパ・ママモード」に、承認・ごほうび・特別ミッション・かぞく同期(複数端末)・AIキー設定があります。<br>このガイドは「せってい」からいつでも見られます。'},
+];
+function guideSeen(){try{return !!localStorage.getItem(GUIDE_LS_KEY);}catch(e){return true;}}
+function showGuide(i){const gi=Math.max(0,Math.min(GUIDE_PAGES.length-1,i||0));
+ try{localStorage.setItem(GUIDE_LS_KEY,'1');}catch(e){}
+ const g=GUIDE_PAGES[gi];const last=gi===GUIDE_PAGES.length-1;
+ openModal('<div style="text-align:center;padding:6px 0">'+
+ '<div style="font-size:52px">'+g.em+'</div>'+
+ '<h3 style="margin:8px 0 6px;justify-content:center">'+g.t+'</h3>'+
+ '<div style="font-size:14px;line-height:1.9;color:var(--ink-soft);text-align:left">'+g.b+'</div>'+
+ '<div style="margin:12px 0 4px">'+GUIDE_PAGES.map((_,j)=>'<span style="display:inline-block;width:8px;height:8px;border-radius:50%;margin:0 3px;background:'+(j===gi?'var(--blue)':'var(--line)')+'"></span>').join('')+'</div>'+
+ '<button class="btn" style="margin-top:8px" onclick="'+(last?'closeModal()':'showGuide('+(gi+1)+')')+'">'+(last?'はじめる! 🚀':'つぎへ →')+'</button>'+
+ (last?'':'<button class="btn ghost sm" style="margin-top:8px" onclick="closeModal()">スキップ</button>')+
+ '</div>');}
 /* ---------- 🚀ロケットOP(起動時1回だけのスプラッシュ) ---------- */
 function showSplash(){
  if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches)return;
@@ -935,7 +957,7 @@ function showSplash(){
  if(rk)rk.addEventListener('animationend',()=>setTimeout(done,120));
  setTimeout(done,1300); // 保険タイマー
  document.body.appendChild(el);}
-function confetti(){const em=['🎉','⭐','🌸','✨','🥟','🐟'];
+function confetti(){const em=['🎉','⭐','🌸','✨','🌈','🍀'];
  for(let i=0;i<28;i++){const s=document.createElement('span');s.className='confetti';
   s.textContent=em[i%em.length];s.style.left=(Math.random()*100)+'vw';
   s.style.animationDelay=(Math.random()*.6)+'s';document.body.appendChild(s);
@@ -1077,14 +1099,14 @@ function weeklyHTML(p){
   '<div class="muted">週まつに、おうちの人がテキストから えらんだ問題にちょうせん(30分くらい)。💯まんてんなら🔥ゴールデンスロット!</div>'+
   '<button class="btn sm" style="margin-top:8px" onclick="battleForm()">'+(bwk.test?'✏️ こんしゅうのけっかをなおす':'⚔️ バトルのけっかをきろく 🎁')+'</button>'+
   revengeHTML(p)+
-  (hist.length?'<h2 style="margin-top:14px">📖 まいしゅうの きろく</h2>'+
+  (hist.length?'<details class="pd"><summary>📖 まいしゅうの きろく('+hist.length+')</summary><div class="pd-body">'+
    hist.map(k=>{const w2=p.weeks[k];
     return '<div class="sess" style="cursor:pointer" onclick="weekDetail(\''+k+'\')"><span class="em">🗓️</span><div class="info">'+
     '<b>'+weekRangeLabel(k)+'</b> <span class="muted">タップでくわしく</span><br>'+
     '📅'+(w2.planTs?'作戦✓':'—')+' ⚔️'+(w2.test?w2.test.correct+'/'+w2.test.total+'問'+(w2.test.correct===w2.test.total?'💯':''):'—')+
     (w2.test&&w2.test.items?'<br><span class="muted">'+w2.test.items.map(x=>x.subj+' '+x.correct+'/'+x.total).join('・')+'</span>':'')+
     ' 🔁'+((w2.reviews||[]).length?(w2.reviews.filter(r=>r.done).length+'/'+w2.reviews.length):'—')+
-    (w2.report?' 🤖':'')+'</div></div>';}).join(''):'')+
+    (w2.report?' 🤖':'')+'</div></div>';}).join('')+'</div></details>':'')+
   '</div>';
  /* AIレポート */
  out+='<div class="card"><h2>🤖 1週間レポート</h2>'+
@@ -1446,17 +1468,20 @@ function setHTML(){const p=P();
    :'<div class="chip" style="opacity:.5" onclick="go(\'home\')">'+th.em+' '+th.name+'(こうかんじょで'+THEME_PRICE+'pt)</div>';
  }).join('')+'</div></div>'+
  '<div class="card"><h2>👨 パパ・ママモード'+(pend?' <span class="badge b-pend">承認まち '+pend+'</span>':'')+'</h2>'+
- '<div class="muted">承認・ごほうび券・目標・APIキー・メンバーやきちの編集はこちら(おうちの人せんよう)</div>'+
+ '<div class="muted">承認・ごほうび券・目標・APIキー・かぞく同期・メンバーやきちの編集はこちら(おうちの人せんよう)</div>'+
  '<button class="btn sm" style="margin-top:10px" onclick="parentGate()">🔐 ひらく</button></div>'+
- '<div class="card"><h2>📱 アプリとしてつかう</h2>'+
+ '<div class="card"><h2>📖 つかいかた</h2>'+
+ '<div class="muted">はじめてガイドを もういちど見られるよ。</div>'+
+ '<button class="btn ghost sm" style="margin-top:8px" onclick="showGuide(0)">🎈 つかいかたガイドを見る</button></div>'+
+ '<details class="pd"><summary>📱 アプリとしてつかう</summary><div class="pd-body">'+
  '<div class="muted">ホーム画面についかすると、アプリみたいに全画面でつかえるよ。<br>'+
  '・Android(Chrome):右上の⋮メニュー →「ホーム画面に追加」<br>'+
  '・iPhone(Safari):共有ボタン →「ホーム画面に追加」</div>'+
- (window.deferredPrompt?'<button class="btn sm" style="margin-top:10px" onclick="installApp()">📲 インストールする</button>':'')+'</div>'+
- '<div class="card"><h2>💾 データ</h2>'+
+ (window.deferredPrompt?'<button class="btn sm" style="margin-top:10px" onclick="installApp()">📲 インストールする</button>':'')+'</div></details>'+
+ '<div class="card" style="margin-top:14px"><h2>💾 データ</h2>'+
  '<div class="muted">データはこの端末の中にだけ保存されます。ときどきバックアップしてね(写真・メモボードはふくまれません)。</div>'+
  '<button class="btn ghost sm" style="margin-top:10px" onclick="exportData()">バックアップを保存(JSON)</button>'+
- '<div class="muted" style="margin-top:8px;text-align:right">スタディきち v14</div></div>';}
+ '<div class="muted" style="margin-top:8px;text-align:right">スタディきち '+APP_VER+'<br>made by そら ＆ ふう ＆ パパ 🚀</div></div>';}
 function saveAiName(){P().aiName=$('#ai-name').value.trim()||'そらとも';P().metaMt=Date.now();save();render();}
 /* --- メンバー編集(パパ・ママモード内) --- */
 function addProfile(){const id='p'+Date.now();
@@ -1602,7 +1627,8 @@ function openParent(){const p=P();const pend=p.sessions.filter(s=>s.status==='pe
   '<input type="file" accept=".json" onchange="importMerge(this)">'+
   '<h2 style="margin-top:14px">🧨 初期化</h2>'+
   '<div class="muted">全メンバーのきろく・ポイント・券・会話・写真・PIN・APIキーをすべて消して、はじめての状態にもどします。</div>'+
-  '<button class="btn ghost sm" style="margin-top:6px;color:#B04040" onclick="factoryReset()">初期設定にもどす</button>';
+  '<button class="btn ghost sm" style="margin-top:6px;color:#B04040" onclick="factoryReset()">初期設定にもどす</button>'+
+  feedbackSectionHTML();
  openModal('<h3>👨 パパ・ママモード('+esc(p.name)+')</h3>'+
   pdSec('approve','✅ 承認センター',nApprove?('承認まち '+nApprove):'',secApprove,true)+
   pdSec('mission','🎯 特別ミッションを出す','',secMission,false)+
@@ -1978,13 +2004,50 @@ function syncJoin(){const v=($('#sync-code-in')?$('#sync-code-in').value.trim().
 function syncShowCode(){
  openModal('<h3>🔑 かぞくコード</h3>'+
  '<div style="font-family:var(--disp);font-weight:800;font-size:18px;word-break:break-all;background:#F4F9FE;border:2px dashed var(--line);border-radius:12px;padding:12px;text-align:center">'+esc(sync.code||'')+'</div>'+
- '<div class="muted" style="margin-top:10px">⚠️ このコードを知っている人はデータを読み書きできます。<b>家族以外に教えないでください。</b><br>追加したい端末の「パパ・ママモード → かぞく同期 → つながる」に入力します。</div>'+
+ '<div class="row" style="margin-top:10px">'+
+ '<button class="btn blue sm" onclick="syncCopyCode()">📋 コピー</button>'+
+ (navigator.share?'<button class="btn blue sm" onclick="syncShareCode()">📤 共有</button>':'')+'</div>'+
+ '<div class="muted" style="margin-top:10px">⚠️ このコードを知っている人はデータを読み書きできます。<b>家族以外に教えないでください。</b><br>追加したい端末の「パパ・ママモード → かぞく同期 → つながる」に入力します(26文字の手入力がたいへんなときは、コピーしてLINE等の家族グループへ)。</div>'+
  '<button class="btn ghost sm" style="margin-top:12px" onclick="openParent();var pd=document.getElementById(\'pd-sync\');if(pd)pd.open=true;">← もどる</button>');}
+function syncCopyCode(){if(!sync.code)return;
+ if(navigator.clipboard&&navigator.clipboard.writeText)
+  navigator.clipboard.writeText(sync.code).then(()=>alert('コピーしました📋'),()=>prompt('ながおしでコピーしてください',sync.code));
+ else prompt('ながおしでコピーしてください',sync.code);}
+function syncShareCode(){if(navigator.share&&sync.code)
+ navigator.share({text:'スタディきちの かぞくコード:\n'+sync.code}).catch(()=>{});}
 function syncDisconnect(){
  if(!confirm('同期を切断しますか?(この端末のデータは残ります。もう一度つなぐにはかぞくコードが必要です)'))return;
  if(syncTransport)try{syncTransport.stop();}catch(e){}
  sync.code=null;syncStatus='off';syncSave();openParent();
  const pd=$('#pd-sync');if(pd)pd.open=true;}
+/* ---------- 📮フィードバック(保護者→開発者。書き込み専用ノード=作者だけがコンソールで閲覧) ---------- */
+const FEEDBACK_LS_KEY='studykichi_fb_ts';
+function feedbackSectionHTML(){
+ if(!syncConfigured())return '';
+ return '<h2 style="margin-top:14px">📮 かいはつ者への感想・要望</h2>'+
+ '<div class="muted">アプリ改善のため、作者だけが読める形で送られます(他の利用者には見えません)。返信はできません。お名前・個人情報は書かないでください。送信は1日1回まで。</div>'+
+ '<label>よかった点</label><input id="fb-good" maxlength="300" placeholder="例:子どもが自分から勉強するようになった">'+
+ '<label>こまったこと・こうなったら嬉しい</label><textarea id="fb-bad" maxlength="800" style="height:64px" placeholder="例:〇〇の画面がわかりにくい/△△がほしい"></textarea>'+
+ '<label>ニックネーム(任意)</label><input id="fb-name" maxlength="30">'+
+ '<button class="btn blue sm" style="margin-top:8px" onclick="sendFeedback()">📮 送信</button>';}
+async function sendFeedback(){
+ const good=($('#fb-good')?$('#fb-good').value.trim():'');
+ const bad=($('#fb-bad')?$('#fb-bad').value.trim():'');
+ const name=($('#fb-name')?$('#fb-name').value.trim():'');
+ if(!good&&!bad){alert('内容を入力してください');return;}
+ try{const last=Number(localStorage.getItem(FEEDBACK_LS_KEY))||0;
+  if(Date.now()-last<864e5){alert('送信は1日1回までです。また明日お願いします🙏');return;}}catch(e){}
+ const payload={text:((good?'[よかった] '+good+'\n':'')+(bad?'[要望] '+bad:'')).slice(0,2000),ts:Date.now(),ver:APP_VER};
+ if(name)payload.name=name.slice(0,30);
+ try{
+  await loadFirebaseSdk();
+  const c=window.FB_CONFIG_TEST||FIREBASE_CONFIG;
+  if(!firebase.apps.length)firebase.initializeApp(c);
+  await firebase.auth().signInAnonymously();
+  await firebase.database().ref('feedback').push(payload);
+  try{localStorage.setItem(FEEDBACK_LS_KEY,String(Date.now()));}catch(e){}
+  alert('送信しました。ありがとうございます!📮');openParent();
+ }catch(e){alert('送信できませんでした。でんぱのあるところで もう一度ためしてください');}}
 
 /* ---------- バックアップ ---------- */
 function exportData(){const blob=new Blob([JSON.stringify(S,null,1)],{type:'application/json'});
@@ -2043,6 +2106,7 @@ window.addEventListener('beforeinstallprompt',e=>{
 showSplash(); /* 🚀ロケットOP → launchGate(だれがつかう?) → ホーム の順 */
 render();
 launchGate();
+if(!guideSeen()&&!$('#modal-root').innerHTML)showGuide(0); /* 🎈初回だけガイド(PINゲート表示中は出さない) */
 /* ☁️かぞく同期: 設定済みかつコード保存済みなら自動接続。オンライン復帰で保留分を再送 */
 syncLoad();
 if(syncConfigured()&&sync.code)syncConnect();

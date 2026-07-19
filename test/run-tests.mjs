@@ -18,21 +18,23 @@ function ok(cond, name) {
 function eq(a, b, name) { ok(Object.is(a, b), name + (Object.is(a, b) ? '' : ` (got ${JSON.stringify(a)}, want ${JSON.stringify(b)})`)); }
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-/* 起動ヘルパー。preState を渡すと localStorage に旧データを仕込んでから起動する */
-function boot(preState) {
+/* 起動ヘルパー。preState=localStorageの旧データ / extraLS=追加のlocalStorageキー */
+function boot(preState, extraLS) {
   const errors = [];
+  const alerts = [];
   const dom = new JSDOM(html, {
     url: 'https://example.com/',
     runScripts: 'dangerously',
     pretendToBeVisual: true,
     beforeParse(window) {
       window.confirm = () => true;
-      window.alert = () => {};
+      window.alert = m => alerts.push(String(m));
       window.addEventListener('error', e => errors.push(e.message));
       if (preState) window.localStorage.setItem('studykichi_v1', JSON.stringify(preState));
+      if (extraLS) Object.entries(extraLS).forEach(([k, v]) => window.localStorage.setItem(k, v));
     },
   });
-  return { dom, w: dom.window, errors };
+  return { dom, w: dom.window, errors, alerts };
 }
 
 /* ---------- 1. 起動 + 🚀ロケットOP ---------- */
@@ -480,11 +482,73 @@ console.log('\n[10] 👨親モードUI');
   w.close();
 }
 
+/* ---------- 11. v15(ガイド・汎用デフォルト・折りたたみ・フィードバック) ---------- */
+console.log('\n[11] 🎈v15');
+{
+  const { w, errors } = boot();
+  ok(w.document.querySelector('#modal-root').innerHTML.includes('しゅつげき'), '初回はガイドが自動表示される');
+  eq(w.localStorage.getItem('studykichi_guide'), '1', '表示済みフラグが端末ローカルに立つ');
+  w.showGuide(3);
+  ok(w.document.querySelector('#modal-root').innerHTML.includes('保護者の方へ'), '最終ページに保護者向け案内');
+  w.closeModal();
+  const St = w.eval('S');
+  eq(St.profiles.sora.name, 'そら', 'デフォルト名「そら」');
+  eq(St.profiles.fuka.name, 'ふう', 'デフォルト名「ふう」');
+  ok(St.bases.some(b => b.name === 'としょかん') && St.bases.some(b => b.name === 'きちカフェ'), 'きち初期値が汎用化');
+  ok(St.profiles.sora.pool[0].name.includes('レストラン'), 'ごほうび券サンプルが汎用化');
+  eq(w.document.title, 'スタディきち', 'タブタイトルが汎用化');
+  w.eval('S').tab = 'set'; w.render();
+  const app = () => w.document.querySelector('#app').innerHTML;
+  ok(app().includes('そら ＆ ふう ＆ パパ'), 'せっていにクレジット表記');
+  ok(app().includes('つかいかたガイド'), 'ガイド再表示ボタンがある');
+  ok(!!w.document.querySelector('#app details.pd'), 'せってい「アプリとしてつかう」が折りたたみ');
+  const p = w.P();
+  p.weeks['2026-7-11'] = { subjects: ['算数'], items: [], range: 'x', goal: '', planTs: 1, planMt: 1, testMt: 0, test: null, reviews: [], granted: {} };
+  w.eval('S').tab = 'goal'; w.render();
+  ok(app().includes('まいしゅうの きろく(1)'), 'まいしゅうのきろくが折りたたみ+件数表示');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  // 表示済みガイドは出ない/既存データは汎用デフォルト化の影響を受けない
+  const old = { v: 5, currentProfile: 'sora', bases: [{ id: 'solid', name: 'ソリッドスクエア', em: '🏢' }],
+    profiles: { sora: { name: '空花', em: '🌸', grade: '小5', points: 0, sessions: [], exams: [], chat: [], pool: [], tickets: [], weeks: {}, bonusSpins: [], books: [] } } };
+  const { w, errors } = boot(old, { studykichi_guide: '1' });
+  eq(w.document.querySelector('#modal-root').innerHTML, '', '表示済みならガイドは出ない');
+  eq(w.P().name, '空花', '既存メンバー名は上書きされない');
+  eq(w.eval('S').bases[0].name, 'ソリッドスクエア', '既存のきちは上書きされない');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  // 📮フィードバック(UI・バリデーション・1日1回制限)
+  const { w, errors, alerts } = boot(undefined, { studykichi_guide: '1' });
+  w.openParent();
+  ok(w.document.querySelector('#modal-root').innerHTML.includes('かいはつ者への感想・要望'), 'フィードバック欄が保護者モードにある');
+  w.sendFeedback();
+  ok(alerts.some(a => a.includes('内容を入力')), '空送信はバリデーションで止まる');
+  w.localStorage.setItem('studykichi_fb_ts', String(Date.now()));
+  w.document.querySelector('#fb-good').value = 'テストの感想';
+  w.sendFeedback();
+  ok(alerts.some(a => a.includes('1日1回')), '連投は1日1回制限で止まる');
+  w.closeModal();
+  // かぞくコードのコピー導線(モックtransportで接続してから確認)
+  w.FB_CONFIG_TEST = { apiKey: 'test', databaseURL: 'https://test' };
+  w.setSyncTransport({ start() { return Promise.resolve(); }, stop() {}, push(fn) { this.node = fn(this.node); return Promise.resolve(); } });
+  w.syncStart();
+  await sleep(80);
+  w.syncShowCode();
+  ok(w.document.querySelector('#modal-root').innerHTML.includes('📋 コピー'), 'かぞくコードにコピーボタン');
+  w.closeModal();
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+
 /* ---------- 6. リリース規約(6ファイル構成 + バージョン同時更新) ---------- */
 console.log('\n[6] リリース規約');
 {
   const sw = fs.readFileSync(path.join(__dirname, '..', 'sw.js'), 'utf8');
-  const vApp = (html.match(/スタディきち v(\d+)/) || [])[1];
+  const vApp = (html.match(/APP_VER='v(\d+)'/) || [])[1];
   const vSw = (sw.match(/studykichi-v(\d+)/) || [])[1];
   ok(vApp === vSw, `せってい表示(v${vApp})と sw.js CACHE(v${vSw})が一致する`);
   for (const f of ['index.html', 'manifest.json', 'sw.js', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png']) {
