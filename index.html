@@ -185,6 +185,15 @@ nav button.on .i{transform:scale(1.2)}
 /* confetti */
 .confetti{position:fixed;top:-10px;font-size:18px;z-index:200;animation:fall 2.4s linear forwards;pointer-events:none}
 @keyframes fall{to{transform:translateY(105vh) rotate(540deg);opacity:.7}}
+/* ---------- パパ・ママモードの折りたたみセクション ---------- */
+.pd{border:2px solid var(--line);border-radius:14px;margin-top:10px;background:#fff}
+.pd summary{cursor:pointer;padding:11px 12px;font-family:var(--disp);font-weight:800;font-size:14px;
+  list-style:none;display:flex;align-items:center;gap:6px;-webkit-user-select:none;user-select:none}
+.pd summary::-webkit-details-marker{display:none}
+.pd summary::after{content:"▾";margin-left:auto;color:var(--ink-soft);transition:.15s}
+.pd[open] summary::after{transform:rotate(180deg)}
+.pd[open] summary{border-bottom:1px dashed var(--line)}
+.pd .pd-body{padding:2px 12px 12px}
 /* ---------- 🚀ロケットOP(起動スプラッシュ) ---------- */
 #splash{position:fixed;inset:0;z-index:500;overflow:hidden;cursor:pointer;
   background:linear-gradient(180deg,var(--hd1) 0%,var(--hd2) 55%,var(--sky-bg) 100%)}
@@ -367,6 +376,7 @@ function save(){
     (pr.chatArchive||[]).forEach(a=>(a.msgs||[]).forEach(m=>{if(m.img)m.img=null;}));
   });
   localStorage.setItem('studykichi_v1',JSON.stringify(S));}catch(_){}}
+ syncSchedulePush(); // ☁️同期中なら2秒デバウンスでクラウドへ(受信適用中は何もしない)
 }
 function P(){return S.profiles[S.currentProfile];}
 
@@ -564,13 +574,14 @@ function whoParent(){
  setTimeout(()=>{const el=$('#who-ppin');if(el)el.focus();},60);}
 function renderNav(){$('#nav').innerHTML=NAV.map(([id,i,l])=>
  '<button class="'+(S.tab===id?'on':'')+'" onclick="go(\''+id+'\')"><span class="i">'+i+'</span>'+l+'</button>').join('');}
-function go(t){if(recOn)try{recog.stop();}catch(e){} S.tab=t;save();render();}
+function go(t){if(recOn)try{recog.stop();}catch(e){} S.tab=t;syncRenderPending=false;save();render();}
 
 /* ---------- モーダル ---------- */
 function openModal(html,closable=true){
  $('#modal-root').innerHTML='<div class="overlay" '+(closable?'onclick="if(event.target===this)closeModal()"':'')+'>'+
  '<div class="modal">'+(closable?'<button class="close-x" onclick="closeModal()">✕</button>':'')+html+'</div></div>';}
-function closeModal(){$('#modal-root').innerHTML='';}
+function closeModal(){$('#modal-root').innerHTML='';
+ if(syncRenderPending&&!S.activeSession&&S.tab!=='goal'){syncRenderPending=false;render();}} // 同期で保留した描画を反映
 async function viewPhotoInline(id){const d=await getPhoto(id);if(!d)return;
  const el=document.createElement('div');el.className='overlay';el.style.zIndex=300;
  el.onclick=()=>el.remove();
@@ -1445,7 +1456,7 @@ function setHTML(){const p=P();
  '<div class="card"><h2>💾 データ</h2>'+
  '<div class="muted">データはこの端末の中にだけ保存されます。ときどきバックアップしてね(写真・メモボードはふくまれません)。</div>'+
  '<button class="btn ghost sm" style="margin-top:10px" onclick="exportData()">バックアップを保存(JSON)</button>'+
- '<div class="muted" style="margin-top:8px;text-align:right">スタディきち v13</div></div>';}
+ '<div class="muted" style="margin-top:8px;text-align:right">スタディきち v14</div></div>';}
 function saveAiName(){P().aiName=$('#ai-name').value.trim()||'そらとも';P().metaMt=Date.now();save();render();}
 /* --- メンバー編集(パパ・ママモード内) --- */
 function addProfile(){const id='p'+Date.now();
@@ -1471,6 +1482,7 @@ function factoryReset(){
  if(!confirm('すべてのデータ(全メンバーのきろく・ポイント・券・会話・写真・PIN・APIキー)を消して、はじめての状態にもどします。よろしいですか?'))return;
  if(!confirm('この操作は もどせません。本当に初期化しますか?'))return;
  try{localStorage.removeItem('studykichi_v1');}catch(e){}
+ try{localStorage.removeItem(SYNC_LS_KEY);}catch(e){} // かぞくコードも消す(古い家族へ push しないため)
  try{indexedDB.deleteDatabase('studykichi');}catch(e){}
  location.reload();}
 
@@ -1487,97 +1499,118 @@ function setPin(){const v=$('#pin-new').value;
  if(!/^\d{4}$/.test(v)){alert('4けたの数字で!');return;}
  S.parentPin=v;S.pinMt=Date.now();save();closeModal();openParent();}
 function checkPin(){if($('#pin-in').value===S.parentPin){closeModal();openParent();}else alert('ちがうみたい…');}
+/* 折りたたみセクション(パパ・ママモード整理用) */
+function pdSec(id,title,badge,body,open2){
+ return '<details class="pd" id="pd-'+id+'"'+(open2?' open':'')+'><summary>'+title+
+  (badge?' <span class="badge b-pend">'+badge+'</span>':'')+'</summary>'+
+  '<div class="pd-body">'+body+'</div></details>';}
 function openParent(){const p=P();const pend=p.sessions.filter(s=>s.status==='pending');
+ const nApprove=pend.length+pendingBonus(p).length+claimedMissions(p).length;
+ /* ① 承認センター */
+ const secApprove=
+  '<h2 style="margin-top:2px">✅ セッション('+pend.length+')</h2>'+
+  '<div class="muted">写真やメモを見て「がんばったね承認」を。承認すると、お子さんが次にアプリをひらいたときにスロットが回せるようになります(なるべく1〜2日以内の承認がおすすめ)。</div>'+
+  '<div id="pend-list">'+(pend.length?pend.map(parentSessRow).join(''):'<div class="muted">承認まちはありません</div>')+'</div>'+
+  '<h2 style="margin-top:14px">🎁 ボーナス('+pendingBonus(p).length+')</h2>'+
+  '<div class="muted">作戦・ボスバトル・リベンジのボーナスです。承認すると🎰スロット+1回。</div>'+
+  '<div>'+(pendingBonus(p).length?pendingBonus(p).map(b=>'<div class="sess" id="pb-'+b.id+'"><span class="em">🎁</span>'+
+   '<div class="info"><b>'+esc(b.reason)+'</b>'+(b.golden?' <span class="badge b-pend">🔥ゴールデン</span>':'')+'</div>'+
+   '<button class="btn blue sm" style="width:56px;flex:0 0 auto" onclick="judgeBonus(\''+b.id+'\',1)">承認</button>'+
+   '<button class="btn ghost sm" style="width:60px;flex:0 0 auto;color:#B04040" onclick="judgeBonus(\''+b.id+'\',0)">却下</button></div>').join(''):
+   '<div class="muted">承認まちのボーナスはありません</div>')+'</div>'+
+  '<h2 style="margin-top:14px">🎯 ミッション('+claimedMissions(p).length+')</h2>'+
+  '<div class="muted">承認するとポイントを直接付与します(スロットは経由しません)。却下すると「出題中」に戻ります。</div>'+
+  '<div>'+(claimedMissions(p).length?claimedMissions(p).map(ms=>'<div class="sess" id="pm-'+ms.id+'"><span class="em">🎯</span>'+
+   '<div class="info"><b>'+esc(ms.title)+'</b> +'+ms.pts+'pt'+(missionDueLabel(ms)?' <span class="muted">'+missionDueLabel(ms)+'</span>':'')+'</div>'+
+   '<button class="btn blue sm" style="width:56px;flex:0 0 auto" onclick="judgeMission(\''+ms.id+'\',1)">承認</button>'+
+   '<button class="btn ghost sm" style="width:60px;flex:0 0 auto;color:#B04040" onclick="judgeMission(\''+ms.id+'\',0)">却下</button></div>').join(''):
+   '<div class="muted">承認まちのミッションはありません</div>')+'</div>';
+ /* ② 特別ミッションを出す */
+ const secMission=
+  '<div class="muted">お手伝いや+αの勉強など、臨時のミッションを出せます。達成→承認で固定ポイントを付与します。</div>'+
+  '<div>'+missionAdminRows(p)+'</div>'+
+  '<div class="row" style="margin-top:8px"><input id="ms-title" placeholder="例:漢字ドリル1ページ">'+
+  '<input id="ms-pts" type="number" min="1" inputmode="numeric" placeholder="pt" style="flex:0 0 74px"></div>'+
+  '<div class="row" style="margin-top:6px">'+
+  '<select id="ms-due" onchange="var d=document.getElementById(\'ms-date\');if(d)d.style.display=this.value===\'date\'?\'\':\'none\'">'+
+   '<option value="today">きょう中</option><option value="week">こんしゅう中(週の土曜まで)</option><option value="date">日付指定</option></select>'+
+  '<input id="ms-date" type="date" style="display:none"></div>'+
+  '<button class="btn blue sm" style="margin-top:8px" onclick="addMission()">🎯 ミッションを出す</button>';
+ /* ③ ごほうび設定 */
+ const secReward=
+  '<h2 style="margin-top:2px">🎟️ ごほうび券とポイント価格</h2>'+
+  '<div class="muted">価格は「⭐こうかんじょ」の値段になります。スロットの券ジャックポット(超レア)では無料で当たります(当たっても一覧からは消えません)。</div>'+
+  '<div style="margin-top:6px">'+p.pool.map((t,i)=>'<div class="ticket-item">'+
+   '<input data-pool-n="'+i+'" value="'+esc(t.name)+'" style="flex:1;min-width:0">'+
+   '<input data-pool-p="'+i+'" type="number" value="'+esc(t.price)+'" style="flex:0 0 74px">'+
+   '<button onclick="delPool('+i+')">削除</button></div>').join('')+'</div>'+
+  '<div class="row" style="margin-top:8px"><input id="pool-new" placeholder="例:回転ずし券 🍣">'+
+  '<input id="pool-price" type="number" placeholder="pt" style="flex:0 0 74px">'+
+  '<button class="btn blue sm" style="flex:0 0 70px" onclick="addPool()">追加</button></div>'+
+  '<h2 style="margin-top:14px">🎯 模試の目標</h2>'+
+  '<div class="row"><input id="tgt-label" placeholder="例:○○模試 偏差値" value="'+esc(p.examTarget.label)+'">'+
+  '<input id="tgt-value" type="number" placeholder="60" value="'+esc(p.examTarget.value)+'" style="flex:0 0 90px"></div>'+
+  '<h2 style="margin-top:14px">🏆 大きなごほうび</h2>'+
+  p.bigGoals.map((g,i)=>'<div class="row" style="margin-bottom:6px">'+
+   '<input data-bg-t="'+i+'" value="'+esc(g.title)+'"><input data-bg-r="'+i+'" value="'+esc(g.reward)+'"></div>').join('')+
+  '<h2 style="margin-top:14px">📚 テキストの登録('+esc(p.name)+')</h2>'+
+  '<div class="muted">さくせん会議で「やるところ」に使うテキストの一覧です。</div>'+
+  '<div>'+p.books.map((b,i)=>'<div class="ticket-item"><span style="flex:1">'+esc(b)+'</span>'+
+   '<button onclick="delBook('+i+')">削除</button></div>').join('')+'</div>'+
+  '<div class="row" style="margin-top:8px"><input id="book-new" placeholder="例:予習シリーズ 算数(上)">'+
+  '<button class="btn blue sm" style="flex:0 0 70px" onclick="addBook()">追加</button></div>';
+ /* ④ メンバーときち */
+ const secMember=
+  '<h2 style="margin-top:2px">👥 メンバーの編集</h2>'+
+  '<div class="muted">なまえ・学年をかえても、きろくやポイントはそのまま引きつがれます。削除はもどせません。<br>💡「こどもPIN」(4けた)を設定すると、アプリを開いたときに「だれがつかう?」画面が出て、本人しか入れなくなります(きょうだいのスロット回し防止!)。空欄にするとロックなしです。</div>'+
+  Object.entries(S.profiles).map(([id,pr])=>'<div class="row" style="margin-top:6px">'+
+   '<input data-pf-em="'+id+'" value="'+esc(pr.em)+'" maxlength="4" style="flex:0 0 50px;text-align:center;font-size:20px">'+
+   '<input data-pf-nm="'+id+'" value="'+esc(pr.name)+'">'+
+   '<input data-pf-gr="'+id+'" value="'+esc(pr.grade)+'" style="flex:0 0 56px">'+
+   '<input data-pf-pin="'+id+'" value="'+esc(pr.pin||'')+'" placeholder="PIN" maxlength="4" inputmode="numeric" style="flex:0 0 62px;text-align:center">'+
+   (Object.keys(S.profiles).length>1?'<button class="btn ghost sm" style="flex:0 0 40px;color:#B04040;padding:9px 4px" onclick="delProfile(\''+id+'\')">✕</button>':'')+
+  '</div>').join('')+
+  '<button class="btn ghost sm" style="margin-top:8px" onclick="addProfile()">＋ メンバーついか</button>'+
+  '<h2 style="margin-top:14px">🗺️ きちの編集</h2>'+
+  '<div class="muted">なまえをかえても出撃回数は引きつがれます。けしても、まえのきろくはのこります。</div>'+
+  S.bases.map((b,i)=>'<div class="row" style="margin-top:6px">'+
+   '<input data-bs-em="'+i+'" value="'+esc(b.em)+'" maxlength="4" style="flex:0 0 56px;text-align:center;font-size:20px">'+
+   '<input data-bs-nm="'+i+'" value="'+esc(b.name)+'">'+
+   (S.bases.length>1?'<button class="btn ghost sm" style="flex:0 0 44px;color:#B04040" onclick="delBase('+i+')">✕</button>':'')+
+  '</div>').join('')+
+  '<button class="btn ghost sm" style="margin-top:8px" onclick="addBase()">＋ きちついか</button>';
+ /* ⑤ かぞく同期(v13-b) / ⑥ データとシステム */
+ const secSys=
+  '<h2 style="margin-top:2px">⭐ ポイントちょうせい('+esc(p.name)+')</h2>'+
+  '<div class="muted">マージ後のズレなどを直す安全弁です。±どちらも可。お子さんの通帳に理由つきで記録されます。</div>'+
+  '<div class="row" style="margin-top:6px"><input id="adj-delta" type="number" inputmode="numeric" placeholder="例: 50 / -30" style="flex:0 0 110px">'+
+  '<input id="adj-memo" placeholder="理由(例:二重購入の補正)"></div>'+
+  '<button class="btn blue sm" style="margin-top:8px" onclick="adjustPoints()">反映</button>'+
+  '<h2 style="margin-top:14px">🔑 Gemini APIキー</h2>'+
+  '<div class="muted">キーはこの端末のブラウザ内にだけ保存され、Googleとの通信にのみ使われます。コードには書かれず、同期・バックアップにも含まれません。</div>'+
+  '<button class="btn ghost sm" style="margin-top:6px" onclick="keyGuide()">📖 キーのかんたん取得ガイド(無料・約5分)</button>'+
+  '<input id="gm-key" type="password" placeholder="AIza..." value="'+esc(S.gemini.key)+'" style="margin-top:6px">'+
+  '<label>モデル</label><input id="gm-model" value="'+esc(S.gemini.model)+'">'+
+  '<h2 style="margin-top:14px">🔐 暗証番号(PIN)の変更</h2>'+
+  '<div class="row"><input id="pin-chg" type="password" inputmode="numeric" maxlength="4" placeholder="新しい4けたの数字">'+
+  '<button class="btn blue sm" style="flex:0 0 90px" onclick="changePin()">変更</button></div>'+
+  '<h2 style="margin-top:14px">💾 バックアップから復元(上書き)</h2>'+
+  '<div class="muted">今のデータを消して、ファイルの内容に置き換えます。</div>'+
+  '<input type="file" accept=".json" onchange="importData(this)">'+
+  '<h2 style="margin-top:14px">🔀 べつの端末のデータと合体(マージ)</h2>'+
+  '<div class="muted">べつの端末で保存したバックアップJSONを選ぶと、足し合わせのプレビューが出ます。同期を使わない端末やトラブル時の安全弁です。</div>'+
+  '<input type="file" accept=".json" onchange="importMerge(this)">'+
+  '<h2 style="margin-top:14px">🧨 初期化</h2>'+
+  '<div class="muted">全メンバーのきろく・ポイント・券・会話・写真・PIN・APIキーをすべて消して、はじめての状態にもどします。</div>'+
+  '<button class="btn ghost sm" style="margin-top:6px;color:#B04040" onclick="factoryReset()">初期設定にもどす</button>';
  openModal('<h3>👨 パパ・ママモード('+esc(p.name)+')</h3>'+
- '<h2 style="margin-top:6px">✅ 承認まちのセッション('+pend.length+')</h2>'+
- '<div class="muted">写真やメモを見て「がんばったね承認」を。承認すると、お子さんが次にアプリをひらいたときにスロットが回せるようになります(なるべく1〜2日以内の承認がおすすめ)。</div>'+
- '<div id="pend-list">'+(pend.length?pend.map(parentSessRow).join(''):'<div class="muted">承認まちはありません</div>')+'</div>'+
- '<h2 style="margin-top:16px">🎟️ ごほうび券とポイント価格</h2>'+
- '<div class="muted">価格は「⭐こうかんじょ」の値段になります。スロットの券ジャックポット(超レア)では無料で当たります(当たっても一覧からは消えません)。</div>'+
- '<div style="margin-top:6px">'+p.pool.map((t,i)=>'<div class="ticket-item">'+
-  '<input data-pool-n="'+i+'" value="'+esc(t.name)+'" style="flex:1;min-width:0">'+
-  '<input data-pool-p="'+i+'" type="number" value="'+esc(t.price)+'" style="flex:0 0 74px">'+
-  '<button onclick="delPool('+i+')">削除</button></div>').join('')+'</div>'+
- '<div class="row" style="margin-top:8px"><input id="pool-new" placeholder="例:回転ずし券 🍣">'+
- '<input id="pool-price" type="number" placeholder="pt" style="flex:0 0 74px">'+
- '<button class="btn blue sm" style="flex:0 0 70px" onclick="addPool()">追加</button></div>'+
- '<h2 style="margin-top:16px">🎯 模試の目標</h2>'+
- '<div class="row"><input id="tgt-label" placeholder="例:○○模試 偏差値" value="'+esc(p.examTarget.label)+'">'+
- '<input id="tgt-value" type="number" placeholder="60" value="'+esc(p.examTarget.value)+'" style="flex:0 0 90px"></div>'+
- '<h2 style="margin-top:16px">🏆 大きなごほうび</h2>'+
- p.bigGoals.map((g,i)=>'<div class="row" style="margin-bottom:6px">'+
-  '<input data-bg-t="'+i+'" value="'+esc(g.title)+'"><input data-bg-r="'+i+'" value="'+esc(g.reward)+'"></div>').join('')+
- '<h2 style="margin-top:16px">🎁 ボーナス承認まち('+pendingBonus(p).length+')</h2>'+
- '<div class="muted">作戦・ボスバトル・リベンジのボーナスです。内容を確認して承認してください。</div>'+
- '<div>'+(pendingBonus(p).length?pendingBonus(p).map(b=>'<div class="sess" id="pb-'+b.id+'"><span class="em">🎁</span>'+
-  '<div class="info"><b>'+esc(b.reason)+'</b>'+(b.golden?' <span class="badge b-pend">🔥ゴールデン</span>':'')+'</div>'+
-  '<button class="btn blue sm" style="width:56px;flex:0 0 auto" onclick="judgeBonus(\''+b.id+'\',1)">承認</button>'+
-  '<button class="btn ghost sm" style="width:60px;flex:0 0 auto;color:#B04040" onclick="judgeBonus(\''+b.id+'\',0)">却下</button></div>').join(''):
-  '<div class="muted">承認まちのボーナスはありません</div>')+'</div>'+
- '<h2 style="margin-top:16px">🎯 ミッション承認まち('+claimedMissions(p).length+')</h2>'+
- '<div class="muted">承認するとポイントを直接付与します(スロットは経由しません)。却下すると「出題中」に戻ります(消したいときは下の一覧から削除)。</div>'+
- '<div>'+(claimedMissions(p).length?claimedMissions(p).map(ms=>'<div class="sess" id="pm-'+ms.id+'"><span class="em">🎯</span>'+
-  '<div class="info"><b>'+esc(ms.title)+'</b> +'+ms.pts+'pt'+(missionDueLabel(ms)?' <span class="muted">'+missionDueLabel(ms)+'</span>':'')+'</div>'+
-  '<button class="btn blue sm" style="width:56px;flex:0 0 auto" onclick="judgeMission(\''+ms.id+'\',1)">承認</button>'+
-  '<button class="btn ghost sm" style="width:60px;flex:0 0 auto;color:#B04040" onclick="judgeMission(\''+ms.id+'\',0)">却下</button></div>').join(''):
-  '<div class="muted">承認まちのミッションはありません</div>')+'</div>'+
- '<h2 style="margin-top:16px">🎯 特別ミッションを出す('+esc(p.name)+')</h2>'+
- '<div class="muted">お手伝いや+αの勉強など、臨時のミッションを出せます。達成→承認で固定ポイントを付与します。</div>'+
- '<div>'+missionAdminRows(p)+'</div>'+
- '<div class="row" style="margin-top:8px"><input id="ms-title" placeholder="例:漢字ドリル1ページ">'+
- '<input id="ms-pts" type="number" min="1" inputmode="numeric" placeholder="pt" style="flex:0 0 74px"></div>'+
- '<div class="row" style="margin-top:6px">'+
- '<select id="ms-due" onchange="var d=document.getElementById(\'ms-date\');if(d)d.style.display=this.value===\'date\'?\'\':\'none\'">'+
-  '<option value="today">きょう中</option><option value="week">こんしゅう中(週の土曜まで)</option><option value="date">日付指定</option></select>'+
- '<input id="ms-date" type="date" style="display:none"></div>'+
- '<button class="btn blue sm" style="margin-top:8px" onclick="addMission()">🎯 ミッションを出す</button>'+
- '<h2 style="margin-top:16px">📚 テキストの登録('+esc(p.name)+')</h2>'+
- '<div class="muted">さくせん会議で「やるところ」に使うテキストの一覧です。</div>'+
- '<div>'+p.books.map((b,i)=>'<div class="ticket-item"><span style="flex:1">'+esc(b)+'</span>'+
-  '<button onclick="delBook('+i+')">削除</button></div>').join('')+'</div>'+
- '<div class="row" style="margin-top:8px"><input id="book-new" placeholder="例:予習シリーズ 算数(上)">'+
- '<button class="btn blue sm" style="flex:0 0 70px" onclick="addBook()">追加</button></div>'+
- '<h2 style="margin-top:16px">👥 メンバーの編集</h2>'+
- '<div class="muted">なまえ・学年をかえても、きろくやポイントはそのまま引きつがれます。削除はもどせません。<br>💡「こどもPIN」(4けた)を設定すると、アプリを開いたときに「だれがつかう?」画面が出て、本人しか入れなくなります(きょうだいのスロット回し防止!)。空欄にするとロックなしです。</div>'+
- Object.entries(S.profiles).map(([id,pr])=>'<div class="row" style="margin-top:6px">'+
-  '<input data-pf-em="'+id+'" value="'+esc(pr.em)+'" maxlength="4" style="flex:0 0 50px;text-align:center;font-size:20px">'+
-  '<input data-pf-nm="'+id+'" value="'+esc(pr.name)+'">'+
-  '<input data-pf-gr="'+id+'" value="'+esc(pr.grade)+'" style="flex:0 0 56px">'+
-  '<input data-pf-pin="'+id+'" value="'+esc(pr.pin||'')+'" placeholder="PIN" maxlength="4" inputmode="numeric" style="flex:0 0 62px;text-align:center">'+
-  (Object.keys(S.profiles).length>1?'<button class="btn ghost sm" style="flex:0 0 40px;color:#B04040;padding:9px 4px" onclick="delProfile(\''+id+'\')">✕</button>':'')+
- '</div>').join('')+
- '<button class="btn ghost sm" style="margin-top:8px" onclick="addProfile()">＋ メンバーついか</button>'+
- '<h2 style="margin-top:16px">🗺️ きちの編集</h2>'+
- '<div class="muted">なまえをかえても出撃回数は引きつがれます。けしても、まえのきろくはのこります。</div>'+
- S.bases.map((b,i)=>'<div class="row" style="margin-top:6px">'+
-  '<input data-bs-em="'+i+'" value="'+esc(b.em)+'" maxlength="4" style="flex:0 0 56px;text-align:center;font-size:20px">'+
-  '<input data-bs-nm="'+i+'" value="'+esc(b.name)+'">'+
-  (S.bases.length>1?'<button class="btn ghost sm" style="flex:0 0 44px;color:#B04040" onclick="delBase('+i+')">✕</button>':'')+
- '</div>').join('')+
- '<button class="btn ghost sm" style="margin-top:8px" onclick="addBase()">＋ きちついか</button>'+
- '<h2 style="margin-top:16px">🔑 Gemini APIキー</h2>'+
- '<div class="muted">キーはこの端末のブラウザ内にだけ保存され、Googleとの通信にのみ使われます。コードには書かれません。</div>'+
- '<button class="btn ghost sm" style="margin-top:6px" onclick="keyGuide()">📖 キーのかんたん取得ガイド(無料・約5分)</button>'+
- '<input id="gm-key" type="password" placeholder="AIza..." value="'+esc(S.gemini.key)+'" style="margin-top:6px">'+
- '<label>モデル</label><input id="gm-model" value="'+esc(S.gemini.model)+'">'+
- '<h2 style="margin-top:16px">🔐 暗証番号(PIN)の変更</h2>'+
- '<div class="row"><input id="pin-chg" type="password" inputmode="numeric" maxlength="4" placeholder="新しい4けたの数字">'+
- '<button class="btn blue sm" style="flex:0 0 90px" onclick="changePin()">変更</button></div>'+
- '<h2 style="margin-top:16px">⭐ ポイントちょうせい('+esc(p.name)+')</h2>'+
- '<div class="muted">マージ後のズレなどを直す安全弁です。±どちらも可。お子さんの通帳に理由つきで記録されます。</div>'+
- '<div class="row" style="margin-top:6px"><input id="adj-delta" type="number" inputmode="numeric" placeholder="例: 50 / -30" style="flex:0 0 110px">'+
- '<input id="adj-memo" placeholder="理由(例:二重購入の補正)"></div>'+
- '<button class="btn blue sm" style="margin-top:8px" onclick="adjustPoints()">反映</button>'+
- '<h2 style="margin-top:16px">💾 バックアップから復元(上書き)</h2>'+
- '<div class="muted">今のデータを消して、ファイルの内容に置き換えます。</div>'+
- '<input type="file" accept=".json" onchange="importData(this)">'+
- '<h2 style="margin-top:16px">🔀 べつの端末のデータと合体(マージ)</h2>'+
- '<div class="muted">べつの端末で保存したバックアップJSONを選ぶと、足し合わせのプレビューが出ます。同期完成までは「週1でJSONを送って合体」で複数端末運用ができます。</div>'+
- '<input type="file" accept=".json" onchange="importMerge(this)">'+
- '<h2 style="margin-top:16px">🧨 初期化</h2>'+
- '<div class="muted">全メンバーのきろく・ポイント・券・会話・写真・PIN・APIキーをすべて消して、はじめての状態にもどします。</div>'+
- '<button class="btn ghost sm" style="margin-top:6px;color:#B04040" onclick="factoryReset()">初期設定にもどす</button>'+
- '<button class="btn" style="margin-top:18px" onclick="saveParent()">まとめて保存</button>');
+  pdSec('approve','✅ 承認センター',nApprove?('承認まち '+nApprove):'',secApprove,true)+
+  pdSec('mission','🎯 特別ミッションを出す','',secMission,false)+
+  pdSec('reward','🎁 ごほうび設定','',secReward,false)+
+  pdSec('member','👥 メンバーときち','',secMember,false)+
+  pdSec('sync','☁️ かぞく同期',syncBadge(),syncSectionHTML(),false)+
+  pdSec('sys','🔧 データとシステム','',secSys,false)+
+  '<button class="btn" style="margin-top:16px" onclick="saveParent()">まとめて保存</button>');
  loadThumbs();}
 function parentSessRow(s){const b=S.bases.find(x=>x.id===s.base)||{em:"📍",name:"(まえの基地)"};
  return '<div class="sess" id="ps-'+s.id+'"><span class="em">'+b.em+'</span>'+
@@ -1797,9 +1830,158 @@ function mergeState(a,b){
  if(!m.profiles[m.currentProfile])m.currentProfile=Object.keys(m.profiles)[0];
  /* gemini/tab/currentProfile/activeSession はローカル維持(mはaのコピーなのでそのまま) */
  return m;}
-/* 同期対象の抽出(端末ローカル項目を除いた複製)。テストの可換性検証・将来のStep Bで使用 */
+/* 同期対象の抽出(端末ローカル項目を除いた複製) */
 function syncable(st){const c=JSON.parse(JSON.stringify(st));
  delete c.gemini;delete c.tab;delete c.currentProfile;delete c.activeSession;return c;}
+
+/* ---------- ☁️かぞく同期(v13-b / Firebase Realtime Database + 家族コード) ----------
+   クラウドには stableStr(syncable(S)) のJSON文字列を丸ごと置く(RTDBのnull削除の影響を受けない)。
+   家族コード = 推測不能な26文字。DBルールは「認証済み かつ パスを知っている者のみ」で、コードが鍵。 */
+const FIREBASE_CONFIG={
+ /* ↓↓ ここに Firebase Webアプリのconfigを貼り付けてください(石橋さん作業) ↓↓
+    例: apiKey:"AIza...", authDomain:"study-kichy.firebaseapp.com",
+        databaseURL:"https://study-kichy-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId:"study-kichy", ...
+    このconfigは公開されて問題ない情報です(守りはRealtime Databaseのルールが行います)。
+    空のままなら同期UIは「じゅんび中」表示になり、他の機能は従来どおり動きます。 */
+};
+const SYNC_LS_KEY='studykichi_sync'; // 家族コードはSと別キー保存=バックアップJSONに含めない(コード漏洩防止)
+let sync={code:null,lastTs:0};
+let syncTransport=null,syncDirty=false,syncTimer=null,syncApplying=false,syncRenderPending=false,syncStatus='off';
+function setSyncTransport(t){syncTransport=t;} // テスト用フック(モックtransport注入)
+function syncConfigured(){const c=window.FB_CONFIG_TEST||FIREBASE_CONFIG;
+ return !!(c&&c.apiKey&&c.databaseURL);}
+function syncLoad(){try{const raw=localStorage.getItem(SYNC_LS_KEY);
+ if(raw)sync=Object.assign(sync,JSON.parse(raw));}catch(e){}}
+function syncSave(){try{localStorage.setItem(SYNC_LS_KEY,JSON.stringify({code:sync.code,lastTs:sync.lastTs}));}catch(e){}}
+function genFamilyCode(){const chars='abcdefghijklmnopqrstuvwxyz234567';const a=new Uint8Array(26);
+ if(window.crypto&&crypto.getRandomValues)crypto.getRandomValues(a);
+ else for(let i=0;i<26;i++)a[i]=Math.floor(Math.random()*256);
+ return Array.from(a,x=>chars[x%32]).join('');}
+/* キー順を正規化したJSON(端末間・RTDB往復で同一内容なら必ず同一文字列になる) */
+function stableStr(v){if(Array.isArray(v))return '['+v.map(stableStr).join(',')+']';
+ if(v&&typeof v==='object')return '{'+Object.keys(v).sort().map(k=>JSON.stringify(k)+':'+stableStr(v[k])).join(',')+'}';
+ return v===undefined?'null':JSON.stringify(v);}
+/* --- Firebase SDK(compat)の動的ロード: configが空なら一切読み込まない。失敗しても本体は動く --- */
+let _fbLoad=null;
+function loadFirebaseSdk(){
+ if(window.firebase&&window.firebase.database)return Promise.resolve();
+ if(_fbLoad)return _fbLoad;
+ const V='10.14.1';
+ _fbLoad=['firebase-app-compat','firebase-auth-compat','firebase-database-compat'].reduce((pr,n)=>pr.then(()=>new Promise((res,rej)=>{
+  const s=document.createElement('script');
+  s.src='https://www.gstatic.com/firebasejs/'+V+'/'+n+'.js';
+  s.onload=res;s.onerror=()=>{_fbLoad=null;rej(new Error('SDK load failed'));};
+  document.head.appendChild(s);})),Promise.resolve());
+ return _fbLoad;}
+function firebaseTransport(){
+ let ref=null,cb=null;
+ return {
+  async start(code,onRemote){
+   await loadFirebaseSdk();
+   const c=window.FB_CONFIG_TEST||FIREBASE_CONFIG;
+   if(!firebase.apps.length)firebase.initializeApp(c);
+   await firebase.auth().signInAnonymously(); // 匿名認証必須(ルール: auth != null)
+   ref=firebase.database().ref('families/'+code);
+   cb=ref.on('value',snap=>onRemote(snap.val()));
+  },
+  stop(){if(ref&&cb)ref.off('value',cb);ref=null;cb=null;},
+  push(fn){if(!ref)return Promise.reject(new Error('not connected'));
+   return ref.transaction(fn).then(()=>{});} // トランザクション=同時書込の取りこぼしなし
+ };}
+/* --- 同期エンジン(B-3) --- */
+function syncSchedulePush(){ // save()から毎回呼ばれる。受信適用中はスケジュールしない(ループ防止)
+ if(!syncConfigured()||!sync.code||syncApplying)return;
+ syncDirty=true;
+ if(syncTimer)clearTimeout(syncTimer);
+ syncTimer=setTimeout(syncPushNow,2000);} // 2秒デバウンス
+function syncPushNow(){if(syncTimer){clearTimeout(syncTimer);syncTimer=null;}
+ if(!syncConfigured()||!sync.code||!syncTransport||!syncDirty)return;
+ syncDirty=false;
+ Promise.resolve(syncTransport.push(node=>({
+  state:syncMergeRemoteStr(node&&node.state),
+  meta:{rev:((node&&node.meta&&node.meta.rev)||0)+1,updatedAt:Date.now()}})))
+ .then(()=>{sync.lastTs=Date.now();syncSave();syncStatusRefresh();})
+ .catch(()=>{syncDirty=true;});} // 失敗は保留→online復帰・次の保存で再送
+function syncMergeRemoteStr(remoteStr){ // クラウド現在値とローカルをマージした文字列を返す(トランザクション内で使用)
+ const local=syncable(S);
+ if(!remoteStr)return stableStr(local);
+ try{const inc=Object.assign(JSON.parse(JSON.stringify(DEFAULT_STATE)),JSON.parse(remoteStr));
+  migrate(inc); // クラウド側が旧スキーマでも安全に
+  return stableStr(syncable(mergeState(inc,local)));
+ }catch(e){return stableStr(local);}}
+function syncOnRemote(node){ // Pull: onValue受信
+ const remoteStr=node&&node.state;
+ if(!remoteStr||typeof remoteStr!=='string')return;
+ let rem;try{rem=JSON.parse(remoteStr);}catch(e){return;}
+ if(!rem||!rem.profiles)return;
+ const inc=Object.assign(JSON.parse(JSON.stringify(DEFAULT_STATE)),rem);
+ migrate(inc);
+ const merged=mergeState(S,inc); // APIキー等の端末ローカル項目は維持される
+ const mergedStr=stableStr(syncable(merged));
+ const curStr=stableStr(syncable(S));
+ sync.lastTs=Date.now();syncSave();
+ if(mergedStr!==curStr){ // クラウドに新しいものがある→取り込み
+  syncApplying=true;
+  try{S=merged;save();}finally{syncApplying=false;}
+  syncSafeRender();}
+ if(mergedStr!==stableStr(syncable(inc))){ // こちらだけが持つものがある→送り返す(収束したら止まる)
+  syncDirty=true;
+  if(syncTimer)clearTimeout(syncTimer);
+  syncTimer=setTimeout(syncPushNow,2000);}
+ syncStatusRefresh();}
+function syncSafeRender(){ // 描画ポリシー: 入力を壊さない(モーダル/タイマー/作戦・バトル編集中はSだけ更新)
+ if($('#modal-root').innerHTML||S.activeSession||S.tab==='goal'){syncRenderPending=true;return;}
+ render();}
+async function syncConnect(){
+ if(!syncConfigured()||!sync.code)return;
+ if(!syncTransport)syncTransport=firebaseTransport();
+ syncStatus='connecting';syncStatusRefresh();
+ try{await syncTransport.start(sync.code,syncOnRemote);
+  syncStatus='on';syncDirty=true;syncPushNow();} // 接続したらまずローカルを合流させる
+ catch(e){syncStatus='error';}
+ syncStatusRefresh();}
+/* --- ☁️UI(パパ・ママモード内) --- */
+function syncBadge(){if(!syncConfigured()||!sync.code)return'';
+ return syncStatus==='on'?'接続中':syncStatus==='connecting'?'接続中…':syncStatus==='error'?'エラー':'未接続';}
+function syncStatusLine(){
+ const st=syncStatus==='on'?'🟢 接続中':syncStatus==='connecting'?'🟡 接続中…':
+  syncStatus==='error'?'🔴 エラー(電波とFirebase設定を確認して、開き直してください)':'⚪ 未接続';
+ if(!sync.lastTs)return st;
+ const d=new Date(sync.lastTs);
+ return st+' ／ 最終同期 '+d.getHours()+':'+String(d.getMinutes()).padStart(2,'0');}
+function syncStatusRefresh(){const el=$('#sync-status');if(el)el.innerHTML=syncStatusLine();}
+function syncSectionHTML(){
+ if(!syncConfigured())return '<div class="muted">☁️ じゅんび中です(アプリにFirebase設定がまだ入っていません)。それまでは「🔧データとシステム」のバックアップ保存と合体(マージ)で複数端末を運用できます。</div>';
+ if(!sync.code)return ''+
+  '<div class="muted">家族みんなの記録・ポイント・承認を、数秒でおたがいの端末にそろえます。写真・計算メモの画像とAPIキーは各端末の中だけに残ります。</div>'+
+  '<button class="btn blue sm" style="margin-top:8px" onclick="syncStart()">☁️ 同期をはじめる(この端末が1台目)</button>'+
+  '<div class="muted" style="margin-top:10px">2台目からは、1台目の「かぞくコード」を入れてつながります:</div>'+
+  '<div class="row" style="margin-top:6px"><input id="sync-code-in" placeholder="かぞくコードを入力" autocapitalize="none" autocomplete="off">'+
+  '<button class="btn blue sm" style="flex:0 0 90px" onclick="syncJoin()">つながる</button></div>';
+ return '<div id="sync-status" class="muted">'+syncStatusLine()+'</div>'+
+  '<button class="btn ghost sm" style="margin-top:8px" onclick="syncShowCode()">🔑 かぞくコードを見る(端末追加用)</button>'+
+  '<button class="btn ghost sm" style="margin-top:8px;color:#B04040" onclick="syncDisconnect()">切断する(この端末のデータは残ります)</button>'+
+  '<div class="muted" style="margin-top:8px">※写真・計算メモの画像は撮った端末の中だけにあるため、他の端末ではサムネイルが出ません(記録じたいは同期されます)。</div>';}
+function syncStart(){
+ if(!confirm('この端末のデータをクラウドに置いて、かぞく同期をはじめますか?'))return;
+ sync.code=genFamilyCode();syncSave();syncConnect();openParent();
+ const pd=$('#pd-sync');if(pd)pd.open=true;}
+function syncJoin(){const v=($('#sync-code-in')?$('#sync-code-in').value.trim().toLowerCase():'');
+ if(!/^[a-z2-7]{20,32}$/.test(v)){alert('かぞくコードの形式が違うようです(英小文字と数字、26文字くらい)');return;}
+ if(!confirm('クラウドにある家族のデータと、この端末のデータを合体して同期をはじめます。よろしいですか?'))return;
+ sync.code=v;syncSave();syncConnect();openParent();
+ const pd=$('#pd-sync');if(pd)pd.open=true;}
+function syncShowCode(){
+ openModal('<h3>🔑 かぞくコード</h3>'+
+ '<div style="font-family:var(--disp);font-weight:800;font-size:18px;word-break:break-all;background:#F4F9FE;border:2px dashed var(--line);border-radius:12px;padding:12px;text-align:center">'+esc(sync.code||'')+'</div>'+
+ '<div class="muted" style="margin-top:10px">⚠️ このコードを知っている人はデータを読み書きできます。<b>家族以外に教えないでください。</b><br>追加したい端末の「パパ・ママモード → かぞく同期 → つながる」に入力します。</div>'+
+ '<button class="btn ghost sm" style="margin-top:12px" onclick="openParent();var pd=document.getElementById(\'pd-sync\');if(pd)pd.open=true;">← もどる</button>');}
+function syncDisconnect(){
+ if(!confirm('同期を切断しますか?(この端末のデータは残ります。もう一度つなぐにはかぞくコードが必要です)'))return;
+ if(syncTransport)try{syncTransport.stop();}catch(e){}
+ sync.code=null;syncStatus='off';syncSave();openParent();
+ const pd=$('#pd-sync');if(pd)pd.open=true;}
 
 /* ---------- バックアップ ---------- */
 function exportData(){const blob=new Blob([JSON.stringify(S,null,1)],{type:'application/json'});
@@ -1858,6 +2040,10 @@ window.addEventListener('beforeinstallprompt',e=>{
 showSplash(); /* 🚀ロケットOP → launchGate(だれがつかう?) → ホーム の順 */
 render();
 launchGate();
+/* ☁️かぞく同期: 設定済みかつコード保存済みなら自動接続。オンライン復帰で保留分を再送 */
+syncLoad();
+if(syncConfigured()&&sync.code)syncConnect();
+window.addEventListener('online',()=>{if(syncConfigured()&&sync.code){syncDirty=true;syncPushNow();}});
 
 </script>
 </body>

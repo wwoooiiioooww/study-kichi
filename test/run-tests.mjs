@@ -374,6 +374,111 @@ console.log('\n[8] 🔀mergeState');
   w.close();
 }
 
+/* ---------- 9. ☁️かぞく同期エンジン(v13-b / モックtransport) ---------- */
+console.log('\n[9] ☁️かぞく同期');
+{
+  // config未設定: 同期UIは「じゅんび中」・他機能は従来どおり
+  const { w, errors } = boot();
+  w.openParent();
+  ok(w.document.querySelector('#modal-root').innerHTML.includes('じゅんび中'), 'config空なら同期セクションは「じゅんび中」');
+  w.closeModal();
+  eq(errors.length, 0, 'config空でも runtime errors: none');
+  w.close();
+}
+{
+  const { w, errors } = boot();
+  w.FB_CONFIG_TEST = { apiKey: 'test', databaseURL: 'https://test' }; // テスト用フック
+  const mock = {
+    started: null, onRemote: null, node: null, pushes: 0,
+    start(code, cb) { this.started = code; this.onRemote = cb; return Promise.resolve(); },
+    stop() { this.started = null; },
+    push(fn) { this.pushes++; this.node = fn(this.node); return Promise.resolve(); },
+  };
+  w.setSyncTransport(mock);
+  // はじめる(1台目)
+  w.syncStart();
+  await sleep(80);
+  const code = w.eval('sync.code');
+  ok(/^[a-z2-7]{26}$/.test(code), '家族コードは26文字のbase32');
+  eq(mock.started, code, 'transportが家族コードで接続される');
+  ok((w.localStorage.getItem('studykichi_sync') || '').includes(code), 'コードは別キーstudykichi_syncに保存');
+  ok(!JSON.stringify(w.eval('S')).includes(code), 'コードはS(=バックアップJSON)に含まれない');
+  await sleep(80);
+  eq(mock.pushes, 1, '接続時にローカルを初回push');
+  ok(mock.node && typeof mock.node.state === 'string' && mock.node.meta.rev === 1, 'クラウドはstate文字列+meta.rev');
+  w.closeModal();
+  // 2秒デバウンスpush: 連続保存でも1回にまとまる
+  const p = w.P();
+  p.missions.push({ id: 'msA', title: 'ローカルミッション', pts: 10, due: { type: 'today', date: null }, status: 'open', createdTs: Date.now(), claimedTs: null, approvedTs: null, ack: false, mt: 1 });
+  w.save(); w.save(); w.save();
+  eq(mock.pushes, 1, 'デバウンス中はまだpushされない');
+  await sleep(2300);
+  eq(mock.pushes, 2, '2秒デバウンスで1回だけpush');
+  ok(mock.node.state.includes('msA') && mock.node.meta.rev === 2, '変更がクラウドに反映されrevが進む');
+  // Pull: クラウド由来の新データを取り込み(ローカル項目は維持)。エコーではpushしない
+  w.eval('S').gemini.key = 'LOCAL-KEY';
+  const rem = JSON.parse(mock.node.state);
+  rem.profiles.sora.sessions.unshift({ id: 's-remote', base: 'home', plannedMin: 25, startTs: 3000, endTs: 4000, minutes: 25, subjects: ['国語'], memo: '', photoId: null, boards: [], focus: null, status: 'pending', spin: null, mt: 5 });
+  mock.onRemote({ state: w.stableStr(rem), meta: { rev: 3, updatedAt: Date.now() } });
+  await sleep(50);
+  ok(w.P().sessions.some(s => s.id === 's-remote'), '受信したセッションが取り込まれる');
+  eq(w.eval('S').gemini.key, 'LOCAL-KEY', 'APIキー等のローカル項目は維持される');
+  const pushesBefore = mock.pushes;
+  await sleep(2300);
+  eq(mock.pushes, pushesBefore, 'クラウドが上位集合なら送り返さない(ループ防止)');
+  // 送り返し: クラウドにこちらだけのデータが無い場合はpush
+  const rem2 = JSON.parse(mock.node.state);
+  delete rem2.profiles.sora.missions; rem2.profiles.sora.missions = [];
+  mock.onRemote({ state: w.stableStr(rem2), meta: { rev: 4, updatedAt: Date.now() } });
+  await sleep(2300);
+  ok(mock.pushes > pushesBefore && mock.node.state.includes('msA'), 'こちらだけが持つ分は送り返して収束');
+  // 描画ポリシー: モーダル中はrenderせず、閉じたら反映
+  w.eval('S').tab = 'home'; w.render();
+  w.openModal('<h3>編集中</h3>');
+  const rem3 = JSON.parse(mock.node.state);
+  rem3.profiles.sora.sessions.unshift({ id: 's-remote2', base: 'home', plannedMin: 5, startTs: 5000, endTs: 6000, minutes: 5, subjects: [], memo: '', photoId: null, boards: [], focus: null, status: 'pending', spin: null, mt: 6 });
+  const appBefore = w.document.querySelector('#app').innerHTML;
+  mock.onRemote({ state: w.stableStr(rem3), meta: { rev: 5, updatedAt: Date.now() } });
+  ok(w.document.querySelector('#app').innerHTML === appBefore, 'モーダル表示中はrenderしない(入力を壊さない)');
+  ok(w.P().sessions.some(s => s.id === 's-remote2'), 'Sは更新されている');
+  ok(w.document.querySelector('#modal-root').innerHTML.includes('編集中'), 'モーダルは開いたまま');
+  w.closeModal();
+  ok(w.document.querySelector('#modal-root').innerHTML === '', 'モーダルが閉じる');
+  // 切断
+  w.syncDisconnect();
+  ok(w.eval('sync.code') === null && mock.started === null, '切断でコード破棄+transport停止');
+  w.closeModal();
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+
+/* ---------- 10. パパ・ママモードの折りたたみ整理 ---------- */
+console.log('\n[10] 👨親モードUI');
+{
+  const { w, errors } = boot();
+  const p = w.P();
+  p.sessions.unshift({ id: 'sp1', base: 'home', plannedMin: 25, startTs: 1, endTs: 2, minutes: 25, subjects: [], memo: '', photoId: null, boards: [], focus: null, status: 'pending', spin: null, mt: 1 });
+  w.openParent();
+  const mr = () => w.document.querySelector('#modal-root');
+  eq(mr().querySelectorAll('details.pd').length, 6, '6つの折りたたみセクションがある');
+  const ap = mr().querySelector('#pd-approve');
+  ok(ap && ap.open, '承認センターは初期展開');
+  ok(ap.innerHTML.includes('承認まちはありません') === false && ap.innerHTML.includes('セッション(1)'), '承認センターに件数が出る');
+  ok(mr().innerHTML.includes('承認まち 1'), 'サマリに承認まちバッジ');
+  for (const id of ['pd-mission', 'pd-reward', 'pd-member', 'pd-sync', 'pd-sys']) {
+    const d = mr().querySelector('#' + id);
+    ok(d && !d.open, id + ' は初期折りたたみ');
+  }
+  // 主要インプットが全部残っているか(機能不変の確認)
+  for (const sel of ['#ms-title', '#pool-new', '#tgt-label', '#book-new', '[data-pf-nm="sora"]', '[data-bs-nm="0"]', '#gm-key', '#pin-chg', '#adj-delta']) {
+    ok(!!mr().querySelector(sel), '入力が存在: ' + sel);
+  }
+  ok(mr().innerHTML.includes('まとめて保存'), 'まとめて保存ボタンがある');
+  w.closeModal();
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+
 /* ---------- 6. リリース規約(6ファイル構成 + バージョン同時更新) ---------- */
 console.log('\n[6] リリース規約');
 {
