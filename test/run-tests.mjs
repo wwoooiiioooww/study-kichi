@@ -94,13 +94,13 @@ console.log('\n[3] 🎨きせかえ');
   w.setTheme('night');
   eq(p.theme, 'sky', '未所持テーマへの切替は無効');
   // ポイント不足では購入不可
-  p.points = 100; w.render();
+  p.points = 50; w.render();
   w.buyTheme('night');
-  eq(p.points, 100, 'ポイント不足では購入されない');
+  eq(p.points, 50, 'ポイント不足では購入されない');
   // 購入 → 減算 → 所持 → 即適用
-  p.points = 350; w.render();
+  p.points = 150; w.render();
   w.buyTheme('night');
-  eq(p.points, 50, '購入で300pt減算される');
+  eq(p.points, 50, '購入で100pt減算される');
   ok(p.ownedThemes.includes('night'), '購入テーマが所持に追加される');
   eq(p.theme, 'night', '購入テーマが即適用される');
   ok(hd1() === '#6478A8', ':root のCSS変数が night に切り替わる');
@@ -115,7 +115,7 @@ console.log('\n[3] 🎨きせかえ');
   w.eval('S').tab = 'home'; w.render();
   ok(doc.querySelector('#app').innerHTML.includes('🎨 きせかえ'), 'こうかんじょに🎨きせかえセクションが常設される');
   w.eval('S').tab = 'set'; w.render();
-  ok(doc.querySelector('#app').innerHTML.includes('こうかんじょで300pt'), 'せっていで未所持テーマに購入誘導が出る');
+  ok(doc.querySelector('#app').innerHTML.includes('こうかんじょで100pt'), 'せっていで未所持テーマに購入誘導が出る');
   eq(errors.length, 0, 'runtime errors: none');
   w.close();
 }
