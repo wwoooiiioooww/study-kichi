@@ -10,12 +10,14 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="スタディきち">
-<title>スタディきち｜そら＆ふう</title>
+<title>スタディきち</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
 :root{
+  /* きせかえで applyTheme() が上書きするテーマ変数(既定=sky) */
   --sky-bg:#EAF4FC; --sky-deep:#CDE5F7;
+  --bg-top:#BBDDF5; --hd1:#8EC8F2; --hd2:#B9DFF8;
   --ink:#2B3A55; --ink-soft:#6B7C99;
   --blue:#3E8FD8; --blue-d:#2F6FB0;
   --orange:#FF8A5C; --orange-d:#F0703F;
@@ -30,14 +32,14 @@
 html,body{height:100%}
 body{
   font-family:var(--body);color:var(--ink);
-  background:linear-gradient(180deg,#BBDDF5 0%,#EAF4FC 40%);
+  background:linear-gradient(180deg,var(--bg-top) 0%,var(--sky-bg) 40%);
   background-attachment:fixed;
 }
 #shell{max-width:480px;margin:0 auto;min-height:100dvh;background:var(--sky-bg);
   box-shadow:0 0 40px rgba(62,143,216,.15);position:relative;padding-bottom:84px}
 /* ---------- sky header ---------- */
 .sky{position:relative;overflow:hidden;padding:18px 18px 22px;
-  background:linear-gradient(180deg,#8EC8F2 0%,#B9DFF8 70%,var(--sky-bg) 100%);
+  background:linear-gradient(180deg,var(--hd1) 0%,var(--hd2) 70%,var(--sky-bg) 100%);
   border-radius:0 0 28px 28px}
 .cloud{position:absolute;background:#fff;border-radius:50px;opacity:.85;filter:blur(1px)}
 .cloud::before,.cloud::after{content:"";position:absolute;background:#fff;border-radius:50%}
@@ -183,6 +185,32 @@ nav button.on .i{transform:scale(1.2)}
 /* confetti */
 .confetti{position:fixed;top:-10px;font-size:18px;z-index:200;animation:fall 2.4s linear forwards;pointer-events:none}
 @keyframes fall{to{transform:translateY(105vh) rotate(540deg);opacity:.7}}
+/* ---------- パパ・ママモードの折りたたみセクション ---------- */
+.pd{border:2px solid var(--line);border-radius:14px;margin-top:10px;background:#fff}
+.pd summary{cursor:pointer;padding:11px 12px;font-family:var(--disp);font-weight:800;font-size:14px;
+  list-style:none;display:flex;align-items:center;gap:6px;-webkit-user-select:none;user-select:none}
+.pd summary::-webkit-details-marker{display:none}
+.pd summary::after{content:"▾";margin-left:auto;color:var(--ink-soft);transition:.15s}
+.pd[open] summary::after{transform:rotate(180deg)}
+.pd[open] summary{border-bottom:1px dashed var(--line)}
+.pd .pd-body{padding:2px 12px 12px}
+/* ---------- 🚀ロケットOP(起動スプラッシュ) ---------- */
+#splash{position:fixed;inset:0;z-index:500;overflow:hidden;cursor:pointer;
+  background:linear-gradient(180deg,var(--hd1) 0%,var(--hd2) 55%,var(--sky-bg) 100%)}
+.spl-cloud{position:absolute;background:#fff;border-radius:50px;opacity:.9}
+.spl-cloud::before,.spl-cloud::after{content:"";position:absolute;background:#fff;border-radius:50%}
+.spl-c1{width:96px;height:28px;top:22%;left:14%}
+.spl-c1::before{width:40px;height:40px;top:-19px;left:15px}
+.spl-c1::after{width:26px;height:26px;top:-12px;left:50px}
+.spl-c2{width:70px;height:22px;top:55%;right:12%;opacity:.7}
+.spl-c2::before{width:30px;height:30px;top:-14px;left:11px}
+.spl-c2::after{width:20px;height:20px;top:-9px;left:38px}
+.spl-rocket{position:absolute;left:50%;bottom:-120px;transform:translateX(-50%);
+  animation:spl-fly 1.1s cubic-bezier(.5,.05,.75,.9) .1s forwards}
+.spl-ship{display:block;font-size:58px;line-height:1;transform:rotate(-45deg)}
+.spl-flame{display:block;text-align:center;font-size:28px;margin-top:-4px;animation:spl-flick .14s linear infinite alternate}
+@keyframes spl-fly{to{transform:translateX(-50%) translateY(-140vh)}}
+@keyframes spl-flick{from{opacity:.55;transform:scale(.85)}to{opacity:1;transform:scale(1)}}
 .ticket-item{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px dashed var(--line);font-size:14px}
 .ticket-item button{border:none;background:#FBE1E1;color:#B04040;border-radius:8px;padding:4px 10px;font-size:11px;cursor:pointer}
 .won-ticket{background:linear-gradient(90deg,#FFF6E3,#FFEFD0);border:2px dashed var(--gold);border-radius:14px;padding:10px 12px;margin-bottom:8px;font-weight:700;font-size:14px;display:flex;justify-content:space-between;align-items:center}
@@ -219,15 +247,27 @@ nav button.on .i{transform:scale(1.2)}
    データはこの端末の中だけに保存されます（localStorage / IndexedDB）
    ============================================================ */
 /* ---------- マスタ ---------- */
+const APP_VER='v15'; // せってい表示とフィードバックの共通バージョン。sw.js の CACHE と同時に上げること
+/* 汎用サンプル(配布用)。既存端末の保存済みデータは上書きされない */
 const DEFAULT_BASES=[
- {id:'solid',name:'ソリッドスクエア',em:'🏢'},
- {id:'mcd',name:'マクドナルド',em:'🍟'},
- {id:'light',name:'ライトハウス自習室',em:'📚'},
- {id:'gakudo',name:'学童',em:'🎒'},
+ {id:'lib',name:'としょかん',em:'📚'},
+ {id:'school',name:'図書室',em:'🏫'},
+ {id:'jido',name:'じどうかん',em:'🎨'},
  {id:'home',name:'おうち机',em:'🏠'},
+ {id:'cafe',name:'きちカフェ',em:'☕'},
 ];
 const TITLES=[[40,'ぬし'],[20,'たつじん'],[10,'じょうれん'],[3,'かよいはじめ']];
 const SUBJECTS=['算数','国語','理科','社会','英語','その他'];
+/* 🎨きせかえテーマ(単一マスタ)。night はインク色(#2B3A55)が読める明るさを保つ(紺〜藍の範囲) */
+const THEMES={
+ sky:   {name:'そら',    em:'☁️',vars:{'--sky-bg':'#EAF4FC','--sky-deep':'#CDE5F7','--bg-top':'#BBDDF5','--hd1':'#8EC8F2','--hd2':'#B9DFF8'}},
+ sakura:{name:'さくら',  em:'🌸',vars:{'--sky-bg':'#FDF1F5','--sky-deep':'#F8D8E6','--bg-top':'#F6CFDF','--hd1':'#F2A9C7','--hd2':'#F9D2E1'}},
+ sunset:{name:'ゆうやけ',em:'🌇',vars:{'--sky-bg':'#FDF4EB','--sky-deep':'#FADDC4','--bg-top':'#F8CBA4','--hd1':'#F5A671','--hd2':'#FACD9F'}},
+ night: {name:'よぞら',  em:'🌙',vars:{'--sky-bg':'#EAEEF7','--sky-deep':'#CCD5EB','--bg-top':'#93A3CB','--hd1':'#6478A8','--hd2':'#96A8D0'}},
+ sea:   {name:'うみ',    em:'🐠',vars:{'--sky-bg':'#E9F6F4','--sky-deep':'#C8EAE5','--bg-top':'#9CDCD4','--hd1':'#5BC2B7','--hd2':'#90DAD1'}},
+ forest:{name:'もり',    em:'🌲',vars:{'--sky-bg':'#EEF6EC','--sky-deep':'#D4EAD1','--bg-top':'#B0DBAC','--hd1':'#78C273','--hd2':'#A8D9A4'}},
+};
+const THEME_PRICE=100; // こうかんじょでの入手価格(全テーマ共通)。実体ごほうび券(300pt〜)より安い入門シンク
 /* AI相棒へのワンタップ質問 */
 const QUICKS=[
  {id:'hint',label:'💡ヒントちょうだい',text:'この問題のヒントを、答えは言わずにひとつだけ教えて。'},
@@ -243,22 +283,29 @@ function mkProfile(name,em,grade){return{
  examTarget:{label:'次の模試の目標',value:''},
  bigGoals:[
   {title:'模試で目標クリア!',reward:'すきなレストランへGO 🍽️'},
-  {title:'中学ごうかく!!',reward:'スペシャル沖縄旅行 ✈️🌺'},
+  {title:'中学ごうかく!!',reward:'スペシャル旅行 ✈️🌟'},
  ],
- pool:[{name:'小籠包ディナー券 🥟',price:800},{name:'魚だしごはんリクエスト券 🐟',price:400},{name:'パパと30分あそぶ券 🎮',price:300}],
+ pool:[{name:'すきなレストランでディナー券 🍽️',price:800},{name:'すきなおやつリクエスト券 🍩',price:400},{name:'パパ・ママと30分あそぶ券 🎮',price:300}],
  tickets:[],
  lastGoldenMilestone:0,
  pin:null,
  weeks:{},
  bonusSpins:[],
  books:[],
+ theme:'sky',
+ ownedThemes:['sky','sakura'],
+ missions:[],
+ ledger:[],   /* ポイント取引台帳。p.points は台帳合計のキャッシュ */
+ deleted:{},  /* 墓標 {id:削除ts}。マージでの蘇り防止 */
+ metaMt:0,    /* スカラー群(name/pool/books/theme等)の更新時刻。マージはLWW */
 };}
 const DEFAULT_STATE={
-v:3, tab:'home', currentProfile:'sora', parentPin:null,
+v:5, tab:'home', currentProfile:'sora', parentPin:null,
  bases:JSON.parse(JSON.stringify(DEFAULT_BASES)),
  gemini:{key:'',model:'gemini-3.5-flash'}, // ※Googleの現行モデル名。エラーになる場合は最新のモデル名に変更してください
- profiles:{ sora:mkProfile('空花','🌸','小5'), fuka:mkProfile('風花','🍃','小3') },
+ profiles:{ sora:mkProfile('そら','🌸','小5'), fuka:mkProfile('ふう','🍃','小3') },
  activeSession:null,
+ deleted:{}, basesMt:0, pinMt:0, /* v13: マージ用(きち・プロフィール削除の墓標 / bases・親PINの更新時刻) */
 };
 let S=load();
 function load(){
@@ -267,9 +314,10 @@ function load(){
  }catch(e){}
  return JSON.parse(JSON.stringify(DEFAULT_STATE));
 }
-/* v1→v3 移行:券の値札・チャットアーカイブ・編集可能な基地 */
+/* v1→v5 移行:券の値札・チャットアーカイブ・編集可能な基地・きせかえ・特別ミッション・台帳とマージ基盤
+   通常起動(load)・バックアップ復元(importData)・マージ入力(importMerge)の3経路すべてで呼ばれる */
 function migrate(st){
- Object.values(st.profiles||{}).forEach(pr=>{
+ Object.entries(st.profiles||{}).forEach(([pid,pr])=>{
   if(Array.isArray(pr.pool))pr.pool=pr.pool.map(t=>typeof t==='string'?{name:t,price:500}:t);
   if(pr.lastGoldenMilestone==null)pr.lastGoldenMilestone=0;
   if(!Array.isArray(pr.chatArchive))pr.chatArchive=[];
@@ -279,17 +327,49 @@ function migrate(st){
   pr.bonusSpins.forEach(b=>{if(!b.id)b.id='bs'+Math.random().toString(36).slice(2);
    if(!b.status)b.status='approved';});
   if(!Array.isArray(pr.books))pr.books=[];
+  if(!Array.isArray(pr.ownedThemes))pr.ownedThemes=['sky','sakura'];
+  ['sky','sakura'].forEach(t=>{if(pr.ownedThemes.indexOf(t)<0)pr.ownedThemes.push(t);});
+  if(!pr.theme||pr.ownedThemes.indexOf(pr.theme)<0)pr.theme='sky';
+  if(!Array.isArray(pr.missions))pr.missions=[];
   Object.values(pr.weeks).forEach(wx=>{if(!Array.isArray(wx.items))wx.items=[];});
   (pr.exams||[]).forEach(e=>{
    if(!e.scores){e.scores={'総合':Number(e.score)||0};delete e.score;}});
   if(Array.isArray(pr.exams))pr.exams.sort((a,b)=>exSortKey(a)-exSortKey(b));
+  /* --- v5(v13-a): 台帳・マージ基盤 --- */
+  if(!Array.isArray(pr.ledger)){pr.ledger=[]; // 既存残高は繰越取引に(決定的ID=2端末で同時migrateしても収束)
+   const bal=Math.round(Number(pr.points)||0);
+   if(bal!==0)pr.ledger.push({id:'tx-init-'+pid,ts:Date.now(),delta:bal,reason:'carryover',ref:null});}
+  if(!pr.deleted||typeof pr.deleted!=='object')pr.deleted={};
+  if(pr.metaMt==null)pr.metaMt=0;
+  /* ID採番(内容由来の決定的IDにし、同じ旧データを別端末でmigrateしても収束させる) */
+  (pr.exams||[]).forEach((e,i)=>{if(!e.id)e.id='ex-'+(e.date||'x')+'-'+i; if(e.mt==null)e.mt=0;});
+  (pr.chat||[]).forEach((m2,i)=>{if(!m2.id)m2.id='cm-'+(m2.ts||0)+'-'+i;});
+  (pr.chatArchive||[]).forEach((a,i)=>{if(!a.id)a.id='ca-'+(a.ts||0)+'-'+i;});
+  if(Array.isArray(pr.tickets))pr.tickets=pr.tickets.map((t,i)=> // 所持券をオブジェクト化(つかう=usedTs記録)
+   typeof t==='string'?{id:'tk-mig-'+i+'-'+t,name:t,ts:0,usedTs:null,mt:0}:t);
+  (pr.sessions||[]).forEach(s=>{if(s.mt==null)s.mt=0;});
+  (pr.bonusSpins||[]).forEach(b=>{if(b.mt==null)b.mt=0;});
+  (pr.missions||[]).forEach(m2=>{if(m2.mt==null)m2.mt=0;});
+  Object.values(pr.weeks).forEach(wx=>{if(wx.planMt==null)wx.planMt=0;if(wx.testMt==null)wx.testMt=0;});
+  recalcPoints(pr); // points=台帳合計のキャッシュ
  });
+ if(!st.deleted||typeof st.deleted!=='object')st.deleted={};
+ if(st.basesMt==null)st.basesMt=0;
+ if(st.pinMt==null)st.pinMt=0;
  if(!Array.isArray(st.bases)||!st.bases.length)st.bases=JSON.parse(JSON.stringify(DEFAULT_BASES));
  if(!st.currentProfile||!st.profiles[st.currentProfile])st.currentProfile=Object.keys(st.profiles)[0];
  if(st.gemini&&(!st.gemini.model||st.gemini.model==='gemini-2.5-flash'))st.gemini.model='gemini-3.5-flash';
- st.v=3;
+ st.v=5;
 }
 function save(){
+ try{const now=Date.now(); // 古い墓標(90日)と使用済み/却下ボーナス(60日)の間引き
+  Object.values(S.profiles||{}).forEach(pr=>{
+   Object.entries(pr.deleted||{}).forEach(([k,ts])=>{if(now-ts>90*864e5)delete pr.deleted[k];});
+   if(Array.isArray(pr.bonusSpins))pr.bonusSpins=pr.bonusSpins.filter(b=>
+    !((b.status==='used'||b.status==='rejected')&&now-(b.mt||0)>60*864e5));
+  });
+  Object.entries(S.deleted||{}).forEach(([k,ts])=>{if(now-ts>90*864e5)delete S.deleted[k];});
+ }catch(e){}
  try{localStorage.setItem('studykichi_v1',JSON.stringify(S));}
  catch(e){ // ほぼ写真での容量オーバー。各プロフィールの古い写真をはがして再試行
   try{Object.values(S.profiles).forEach(pr=>{
@@ -298,8 +378,20 @@ function save(){
     (pr.chatArchive||[]).forEach(a=>(a.msgs||[]).forEach(m=>{if(m.img)m.img=null;}));
   });
   localStorage.setItem('studykichi_v1',JSON.stringify(S));}catch(_){}}
+ syncSchedulePush(); // ☁️同期中なら2秒デバウンスでクラウドへ(受信適用中は何もしない)
 }
 function P(){return S.profiles[S.currentProfile];}
+
+/* ---------- ⭐ポイント台帳(全ポイント変動をここに集約) ----------
+   fixedId(決定的ID)を渡すと冪等: 同じ取引が2端末で発生してもマージで1件に収束する */
+function addLedger(p,delta,reason,ref,fixedId){
+ const id=fixedId||('tx-'+reason+'-'+Date.now().toString(36)+Math.random().toString(36).slice(2,7));
+ if(!Array.isArray(p.ledger))p.ledger=[];
+ if(p.ledger.some(t=>t.id===id))return false;
+ p.ledger.push({id,ts:Date.now(),delta:Math.round(delta),reason,ref:ref==null?null:ref});
+ p.points+=Math.round(delta);
+ return true;}
+function recalcPoints(p){p.points=(p.ledger||[]).reduce((a,t)=>a+(Math.round(t.delta)||0),0);}
 
 /* ---------- 写真ストレージ (IndexedDB) ---------- */
 let _db=null;
@@ -357,9 +449,11 @@ function testTargetKey(){const d=new Date();
  return d.getDay()===0?weekKeyFor(Date.now()-864e5):weekKeyFor(Date.now());} // 日曜は「きのう終わった週」のバトル
 function getWeek(p,key){if(!p.weeks[key])p.weeks[key]={subjects:[],range:'',goal:'',planTs:null,test:null,reviews:[],granted:{}};
  if(!p.weeks[key].granted)p.weeks[key].granted={};return p.weeks[key];}
-function grantBonus(p,wk,kind,reason,golden){if(wk.granted[kind])return false;
+function grantBonus(p,key,wk,kind,reason,golden){if(wk.granted[kind])return false;
+ const id='bs-'+key+'-'+kind; // 決定的ID: 2端末が同条件で独立発行してもマージで1件に収束
+ if((p.bonusSpins||[]).some(b=>b.id===id))return false;
  wk.granted[kind]=1;
- p.bonusSpins.push({id:'bs'+Date.now()+Math.floor(Math.random()*1e4),reason,golden:!!golden,status:'pending'});
+ p.bonusSpins.push({id,reason,golden:!!golden,status:'pending',mt:Date.now()});
  return true;}
 function approvedBonus(p){return (p.bonusSpins||[]).filter(b=>b.status==='approved');}
 function pendingBonus(p){return (p.bonusSpins||[]).filter(b=>b.status==='pending');}
@@ -369,11 +463,71 @@ function weekLoopStreak(p,key){let n=0,k=key;
 function checkWeekLoop(p,key){const wk=p.weeks[key];if(!wk||!wk.planTs||!wk.test)return;
  if(wk.granted.loopChecked)return;wk.granted.loopChecked=1;
  const st=weekLoopStreak(p,key);
- if(WEEK_MS.indexOf(st)>=0)grantBonus(p,wk,'wstreak','🔥パーフェクトウィーク'+st+'週れんぞく!!',true);}
+ if(WEEK_MS.indexOf(st)>=0)grantBonus(p,key,wk,'wstreak','🔥パーフェクトウィーク'+st+'週れんぞく!!',true);}
+/* ---------- 🎯パパ・ママからの特別ミッション ----------
+   報酬は承認ゲート必須(できた!=claimed → 親の承認 → ポイント付与)。
+   スロットを経由しない固定ポイント(臨時収入)。 */
+function missionDueTs(ms){ // 期限日の23:59:59。期限延長された場合は dueBaseTs 起点で再計算
+ if(!ms.due)return null;
+ const base=ms.dueBaseTs||ms.createdTs;
+ if(ms.due.type==='today'){const d=new Date(base);
+  return new Date(d.getFullYear(),d.getMonth(),d.getDate(),23,59,59).getTime();}
+ if(ms.due.type==='week'){const[y,m,dd]=weekKeyFor(base).split('-').map(Number);
+  return new Date(y,m-1,dd,23,59,59).getTime();} // その週の土曜23:59まで
+ if(ms.due.type==='date'&&ms.due.date){const[y,m,dd]=String(ms.due.date).split('-').map(Number);
+  return new Date(y,m-1,dd,23,59,59).getTime();}
+ return null;}
+function missionDueLabel(ms){if(!ms.due)return'';
+ if(ms.due.type==='today')return'きょう中!';
+ if(ms.due.type==='week')return'こんしゅう中!';
+ if(ms.due.type==='date'&&ms.due.date){const a=String(ms.due.date).split('-').map(Number);return a[1]+'/'+a[2]+'まで';}
+ return'';}
+function checkMissionExpiry(p){let ch=false;const now=Date.now(); // 表示時判定で open→expired
+ (p.missions||[]).forEach(ms=>{if(ms.status==='open'){const dt=missionDueTs(ms);
+  if(dt&&now>dt){ms.status='expired';ms.expiredTs=now;ch=true;}}});
+ if(ch)save();}
+function claimedMissions(p){return (p.missions||[]).filter(m=>m.status==='claimed');}
+let msCelebrated={}; // 達成カードのconfettiを1セッション1回にする
+function missionClaim(id){const p=P();const ms=(p.missions||[]).find(m=>m.id===id);
+ if(!ms||ms.status!=='open')return;
+ ms.status='claimed';ms.claimedTs=Date.now();ms.mt=Date.now();save();render();}
+function missionAck(id){const p=P();const ms=(p.missions||[]).find(m=>m.id===id);
+ if(!ms)return;ms.ack=true;ms.mt=Date.now();save();render();}
+function judgeMission(id,ok){const p=P();const ms=(p.missions||[]).find(m=>m.id===id);
+ if(!ms||ms.status!=='claimed')return;
+ if(ok){ms.status='approved';ms.approvedTs=Date.now();ms.ack=false;
+  addLedger(p,ms.pts,'mission',ms.title,'tx-ms-'+ms.id); // 決定的ID=マージで二重付与しない
+ }else{ms.status='open';ms.claimedTs=null;} // 却下は再挑戦可。消したいときは親が削除
+ ms.mt=Date.now();
+ save();const row=$('#pm-'+id);if(row)row.remove();}
 
+/* ---------- 🎨きせかえ ---------- */
+function applyTheme(){const p=P();const th=(p&&THEMES[p.theme])||THEMES.sky;
+ Object.entries(th.vars).forEach(([k,v])=>document.documentElement.style.setProperty(k,v));
+ const mt=document.querySelector('meta[name=theme-color]');if(mt)mt.setAttribute('content',th.vars['--hd1']);}
+function setTheme(id){const p=P();
+ if((p.ownedThemes||[]).indexOf(id)<0)return;
+ p.theme=id;p.metaMt=Date.now();save();render();}
+function buyTheme(id){const p=P();const th=THEMES[id];
+ if(!th||(p.ownedThemes||[]).indexOf(id)>=0||p.points<THEME_PRICE)return;
+ if(confirm('⭐'+THEME_PRICE+'ポイントで きせかえ「'+th.em+th.name+'」をゲットする?')){
+  addLedger(p,-THEME_PRICE,'theme',th.em+th.name,'tx-theme-'+S.currentProfile+'-'+id); // 決定的ID=二重購入をマージで防止
+  p.ownedThemes.push(id);p.theme=id;p.metaMt=Date.now(); // 買ったらすぐ着がえる
+  save();confetti();render();}}
+/* こうかんじょの常設「🎨きせかえ」セクション(システム品・親のpoolとは別枠) */
+function themeShopHTML(p){
+ const un=Object.keys(THEMES).filter(t=>(p.ownedThemes||[]).indexOf(t)<0);
+ return '<h2 style="margin-top:12px">🎨 きせかえ</h2>'+
+ (un.length?un.map(id=>{const th=THEMES[id];const can=p.points>=THEME_PRICE;
+  return '<div class="ticket-item"><span style="flex:1">'+th.em+' はいけい「'+th.name+'」</span>'+
+  '<b style="font-family:var(--disp);color:#B07800;font-size:13px">'+THEME_PRICE+'pt</b>'+
+  '<button style="background:'+(can?'#DDF3E6;color:#2C7A4E':'#EEF4FA;color:#9AA9BE')+'"'+(can?'':' disabled')+' onclick="buyTheme(\''+id+'\')">こうかん</button></div>';}).join('')+
+  '<div class="muted" style="margin-top:4px">ゲットしたきせかえは「せってい」でいつでも きがえられるよ</div>'
+ :'<div class="muted">きせかえは ぜんぶあつめたよ!すごい✨(きがえは「せってい」でできるよ)</div>');}
 /* ---------- 画面制御 ---------- */
 const NAV=[['home','🏠','きち'],['rec','🌱','きろく'],['goal','🏆','もくひょう'],['ai','🤖','AI相棒'],['set','⚙️','せってい']];
 function render(){
+ applyTheme(); /* メンバーごとのテーマ(起動時・プロフィール切替時もここで反映) */
  renderHeader();renderNav();
  const app=$('#app');
  if(S.activeSession&&S.tab==='home'){app.innerHTML=timerHTML();
@@ -422,13 +576,14 @@ function whoParent(){
  setTimeout(()=>{const el=$('#who-ppin');if(el)el.focus();},60);}
 function renderNav(){$('#nav').innerHTML=NAV.map(([id,i,l])=>
  '<button class="'+(S.tab===id?'on':'')+'" onclick="go(\''+id+'\')"><span class="i">'+i+'</span>'+l+'</button>').join('');}
-function go(t){if(recOn)try{recog.stop();}catch(e){} S.tab=t;save();render();}
+function go(t){if(recOn)try{recog.stop();}catch(e){} S.tab=t;syncRenderPending=false;save();render();}
 
 /* ---------- モーダル ---------- */
 function openModal(html,closable=true){
  $('#modal-root').innerHTML='<div class="overlay" '+(closable?'onclick="if(event.target===this)closeModal()"':'')+'>'+
  '<div class="modal">'+(closable?'<button class="close-x" onclick="closeModal()">✕</button>':'')+html+'</div></div>';}
-function closeModal(){$('#modal-root').innerHTML='';}
+function closeModal(){$('#modal-root').innerHTML='';
+ if(syncRenderPending&&!S.activeSession&&S.tab!=='goal'){syncRenderPending=false;render();}} // 同期で保留した描画を反映
 async function viewPhotoInline(id){const d=await getPhoto(id);if(!d)return;
  const el=document.createElement('div');el.className='overlay';el.style.zIndex=300;
  el.onclick=()=>el.remove();
@@ -452,17 +607,45 @@ function homeHTML(){const p=P();const m=minutesByDay(p);
   '<button class="btn" style="margin-top:10px" onclick="openSlots()">まわす! 🎰</button>'+
   '<div style="text-align:center;margin-top:6px"><span class="muted" style="text-decoration:underline;cursor:pointer" onclick="slotRules()">❓なにが当たるの?</span></div></div>';}
  let tix='';
- if(p.tickets.length){tix='<div class="card"><h2>🎟️ もっている券</h2>'+
-  p.tickets.map((t,i)=>'<div class="won-ticket"><span>'+esc(t)+'</span><button onclick="useTicket('+i+')">つかう</button></div>').join('')+
+ const tixLive=p.tickets.filter(t=>!t.usedTs); // 未使用のみ表示
+ if(tixLive.length){tix='<div class="card"><h2>🎟️ もっている券</h2>'+
+  tixLive.map(t=>'<div class="won-ticket"><span>'+esc(t.name)+'</span><button onclick="useTicket(\''+t.id+'\')">つかう</button></div>').join('')+
   '<div class="muted">「つかう」はパパ・ママといっしょにおしてね</div></div>';}
- /* ⭐こうかんじょ */
- let shop='';
- if(p.pool.length){shop='<div class="card"><h2>⭐ こうかんじょ</h2>'+
-  p.pool.map((t,i)=>{const can=p.points>=t.price;
+ /* 🎯特別ミッション(情報が無いときはカードを出さない) */
+ checkMissionExpiry(p);
+ const msAll=p.missions||[];
+ const msAch=msAll.filter(x=>x.status==='approved'&&!x.ack);
+ let achCard='';
+ if(msAch.length){
+  if(msAch.some(x=>!msCelebrated[x.id])){msAch.forEach(x=>{msCelebrated[x.id]=1;});setTimeout(confetti,150);}
+  achCard='<div class="card" style="background:linear-gradient(135deg,#FFF6E3,#FFE9C0);border:2px solid var(--gold)">'+
+  '<h2>🎉 ミッションたっせい!</h2>'+
+  msAch.map(x=>'<div class="won-ticket"><span>🎯'+esc(x.title)+' <b style="color:#B07800">+'+x.pts+'pt</b></span>'+
+   '<button onclick="missionAck(\''+x.id+'\')">やったー!</button></div>').join('')+
+  '<div class="muted">パパ・ママが「よくやった!」って承認してくれたよ✨ポイントゲット!</div></div>';}
+ const msOpen=msAll.filter(x=>x.status==='open');
+ const msWait=claimedMissions(p);
+ const msExp=msAll.filter(x=>x.status==='expired'&&Date.now()-(x.expiredTs||0)<3*864e5); // 期限切れはグレー表示3日で自動非表示
+ let msCard='';
+ if(msOpen.length||msWait.length||msExp.length){
+  msCard='<div class="card" style="border:2px solid #CDE5F7"><h2>🎯 パパ・ママからの特別ミッション</h2>'+
+  msOpen.map(x=>'<div class="ticket-item"><span style="flex:1">'+esc(x.title)+'</span>'+
+   '<b style="font-family:var(--disp);color:#B07800;font-size:13px">+'+x.pts+'pt</b>'+
+   (missionDueLabel(x)?'<span class="badge b-pend">'+missionDueLabel(x)+'</span>':'')+
+   '<button style="background:#DDF3E6;color:#2C7A4E" onclick="missionClaim(\''+x.id+'\')">できた!</button></div>').join('')+
+  msWait.map(x=>'<div class="ticket-item" style="opacity:.75"><span style="flex:1">'+esc(x.title)+' <b style="font-family:var(--disp);font-size:12px">+'+x.pts+'pt</b></span>'+
+   '<span class="badge b-pend">パパ・ママの承認まち</span></div>').join('')+
+  msExp.map(x=>'<div class="ticket-item" style="opacity:.5"><span style="flex:1;text-decoration:line-through">'+esc(x.title)+'</span>'+
+   '<span class="badge b-ng">⌛きげんすぎちゃった</span></div>').join('')+
+  '<div class="muted" style="margin-top:4px">「できた!」→パパ・ママが承認すると ポイントがとどくよ</div></div>';}
+ /* ⭐こうかんじょ(ごほうび券+常設の🎨きせかえ) */
+ const shop='<div class="card"><h2>⭐ こうかんじょ</h2>'+
+  (p.pool.length?p.pool.map((t,i)=>{const can=p.points>=t.price;
    return '<div class="ticket-item"><span style="flex:1">'+esc(t.name)+'</span>'+
    '<b style="font-family:var(--disp);color:#B07800;font-size:13px">'+t.price+'pt</b>'+
-   '<button style="background:'+(can?'#DDF3E6;color:#2C7A4E':'#EEF4FA;color:#9AA9BE')+'"'+(can?'':' disabled')+' onclick="buyTicket('+i+')">こうかん</button></div>';}).join('')+
-  '<div class="muted" style="margin-top:6px">スロットでためたポイントで、すきな券とこうかんできるよ!</div></div>';}
+   '<button style="background:'+(can?'#DDF3E6;color:#2C7A4E':'#EEF4FA;color:#9AA9BE')+'"'+(can?'':' disabled')+' onclick="buyTicket('+i+')">こうかん</button></div>';}).join(''):'')+
+  themeShopHTML(p)+
+  '<div class="muted" style="margin-top:6px">スロットでためたポイントで、すきな券やきせかえと こうかんできるよ!</div></div>';
  /* ゴールデンスロット予告 */
  const nm=nextMilestone(p);
  let teaser='';
@@ -477,8 +660,8 @@ function homeHTML(){const p=P();const m=minutesByDay(p);
  return '<div class="stats">'+
   '<div class="stat"><div class="n">🔥'+streak+'</div><div class="l">れんぞく日</div></div>'+
   '<div class="stat"><div class="n">'+today+'<span style="font-size:12px">分</span></div><div class="l">きょうの勉強</div></div>'+
-  '<div class="stat"><div class="n">⭐'+p.points+'</div><div class="l">ポイント</div></div></div>'+
-  slotCard+tix+
+  '<div class="stat" style="cursor:pointer" onclick="openLedger()"><div class="n">⭐'+p.points+'</div><div class="l">ポイント📖</div></div></div>'+
+  achCard+slotCard+tix+msCard+
   '<div class="card"><h2>🚀 きょうの基地(きち)をえらぼう!</h2><div class="bases">'+
   S.bases.map(b=>{const n=baseCount(p,b.id);const t=titleFor(n);
    return '<div class="base" onclick="pickBase(\''+b.id+'\')"><div class="em">'+b.em+'</div>'+
@@ -487,6 +670,18 @@ function homeHTML(){const p=P();const m=minutesByDay(p);
   '</div><div class="muted" style="margin-top:10px">💡 まずは「5分だけ」でOK!はじめるのが いちばんえらい!'+teaser+planLine+
   '<br><span style="text-decoration:underline;cursor:pointer;color:var(--blue-d)" onclick="slotRules()">❓スロットとポイントのルール</span></div></div>'+
   shop;}
+/* ---------- ⭐ポイントつうちょう(A-2) ---------- */
+function ledgerLabel(t){const L={slot:'🎰スロット',shop:'⭐こうかんじょ',theme:'🎨きせかえ',mission:'🎯ミッション',adjust:'🔧ちょうせい',carryover:'くりこし'};
+ return (L[t.reason]||t.reason)+(t.ref?'('+t.ref+')':'');}
+function openLedger(){const p=P();
+ const list=(p.ledger||[]).slice().sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,30);
+ openModal('<h3>⭐ ポイントつうちょう</h3>'+
+ '<div style="font-family:var(--disp);font-weight:800;font-size:18px;color:var(--blue-d);margin-bottom:6px">いま ⭐'+p.points+'pt</div>'+
+ (list.length?list.map(t=>'<div class="ticket-item"><span class="muted" style="flex:0 0 40px">'+fmtDate(t.ts)+'</span>'+
+  '<span style="flex:1;font-size:13px">'+esc(ledgerLabel(t))+'</span>'+
+  '<b style="font-family:var(--disp);color:'+(t.delta>=0?'#2C7A4E':'#B04040')+'">'+(t.delta>=0?'+':'')+t.delta+'</b></div>').join(''):
+  '<div class="muted">まだ きろくがないよ。スロットをまわすと ここにたまっていくよ!</div>')+
+ '<div class="muted" style="margin-top:6px">さいきんの30けんまで みられるよ</div>');}
 function slotRules(){openModal('<h3>🎰 スロットのルール</h3>'+
  '<div class="sess"><span class="em">🎟️</span><div class="info"><b>🎟️🎟️🎟️ 券ジャックポット(超レア🌈)</b><br>こうかんじょの券が1まい<b>タダ</b>でもらえる!その日ぜんぶで<b>25分いじょう</b>勉強した日だけチャンスがあるよ</div></div>'+
  '<div class="sess"><span class="em">👑</span><div class="info"><b>👑👑👑 大当たり(レア)</b><br>+100ポイント!</div></div>'+
@@ -500,9 +695,14 @@ function slotRules(){openModal('<h3>🎰 スロットのルール</h3>'+
 function buyTicket(i){const p=P();const t=p.pool[i];
  if(!t||p.points<t.price)return;
  if(confirm('⭐'+t.price+'ポイントで「'+t.name+'」とこうかんする?')){
-  p.points-=t.price;p.tickets.push(t.name);save();confetti();render();}}
-function useTicket(i){const p=P();
- if(confirm('「'+p.tickets[i]+'」をつかう?(おうちの人といっしょにね)')){p.tickets.splice(i,1);save();render();}}
+  addLedger(p,-t.price,'shop',t.name); // 正当な複数購入があるためランダムID
+  p.tickets.push({id:'tk'+Date.now().toString(36)+Math.random().toString(36).slice(2,7),
+   name:t.name,ts:Date.now(),usedTs:null,mt:Date.now()});
+  save();confetti();render();}}
+function useTicket(id){const p=P();const t=p.tickets.find(x=>x.id===id);
+ if(!t||t.usedTs)return;
+ if(confirm('「'+t.name+'」をつかう?(おうちの人といっしょにね)')){
+  t.usedTs=Date.now();t.mt=Date.now();save();render();}} // 削除でなく使用マーク(履歴が残る)
 
 /* ---------- 出撃(セッション) ---------- */
 let pendingBase=null;
@@ -596,7 +796,7 @@ async function saveSession(min){const a=S.activeSession;
  P().sessions.unshift({id,base:a.base,plannedMin:a.plannedMin,startTs:a.startTs,endTs:Date.now(),
   minutes:min,subjects:subs,memo:$('#end-memo').value.trim(),photoId,boards:(a.boards||[]),
   focus:(document.querySelector('#focus-chips .chip.on')||{dataset:{}}).dataset.f||null,
-  status:'pending',spin:null});
+  status:'pending',spin:null,mt:Date.now()});
  S.activeSession=null;save();closeModal();render();
  openModal('<h3>きろくしたよ! ✍️</h3>'+
  '<div class="muted">パパ・ママが「がんばったね」って承認してくれたら、つぎにアプリをひらいたときに 🎰スロットがまわせるよ。たのしみにまっててね!</div>'+
@@ -663,7 +863,7 @@ function closeBoard(){
    確率(ゴールデン): 8% / 20% / 35% / 37%
    ポイントには時間係数がかかる: 15分未満×0.3 / 15〜44分×1.0 / 45分以上×1.5
    券ジャックポットは「その日の合計25分以上」のセッションだけ抽選対象 */
-const EMO=['🍀','⭐','🥟','🐟','🌸','🍃','👑'];
+const EMO=['🍀','⭐','🍩','🎈','🌸','🍃','👑'];
 let slotQueue=[];let goldenM=0;
 function openSlots(){const p=P();
  slotQueue=spinQueue(p).map(s=>({t:'s',id:s.id}));
@@ -710,18 +910,54 @@ function spinNext(){const p=P();const item=slotQueue[0];
  setTimeout(()=>{clearInterval(spinI);
   reels.forEach((r,i)=>{r.classList.remove('spin');r.textContent=res.face[i];});
   $('#slot-res').textContent=res.msg;
-  p.points+=res.pts;
-  if(res.ticket)p.tickets.push(res.ticket);
-  if(sess){sess.spin=(golden?'🔥':'')+res.msg;
+  const spinKey=(item.t==='s'?item.id:item.bid); // 決定的ID: 同一スピンは台帳・券とも1件に収束
+  if(res.pts)addLedger(p,res.pts,'slot',null,'tx-spin-'+spinKey);
+  if(res.ticket&&!p.tickets.some(t=>t.id==='tk-spin-'+spinKey))
+   p.tickets.push({id:'tk-spin-'+spinKey,name:res.ticket,ts:Date.now(),usedTs:null,mt:Date.now()});
+  if(sess){sess.spin=(golden?'🔥':'')+res.msg;sess.mt=Date.now();
    if(golden){p.lastGoldenMilestone=goldenM;goldenM=0;}}
-  else{p.bonusSpins=p.bonusSpins.filter(b=>b.id!==item.bid);}
+  else{const bb=p.bonusSpins.find(b2=>b2.id===item.bid);
+   if(bb){bb.status='used';bb.mt=Date.now();}} // 削除でなく消費マーク(マージでの蘇り防止)
   slotQueue.shift();save();
   if(res.big)confetti();
   btn.disabled=false;
   if(slotQueue.length){btn.textContent='つぎのスロットへ(あと'+slotQueue.length+'回)🎰';btn.onclick=showSlotModal;}
   else{btn.textContent='とじる';btn.onclick=()=>{closeModal();render();};}
  },1600);}
-function confetti(){const em=['🎉','⭐','🌸','✨','🥟','🐟'];
+/* ---------- 🎈はじめてガイド(初回だけ。せっていから再表示可) ---------- */
+const GUIDE_LS_KEY='studykichi_guide'; // 端末ローカル(同期・バックアップに混ぜない)
+const GUIDE_PAGES=[
+ {em:'🚀',t:'きちに しゅつげき!',b:'ホームで きょうの「きち(勉強ばしょ)」をタップして、タイマーで べんきょうスタート!<br>まずは<b>「5分だけ」</b>でOK。はじめるのが いちばんえらい!'},
+ {em:'🎰',t:'がんばりが スロットに!',b:'きろくを パパ・ママが「がんばったね」って承認すると、🎰スロットがまわせるよ。<br>⭐ポイントをためて「こうかんじょ」で ごほうび券や🎨きせかえと こうかんしよう!'},
+ {em:'⚔️',t:'週の さくせん と ボスバトル',b:'土曜は📅<b>さくせん会議</b>で らいしゅうの作戦をたてて、週まつは⚔️<b>ボスバトル</b>にちょうせん!<br>わからない問題は 🤖AI相棒に しつもんできるよ。'},
+ {em:'👨',t:'保護者の方へ',b:'「せってい → パパ・ママモード」に、承認・ごほうび・特別ミッション・かぞく同期(複数端末)・AIキー設定があります。<br>このガイドは「せってい」からいつでも見られます。'},
+];
+function guideSeen(){try{return !!localStorage.getItem(GUIDE_LS_KEY);}catch(e){return true;}}
+function showGuide(i){const gi=Math.max(0,Math.min(GUIDE_PAGES.length-1,i||0));
+ try{localStorage.setItem(GUIDE_LS_KEY,'1');}catch(e){}
+ const g=GUIDE_PAGES[gi];const last=gi===GUIDE_PAGES.length-1;
+ openModal('<div style="text-align:center;padding:6px 0">'+
+ '<div style="font-size:52px">'+g.em+'</div>'+
+ '<h3 style="margin:8px 0 6px;justify-content:center">'+g.t+'</h3>'+
+ '<div style="font-size:14px;line-height:1.9;color:var(--ink-soft);text-align:left">'+g.b+'</div>'+
+ '<div style="margin:12px 0 4px">'+GUIDE_PAGES.map((_,j)=>'<span style="display:inline-block;width:8px;height:8px;border-radius:50%;margin:0 3px;background:'+(j===gi?'var(--blue)':'var(--line)')+'"></span>').join('')+'</div>'+
+ '<button class="btn" style="margin-top:8px" onclick="'+(last?'closeModal()':'showGuide('+(gi+1)+')')+'">'+(last?'はじめる! 🚀':'つぎへ →')+'</button>'+
+ (last?'':'<button class="btn ghost sm" style="margin-top:8px" onclick="closeModal()">スキップ</button>')+
+ '</div>');}
+/* ---------- 🚀ロケットOP(起動時1回だけのスプラッシュ) ---------- */
+function showSplash(){
+ if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+ const el=document.createElement('div');el.id='splash';
+ el.innerHTML='<div class="spl-cloud spl-c1"></div><div class="spl-cloud spl-c2"></div>'+
+  '<div class="spl-rocket"><span class="spl-ship">🚀</span><span class="spl-flame">🔥</span></div>';
+ let gone=false;
+ const done=()=>{if(gone)return;gone=true;el.remove();};
+ el.addEventListener('click',done); // タップで即スキップ
+ const rk=el.querySelector('.spl-rocket');
+ if(rk)rk.addEventListener('animationend',()=>setTimeout(done,120));
+ setTimeout(done,1300); // 保険タイマー
+ document.body.appendChild(el);}
+function confetti(){const em=['🎉','⭐','🌸','✨','🌈','🍀'];
  for(let i=0;i<28;i++){const s=document.createElement('span');s.className='confetti';
   s.textContent=em[i%em.length];s.style.left=(Math.random()*100)+'vw';
   s.style.animationDelay=(Math.random()*.6)+'s';document.body.appendChild(s);
@@ -863,14 +1099,14 @@ function weeklyHTML(p){
   '<div class="muted">週まつに、おうちの人がテキストから えらんだ問題にちょうせん(30分くらい)。💯まんてんなら🔥ゴールデンスロット!</div>'+
   '<button class="btn sm" style="margin-top:8px" onclick="battleForm()">'+(bwk.test?'✏️ こんしゅうのけっかをなおす':'⚔️ バトルのけっかをきろく 🎁')+'</button>'+
   revengeHTML(p)+
-  (hist.length?'<h2 style="margin-top:14px">📖 まいしゅうの きろく</h2>'+
+  (hist.length?'<details class="pd"><summary>📖 まいしゅうの きろく('+hist.length+')</summary><div class="pd-body">'+
    hist.map(k=>{const w2=p.weeks[k];
     return '<div class="sess" style="cursor:pointer" onclick="weekDetail(\''+k+'\')"><span class="em">🗓️</span><div class="info">'+
     '<b>'+weekRangeLabel(k)+'</b> <span class="muted">タップでくわしく</span><br>'+
     '📅'+(w2.planTs?'作戦✓':'—')+' ⚔️'+(w2.test?w2.test.correct+'/'+w2.test.total+'問'+(w2.test.correct===w2.test.total?'💯':''):'—')+
     (w2.test&&w2.test.items?'<br><span class="muted">'+w2.test.items.map(x=>x.subj+' '+x.correct+'/'+x.total).join('・')+'</span>':'')+
     ' 🔁'+((w2.reviews||[]).length?(w2.reviews.filter(r=>r.done).length+'/'+w2.reviews.length):'—')+
-    (w2.report?' 🤖':'')+'</div></div>';}).join(''):'')+
+    (w2.report?' 🤖':'')+'</div></div>';}).join('')+'</div></details>':'')+
   '</div>';
  /* AIレポート */
  out+='<div class="card"><h2>🤖 1週間レポート</h2>'+
@@ -893,7 +1129,8 @@ function savePlan(){const p=P();const d=ensureDraft(p);const key=d.key;
  wk.range=d.range;
  let first=false;
  if(!wk.planTs){wk.planTs=Date.now();
-  first=grantBonus(p,wk,'plan','📅作戦けってい ボーナス',false);}
+  first=grantBonus(p,key,wk,'plan','📅作戦けってい ボーナス',false);}
+ wk.planMt=Date.now();
  checkWeekLoop(p,key);save();render();
  if(first)alert('作戦けってい⚔️ パパ・ママが承認すると 🎁ボーナススロットが とどくよ!');}
 let btDraft=null;
@@ -941,8 +1178,9 @@ function battleSave(){const p=P();const d=btDraft;if(!d)return;const key=d.key;
  if(!wk.test)wk.test={};
  wk.test.total=total;wk.test.correct=correct;wk.test.items=items;
  if(!wk.test.ts)wk.test.ts=Date.now();
- let got=grantBonus(p,wk,'test','⚔️ボスバトル ボーナス',false);
- if(correct===total){if(grantBonus(p,wk,'perfect','💯まんてん!パーフェクトボーナス',true)){got=true;confetti();}}
+ wk.testMt=Date.now();
+ let got=grantBonus(p,key,wk,'test','⚔️ボスバトル ボーナス',false);
+ if(correct===total){if(grantBonus(p,key,wk,'perfect','💯まんてん!パーフェクトボーナス',true)){got=true;confetti();}}
  checkWeekLoop(p,key);save();closeModal();btDraft=null;render();
  if(got)alert('きろくしたよ⚔️ パパ・ママが承認すると 🎁スロットが とどくよ!');}
 function revengeHTML(p){const items=[];
@@ -960,7 +1198,7 @@ function revToggle(k,i){const p=P();const wk=p.weeks[k];
  if(!wk||!wk.reviews||!wk.reviews[i])return;
  wk.reviews[i].done=!wk.reviews[i].done;
  if(wk.reviews.length&&wk.reviews.every(r=>r.done)){
-  if(grantBonus(p,wk,'review','🔁リベンジぜんぶクリア ボーナス',false))confetti();}
+  if(grantBonus(p,k,wk,'review','🔁リベンジぜんぶクリア ボーナス',false))confetti();}
  save();render();}
 function weekDetail(k){const p=P();const w2=p.weeks[k];if(!w2)return;
  openModal('<h3>🗓️ '+weekRangeLabel(k)+' のきろく</h3>'+
@@ -1081,13 +1319,17 @@ function examSave(i){const scores={};let any=false;
  document.querySelectorAll('[data-ex-s]').forEach(inp=>{const v=inp.value.trim();
   if(v!==''){scores[inp.dataset.exS]=Number(v);any=true;}});
  if(!any){alert('どれかひとつは スコアをいれてね');return;}
- const rec={name:$('#ex-name').value.trim()||'模試',date:$('#ex-date').value||todayKey(),
-  scores,memo:$('#ex-memo').value.trim()};
+ const old=(i!=null)?P().exams[i]:null;
+ const rec={id:old&&old.id?old.id:'ex'+Date.now()+Math.random().toString(36).slice(2,6), // 編集でIDを失わない
+  name:$('#ex-name').value.trim()||'模試',date:$('#ex-date').value||todayKey(),
+  scores,memo:$('#ex-memo').value.trim(),mt:Date.now()};
  if(i==null)P().exams.push(rec);else P().exams[i]=rec;
  P().exams.sort((a,b)=>exSortKey(a)-exSortKey(b)); // 日づけ順にならべる
  save();closeModal();render();}
 function examDel(i){if(confirm('このけっかを削除する?(もどせないよ)')){
- P().exams.splice(i,1);save();closeModal();render();}}
+ const p=P();const e=p.exams[i];
+ if(e&&e.id)p.deleted[e.id]=Date.now(); // 墓標=マージで蘇らない
+ p.exams.splice(i,1);save();closeModal();render();}}
 
 /* ---------- AI相棒 ---------- */
 function chatLogHTML(msgs,aiName){let out='';let lastDay='';
@@ -1125,7 +1367,7 @@ function aiHTML(){const p=P();const hasKey=!!S.gemini.key;
 function newChat(){const p=P();
  if(!p.chat.length){alert('まだ会話がないよ');return;}
  if(confirm('いまの会話を「まえの会話」にしまって、新しい会話をはじめる?')){
-  (p.chatArchive=p.chatArchive||[]).push({ts:Date.now(),msgs:p.chat});
+  (p.chatArchive=p.chatArchive||[]).push({id:'ca'+Date.now()+Math.random().toString(36).slice(2,6),ts:Date.now(),msgs:p.chat,mt:Date.now()});
   p.chat=[];save();render();}}
 function openArchive(){const p=P();const arch=p.chatArchive||[];
  if(!arch.length){openModal('<h3>📚 まえの会話</h3><div class="muted">アーカイブはまだないよ。「新しい会話をはじめる」をおすと、それまでの会話がここにたまっていくよ。</div>');return;}
@@ -1141,7 +1383,9 @@ function viewArchive(i){const p=P();const a=(p.chatArchive||[])[i];if(!a)return;
  '<div class="chat-log" style="max-height:60vh">'+chatLogHTML(a.msgs,p.aiName)+'</div>'+
  '<button class="btn ghost sm" style="margin-top:10px" onclick="openArchive()">← いちらんに もどる</button>');}
 function delArchive(i){const p=P();
- if(confirm('この会話をけす?(もどせないよ)')){p.chatArchive.splice(i,1);save();openArchive();}}
+ if(confirm('この会話をけす?(もどせないよ)')){
+  const a=p.chatArchive[i];if(a&&a.id)p.deleted[a.id]=Date.now(); // 墓標
+  p.chatArchive.splice(i,1);save();openArchive();}}
 /* --- 音声入力 (Web Speech API / 対応ブラウザのみ) --- */
 let recog=null,recOn=false;
 function voiceSupported(){return ('SpeechRecognition' in window)||('webkitSpeechRecognition' in window);}
@@ -1181,7 +1425,7 @@ async function sendChat(forceText){const p=P();const ta=$('#chat-in');
  const img=chatPhotoData;
  if(!t&&!img)return;
  if(!S.gemini.key){alert('パパ・ママモードでAPIキーを設定してもらってね');return;}
- p.chat.push({r:'user',t:t||'（この写真を見てね）',img:img||null,ts:Date.now()});
+ p.chat.push({id:'cm'+Date.now()+Math.random().toString(36).slice(2,6),r:'user',t:t||'（この写真を見てね）',img:img||null,ts:Date.now()});
  chatPhotoData=null;save();render();scrollChat();
  const ty=$('#typing');if(ty)ty.textContent=p.aiName+' がかんがえ中…';
  try{
@@ -1198,8 +1442,8 @@ async function sendChat(forceText){const p=P();const ta=$('#chat-in');
   if(data.error){txt='エラーみたい:'+(data.error.message||'')+'\nパパにカギ(APIキー)やモデル名を見てもらってね。';}
   else{txt=(data.candidates&&data.candidates[0]&&data.candidates[0].content&&data.candidates[0].content.parts||[])
    .map(x=>x.text||'').join('')||'(うまく へんじできなかった…もういちど ためしてね)';}
-  p.chat.push({r:'model',t:txt,ts:Date.now()});
- }catch(e){p.chat.push({r:'model',t:'つうしんエラーだよ。でんぱのあるところで もういちど ためしてね📡',ts:Date.now()});}
+  p.chat.push({id:'cm'+Date.now()+Math.random().toString(36).slice(2,6),r:'model',t:txt,ts:Date.now()});
+ }catch(e){p.chat.push({id:'cm'+Date.now()+Math.random().toString(36).slice(2,6),r:'model',t:'つうしんエラーだよ。でんぱのあるところで もういちど ためしてね📡',ts:Date.now()});}
  save();render();scrollChat();}
 function quickAsk(id){const q=QUICKS.find(x=>x.id===id);if(!q)return;sendChat(q.text);}
 function onChatPhoto(inp){const f=inp.files&&inp.files[0];if(!f)return;
@@ -1211,23 +1455,34 @@ function clearChatPhoto(){chatPhotoData=null;const el=$('#chat-photo-prev');if(e
 
 /* ---------- せってい ---------- */
 function setHTML(){const p=P();
- const pend=p.sessions.filter(s=>s.status==='pending').length+pendingBonus(p).length;
+ const pend=p.sessions.filter(s=>s.status==='pending').length+pendingBonus(p).length+claimedMissions(p).length;
  return '<div class="card"><h2>🤖 AI相棒のなまえ</h2>'+
  '<input id="ai-name" value="'+esc(p.aiName)+'">'+
  '<button class="btn blue sm" style="margin-top:8px" onclick="saveAiName()">きめた!</button></div>'+
+ '<div class="card"><h2>🎨 きせかえ</h2>'+
+ '<div class="muted">タップで はいけいを きがえられるよ('+esc(p.name)+'せんよう)。</div>'+
+ '<div class="chips" style="margin-top:8px">'+Object.entries(THEMES).map(([id,th])=>{
+  const owned=(p.ownedThemes||[]).indexOf(id)>=0;const cur=p.theme===id;
+  return owned
+   ?'<div class="chip'+(cur?' on':'')+'" onclick="setTheme(\''+id+'\')">'+th.em+' '+th.name+(cur?' ✓':'')+'</div>'
+   :'<div class="chip" style="opacity:.5" onclick="go(\'home\')">'+th.em+' '+th.name+'(こうかんじょで'+THEME_PRICE+'pt)</div>';
+ }).join('')+'</div></div>'+
  '<div class="card"><h2>👨 パパ・ママモード'+(pend?' <span class="badge b-pend">承認まち '+pend+'</span>':'')+'</h2>'+
- '<div class="muted">承認・ごほうび券・目標・APIキー・メンバーやきちの編集はこちら(おうちの人せんよう)</div>'+
+ '<div class="muted">承認・ごほうび券・目標・APIキー・かぞく同期・メンバーやきちの編集はこちら(おうちの人せんよう)</div>'+
  '<button class="btn sm" style="margin-top:10px" onclick="parentGate()">🔐 ひらく</button></div>'+
- '<div class="card"><h2>📱 アプリとしてつかう</h2>'+
+ '<div class="card"><h2>📖 つかいかた</h2>'+
+ '<div class="muted">はじめてガイドを もういちど見られるよ。</div>'+
+ '<button class="btn ghost sm" style="margin-top:8px" onclick="showGuide(0)">🎈 つかいかたガイドを見る</button></div>'+
+ '<details class="pd"><summary>📱 アプリとしてつかう</summary><div class="pd-body">'+
  '<div class="muted">ホーム画面についかすると、アプリみたいに全画面でつかえるよ。<br>'+
  '・Android(Chrome):右上の⋮メニュー →「ホーム画面に追加」<br>'+
  '・iPhone(Safari):共有ボタン →「ホーム画面に追加」</div>'+
- (window.deferredPrompt?'<button class="btn sm" style="margin-top:10px" onclick="installApp()">📲 インストールする</button>':'')+'</div>'+
- '<div class="card"><h2>💾 データ</h2>'+
+ (window.deferredPrompt?'<button class="btn sm" style="margin-top:10px" onclick="installApp()">📲 インストールする</button>':'')+'</div></details>'+
+ '<div class="card" style="margin-top:14px"><h2>💾 データ</h2>'+
  '<div class="muted">データはこの端末の中にだけ保存されます。ときどきバックアップしてね(写真・メモボードはふくまれません)。</div>'+
  '<button class="btn ghost sm" style="margin-top:10px" onclick="exportData()">バックアップを保存(JSON)</button>'+
- '<div class="muted" style="margin-top:8px;text-align:right">スタディきち v11</div></div>';}
-function saveAiName(){P().aiName=$('#ai-name').value.trim()||'そらとも';save();render();}
+ '<div class="muted" style="margin-top:8px;text-align:right">スタディきち '+APP_VER+'<br>made by そら ＆ ふう ＆ パパ 🚀</div></div>';}
+function saveAiName(){P().aiName=$('#ai-name').value.trim()||'そらとも';P().metaMt=Date.now();save();render();}
 /* --- メンバー編集(パパ・ママモード内) --- */
 function addProfile(){const id='p'+Date.now();
  S.profiles[id]=mkProfile('あたらしい人','🙂','小1');save();openParent();}
@@ -1235,14 +1490,16 @@ function delProfile(id){const pr=S.profiles[id];if(!pr)return;
  if(Object.keys(S.profiles).length<=1)return;
  if(!confirm('「'+pr.name+'」をけす?きろく・ポイント・券もぜんぶ消えて、もどせないよ!'))return;
  if(!confirm('ほんとうに いい?(さいごの確認)'))return;
+ S.deleted['pf-'+id]=Date.now(); // 墓標=マージで蘇らない
  delete S.profiles[id];
  if(S.currentProfile===id)S.currentProfile=Object.keys(S.profiles)[0];
  save();openParent();}
 /* --- きち編集(パパ・ママモード内) --- */
-function addBase(){S.bases.push({id:'b'+Date.now(),name:'あたらしい基地',em:'📍'});save();openParent();}
+function addBase(){S.bases.push({id:'b'+Date.now(),name:'あたらしい基地',em:'📍'});S.basesMt=Date.now();save();openParent();}
 function delBase(i){const b=S.bases[i];if(!b||S.bases.length<=1)return;
  if(!confirm('「'+b.name+'」をけす?(まえのきろくは のこるよ)'))return;
- S.bases.splice(i,1);save();openParent();}
+ S.deleted['base-'+b.id]=Date.now(); // 墓標
+ S.bases.splice(i,1);S.basesMt=Date.now();save();openParent();}
 function installApp(){if(!window.deferredPrompt)return;
  window.deferredPrompt.prompt();window.deferredPrompt=null;render();}
 /* --- 初期化 --- */
@@ -1250,6 +1507,7 @@ function factoryReset(){
  if(!confirm('すべてのデータ(全メンバーのきろく・ポイント・券・会話・写真・PIN・APIキー)を消して、はじめての状態にもどします。よろしいですか?'))return;
  if(!confirm('この操作は もどせません。本当に初期化しますか?'))return;
  try{localStorage.removeItem('studykichi_v1');}catch(e){}
+ try{localStorage.removeItem(SYNC_LS_KEY);}catch(e){} // かぞくコードも消す(古い家族へ push しないため)
  try{indexedDB.deleteDatabase('studykichi');}catch(e){}
  location.reload();}
 
@@ -1264,73 +1522,121 @@ function parentGate(){
  '<button class="btn" style="margin-top:12px" onclick="checkPin()">ひらく</button>');}
 function setPin(){const v=$('#pin-new').value;
  if(!/^\d{4}$/.test(v)){alert('4けたの数字で!');return;}
- S.parentPin=v;save();closeModal();openParent();}
+ S.parentPin=v;S.pinMt=Date.now();save();closeModal();openParent();}
 function checkPin(){if($('#pin-in').value===S.parentPin){closeModal();openParent();}else alert('ちがうみたい…');}
+/* 折りたたみセクション(パパ・ママモード整理用) */
+function pdSec(id,title,badge,body,open2){
+ return '<details class="pd" id="pd-'+id+'"'+(open2?' open':'')+'><summary>'+title+
+  (badge?' <span class="badge b-pend">'+badge+'</span>':'')+'</summary>'+
+  '<div class="pd-body">'+body+'</div></details>';}
 function openParent(){const p=P();const pend=p.sessions.filter(s=>s.status==='pending');
+ const nApprove=pend.length+pendingBonus(p).length+claimedMissions(p).length;
+ /* ① 承認センター */
+ const secApprove=
+  '<h2 style="margin-top:2px">✅ セッション('+pend.length+')</h2>'+
+  '<div class="muted">写真やメモを見て「がんばったね承認」を。承認すると、お子さんが次にアプリをひらいたときにスロットが回せるようになります(なるべく1〜2日以内の承認がおすすめ)。</div>'+
+  '<div id="pend-list">'+(pend.length?pend.map(parentSessRow).join(''):'<div class="muted">承認まちはありません</div>')+'</div>'+
+  '<h2 style="margin-top:14px">🎁 ボーナス('+pendingBonus(p).length+')</h2>'+
+  '<div class="muted">作戦・ボスバトル・リベンジのボーナスです。承認すると🎰スロット+1回。</div>'+
+  '<div>'+(pendingBonus(p).length?pendingBonus(p).map(b=>'<div class="sess" id="pb-'+b.id+'"><span class="em">🎁</span>'+
+   '<div class="info"><b>'+esc(b.reason)+'</b>'+(b.golden?' <span class="badge b-pend">🔥ゴールデン</span>':'')+'</div>'+
+   '<button class="btn blue sm" style="width:56px;flex:0 0 auto" onclick="judgeBonus(\''+b.id+'\',1)">承認</button>'+
+   '<button class="btn ghost sm" style="width:60px;flex:0 0 auto;color:#B04040" onclick="judgeBonus(\''+b.id+'\',0)">却下</button></div>').join(''):
+   '<div class="muted">承認まちのボーナスはありません</div>')+'</div>'+
+  '<h2 style="margin-top:14px">🎯 ミッション('+claimedMissions(p).length+')</h2>'+
+  '<div class="muted">承認するとポイントを直接付与します(スロットは経由しません)。却下すると「出題中」に戻ります。</div>'+
+  '<div>'+(claimedMissions(p).length?claimedMissions(p).map(ms=>'<div class="sess" id="pm-'+ms.id+'"><span class="em">🎯</span>'+
+   '<div class="info"><b>'+esc(ms.title)+'</b> +'+ms.pts+'pt'+(missionDueLabel(ms)?' <span class="muted">'+missionDueLabel(ms)+'</span>':'')+'</div>'+
+   '<button class="btn blue sm" style="width:56px;flex:0 0 auto" onclick="judgeMission(\''+ms.id+'\',1)">承認</button>'+
+   '<button class="btn ghost sm" style="width:60px;flex:0 0 auto;color:#B04040" onclick="judgeMission(\''+ms.id+'\',0)">却下</button></div>').join(''):
+   '<div class="muted">承認まちのミッションはありません</div>')+'</div>';
+ /* ② 特別ミッションを出す */
+ const secMission=
+  '<div class="muted">お手伝いや+αの勉強など、臨時のミッションを出せます。達成→承認で固定ポイントを付与します。</div>'+
+  '<div>'+missionAdminRows(p)+'</div>'+
+  '<div class="row" style="margin-top:8px"><input id="ms-title" placeholder="例:漢字ドリル1ページ">'+
+  '<input id="ms-pts" type="number" min="1" inputmode="numeric" placeholder="pt" style="flex:0 0 74px"></div>'+
+  '<div class="row" style="margin-top:6px">'+
+  '<select id="ms-due" onchange="var d=document.getElementById(\'ms-date\');if(d)d.style.display=this.value===\'date\'?\'\':\'none\'">'+
+   '<option value="today">きょう中</option><option value="week">こんしゅう中(週の土曜まで)</option><option value="date">日付指定</option></select>'+
+  '<input id="ms-date" type="date" style="display:none"></div>'+
+  '<button class="btn blue sm" style="margin-top:8px" onclick="addMission()">🎯 ミッションを出す</button>';
+ /* ③ ごほうび設定 */
+ const secReward=
+  '<h2 style="margin-top:2px">🎟️ ごほうび券とポイント価格</h2>'+
+  '<div class="muted">価格は「⭐こうかんじょ」の値段になります。スロットの券ジャックポット(超レア)では無料で当たります(当たっても一覧からは消えません)。</div>'+
+  '<div style="margin-top:6px">'+p.pool.map((t,i)=>'<div class="ticket-item">'+
+   '<input data-pool-n="'+i+'" value="'+esc(t.name)+'" style="flex:1;min-width:0">'+
+   '<input data-pool-p="'+i+'" type="number" value="'+esc(t.price)+'" style="flex:0 0 74px">'+
+   '<button onclick="delPool('+i+')">削除</button></div>').join('')+'</div>'+
+  '<div class="row" style="margin-top:8px"><input id="pool-new" placeholder="例:回転ずし券 🍣">'+
+  '<input id="pool-price" type="number" placeholder="pt" style="flex:0 0 74px">'+
+  '<button class="btn blue sm" style="flex:0 0 70px" onclick="addPool()">追加</button></div>'+
+  '<h2 style="margin-top:14px">🎯 模試の目標</h2>'+
+  '<div class="row"><input id="tgt-label" placeholder="例:○○模試 偏差値" value="'+esc(p.examTarget.label)+'">'+
+  '<input id="tgt-value" type="number" placeholder="60" value="'+esc(p.examTarget.value)+'" style="flex:0 0 90px"></div>'+
+  '<h2 style="margin-top:14px">🏆 大きなごほうび</h2>'+
+  p.bigGoals.map((g,i)=>'<div class="row" style="margin-bottom:6px">'+
+   '<input data-bg-t="'+i+'" value="'+esc(g.title)+'"><input data-bg-r="'+i+'" value="'+esc(g.reward)+'"></div>').join('')+
+  '<h2 style="margin-top:14px">📚 テキストの登録('+esc(p.name)+')</h2>'+
+  '<div class="muted">さくせん会議で「やるところ」に使うテキストの一覧です。</div>'+
+  '<div>'+p.books.map((b,i)=>'<div class="ticket-item"><span style="flex:1">'+esc(b)+'</span>'+
+   '<button onclick="delBook('+i+')">削除</button></div>').join('')+'</div>'+
+  '<div class="row" style="margin-top:8px"><input id="book-new" placeholder="例:予習シリーズ 算数(上)">'+
+  '<button class="btn blue sm" style="flex:0 0 70px" onclick="addBook()">追加</button></div>';
+ /* ④ メンバーときち */
+ const secMember=
+  '<h2 style="margin-top:2px">👥 メンバーの編集</h2>'+
+  '<div class="muted">なまえ・学年をかえても、きろくやポイントはそのまま引きつがれます。削除はもどせません。<br>💡「こどもPIN」(4けた)を設定すると、アプリを開いたときに「だれがつかう?」画面が出て、本人しか入れなくなります(きょうだいのスロット回し防止!)。空欄にするとロックなしです。</div>'+
+  Object.entries(S.profiles).map(([id,pr])=>'<div class="row" style="margin-top:6px">'+
+   '<input data-pf-em="'+id+'" value="'+esc(pr.em)+'" maxlength="4" style="flex:0 0 50px;text-align:center;font-size:20px">'+
+   '<input data-pf-nm="'+id+'" value="'+esc(pr.name)+'">'+
+   '<input data-pf-gr="'+id+'" value="'+esc(pr.grade)+'" style="flex:0 0 56px">'+
+   '<input data-pf-pin="'+id+'" value="'+esc(pr.pin||'')+'" placeholder="PIN" maxlength="4" inputmode="numeric" style="flex:0 0 62px;text-align:center">'+
+   (Object.keys(S.profiles).length>1?'<button class="btn ghost sm" style="flex:0 0 40px;color:#B04040;padding:9px 4px" onclick="delProfile(\''+id+'\')">✕</button>':'')+
+  '</div>').join('')+
+  '<button class="btn ghost sm" style="margin-top:8px" onclick="addProfile()">＋ メンバーついか</button>'+
+  '<h2 style="margin-top:14px">🗺️ きちの編集</h2>'+
+  '<div class="muted">なまえをかえても出撃回数は引きつがれます。けしても、まえのきろくはのこります。</div>'+
+  S.bases.map((b,i)=>'<div class="row" style="margin-top:6px">'+
+   '<input data-bs-em="'+i+'" value="'+esc(b.em)+'" maxlength="4" style="flex:0 0 56px;text-align:center;font-size:20px">'+
+   '<input data-bs-nm="'+i+'" value="'+esc(b.name)+'">'+
+   (S.bases.length>1?'<button class="btn ghost sm" style="flex:0 0 44px;color:#B04040" onclick="delBase('+i+')">✕</button>':'')+
+  '</div>').join('')+
+  '<button class="btn ghost sm" style="margin-top:8px" onclick="addBase()">＋ きちついか</button>';
+ /* ⑤ かぞく同期(v13-b) / ⑥ データとシステム */
+ const secSys=
+  '<h2 style="margin-top:2px">⭐ ポイントちょうせい('+esc(p.name)+')</h2>'+
+  '<div class="muted">マージ後のズレなどを直す安全弁です。±どちらも可。お子さんの通帳に理由つきで記録されます。</div>'+
+  '<div class="row" style="margin-top:6px"><input id="adj-delta" type="number" inputmode="numeric" placeholder="例: 50 / -30" style="flex:0 0 110px">'+
+  '<input id="adj-memo" placeholder="理由(例:二重購入の補正)"></div>'+
+  '<button class="btn blue sm" style="margin-top:8px" onclick="adjustPoints()">反映</button>'+
+  '<h2 style="margin-top:14px">🔑 Gemini APIキー</h2>'+
+  '<div class="muted">キーはこの端末のブラウザ内にだけ保存され、Googleとの通信にのみ使われます。コードには書かれず、同期・バックアップにも含まれません。</div>'+
+  '<button class="btn ghost sm" style="margin-top:6px" onclick="keyGuide()">📖 キーのかんたん取得ガイド(無料・約5分)</button>'+
+  '<input id="gm-key" type="password" placeholder="AIza..." value="'+esc(S.gemini.key)+'" style="margin-top:6px">'+
+  '<label>モデル</label><input id="gm-model" value="'+esc(S.gemini.model)+'">'+
+  '<h2 style="margin-top:14px">🔐 暗証番号(PIN)の変更</h2>'+
+  '<div class="row"><input id="pin-chg" type="password" inputmode="numeric" maxlength="4" placeholder="新しい4けたの数字">'+
+  '<button class="btn blue sm" style="flex:0 0 90px" onclick="changePin()">変更</button></div>'+
+  '<h2 style="margin-top:14px">💾 バックアップから復元(上書き)</h2>'+
+  '<div class="muted">今のデータを消して、ファイルの内容に置き換えます。</div>'+
+  '<input type="file" accept=".json" onchange="importData(this)">'+
+  '<h2 style="margin-top:14px">🔀 べつの端末のデータと合体(マージ)</h2>'+
+  '<div class="muted">べつの端末で保存したバックアップJSONを選ぶと、足し合わせのプレビューが出ます。同期を使わない端末やトラブル時の安全弁です。</div>'+
+  '<input type="file" accept=".json" onchange="importMerge(this)">'+
+  '<h2 style="margin-top:14px">🧨 初期化</h2>'+
+  '<div class="muted">全メンバーのきろく・ポイント・券・会話・写真・PIN・APIキーをすべて消して、はじめての状態にもどします。</div>'+
+  '<button class="btn ghost sm" style="margin-top:6px;color:#B04040" onclick="factoryReset()">初期設定にもどす</button>'+
+  feedbackSectionHTML();
  openModal('<h3>👨 パパ・ママモード('+esc(p.name)+')</h3>'+
- '<h2 style="margin-top:6px">✅ 承認まちのセッション('+pend.length+')</h2>'+
- '<div class="muted">写真やメモを見て「がんばったね承認」を。承認すると、お子さんが次にアプリをひらいたときにスロットが回せるようになります(なるべく1〜2日以内の承認がおすすめ)。</div>'+
- '<div id="pend-list">'+(pend.length?pend.map(parentSessRow).join(''):'<div class="muted">承認まちはありません</div>')+'</div>'+
- '<h2 style="margin-top:16px">🎟️ ごほうび券とポイント価格</h2>'+
- '<div class="muted">価格は「⭐こうかんじょ」の値段になります。スロットの券ジャックポット(超レア)では無料で当たります(当たっても一覧からは消えません)。</div>'+
- '<div style="margin-top:6px">'+p.pool.map((t,i)=>'<div class="ticket-item">'+
-  '<input data-pool-n="'+i+'" value="'+esc(t.name)+'" style="flex:1;min-width:0">'+
-  '<input data-pool-p="'+i+'" type="number" value="'+esc(t.price)+'" style="flex:0 0 74px">'+
-  '<button onclick="delPool('+i+')">削除</button></div>').join('')+'</div>'+
- '<div class="row" style="margin-top:8px"><input id="pool-new" placeholder="例:回転ずし券 🍣">'+
- '<input id="pool-price" type="number" placeholder="pt" style="flex:0 0 74px">'+
- '<button class="btn blue sm" style="flex:0 0 70px" onclick="addPool()">追加</button></div>'+
- '<h2 style="margin-top:16px">🎯 模試の目標</h2>'+
- '<div class="row"><input id="tgt-label" placeholder="例:○○模試 偏差値" value="'+esc(p.examTarget.label)+'">'+
- '<input id="tgt-value" type="number" placeholder="60" value="'+esc(p.examTarget.value)+'" style="flex:0 0 90px"></div>'+
- '<h2 style="margin-top:16px">🏆 大きなごほうび</h2>'+
- p.bigGoals.map((g,i)=>'<div class="row" style="margin-bottom:6px">'+
-  '<input data-bg-t="'+i+'" value="'+esc(g.title)+'"><input data-bg-r="'+i+'" value="'+esc(g.reward)+'"></div>').join('')+
- '<h2 style="margin-top:16px">🎁 ボーナス承認まち('+pendingBonus(p).length+')</h2>'+
- '<div class="muted">作戦・ボスバトル・リベンジのボーナスです。内容を確認して承認してください。</div>'+
- '<div>'+(pendingBonus(p).length?pendingBonus(p).map(b=>'<div class="sess" id="pb-'+b.id+'"><span class="em">🎁</span>'+
-  '<div class="info"><b>'+esc(b.reason)+'</b>'+(b.golden?' <span class="badge b-pend">🔥ゴールデン</span>':'')+'</div>'+
-  '<button class="btn blue sm" style="width:56px;flex:0 0 auto" onclick="judgeBonus(\''+b.id+'\',1)">承認</button>'+
-  '<button class="btn ghost sm" style="width:60px;flex:0 0 auto;color:#B04040" onclick="judgeBonus(\''+b.id+'\',0)">却下</button></div>').join(''):
-  '<div class="muted">承認まちのボーナスはありません</div>')+'</div>'+
- '<h2 style="margin-top:16px">📚 テキストの登録('+esc(p.name)+')</h2>'+
- '<div class="muted">さくせん会議で「やるところ」に使うテキストの一覧です。</div>'+
- '<div>'+p.books.map((b,i)=>'<div class="ticket-item"><span style="flex:1">'+esc(b)+'</span>'+
-  '<button onclick="delBook('+i+')">削除</button></div>').join('')+'</div>'+
- '<div class="row" style="margin-top:8px"><input id="book-new" placeholder="例:予習シリーズ 算数(上)">'+
- '<button class="btn blue sm" style="flex:0 0 70px" onclick="addBook()">追加</button></div>'+
- '<h2 style="margin-top:16px">👥 メンバーの編集</h2>'+
- '<div class="muted">なまえ・学年をかえても、きろくやポイントはそのまま引きつがれます。削除はもどせません。<br>💡「こどもPIN」(4けた)を設定すると、アプリを開いたときに「だれがつかう?」画面が出て、本人しか入れなくなります(きょうだいのスロット回し防止!)。空欄にするとロックなしです。</div>'+
- Object.entries(S.profiles).map(([id,pr])=>'<div class="row" style="margin-top:6px">'+
-  '<input data-pf-em="'+id+'" value="'+esc(pr.em)+'" maxlength="4" style="flex:0 0 50px;text-align:center;font-size:20px">'+
-  '<input data-pf-nm="'+id+'" value="'+esc(pr.name)+'">'+
-  '<input data-pf-gr="'+id+'" value="'+esc(pr.grade)+'" style="flex:0 0 56px">'+
-  '<input data-pf-pin="'+id+'" value="'+esc(pr.pin||'')+'" placeholder="PIN" maxlength="4" inputmode="numeric" style="flex:0 0 62px;text-align:center">'+
-  (Object.keys(S.profiles).length>1?'<button class="btn ghost sm" style="flex:0 0 40px;color:#B04040;padding:9px 4px" onclick="delProfile(\''+id+'\')">✕</button>':'')+
- '</div>').join('')+
- '<button class="btn ghost sm" style="margin-top:8px" onclick="addProfile()">＋ メンバーついか</button>'+
- '<h2 style="margin-top:16px">🗺️ きちの編集</h2>'+
- '<div class="muted">なまえをかえても出撃回数は引きつがれます。けしても、まえのきろくはのこります。</div>'+
- S.bases.map((b,i)=>'<div class="row" style="margin-top:6px">'+
-  '<input data-bs-em="'+i+'" value="'+esc(b.em)+'" maxlength="4" style="flex:0 0 56px;text-align:center;font-size:20px">'+
-  '<input data-bs-nm="'+i+'" value="'+esc(b.name)+'">'+
-  (S.bases.length>1?'<button class="btn ghost sm" style="flex:0 0 44px;color:#B04040" onclick="delBase('+i+')">✕</button>':'')+
- '</div>').join('')+
- '<button class="btn ghost sm" style="margin-top:8px" onclick="addBase()">＋ きちついか</button>'+
- '<h2 style="margin-top:16px">🔑 Gemini APIキー</h2>'+
- '<div class="muted">キーはこの端末のブラウザ内にだけ保存され、Googleとの通信にのみ使われます。コードには書かれません。</div>'+
- '<button class="btn ghost sm" style="margin-top:6px" onclick="keyGuide()">📖 キーのかんたん取得ガイド(無料・約5分)</button>'+
- '<input id="gm-key" type="password" placeholder="AIza..." value="'+esc(S.gemini.key)+'" style="margin-top:6px">'+
- '<label>モデル</label><input id="gm-model" value="'+esc(S.gemini.model)+'">'+
- '<h2 style="margin-top:16px">🔐 暗証番号(PIN)の変更</h2>'+
- '<div class="row"><input id="pin-chg" type="password" inputmode="numeric" maxlength="4" placeholder="新しい4けたの数字">'+
- '<button class="btn blue sm" style="flex:0 0 90px" onclick="changePin()">変更</button></div>'+
- '<h2 style="margin-top:16px">💾 バックアップから復元</h2>'+
- '<input type="file" accept=".json" onchange="importData(this)">'+
- '<h2 style="margin-top:16px">🧨 初期化</h2>'+
- '<div class="muted">全メンバーのきろく・ポイント・券・会話・写真・PIN・APIキーをすべて消して、はじめての状態にもどします。</div>'+
- '<button class="btn ghost sm" style="margin-top:6px;color:#B04040" onclick="factoryReset()">初期設定にもどす</button>'+
- '<button class="btn" style="margin-top:18px" onclick="saveParent()">まとめて保存</button>');
+  pdSec('approve','✅ 承認センター',nApprove?('承認まち '+nApprove):'',secApprove,true)+
+  pdSec('mission','🎯 特別ミッションを出す','',secMission,false)+
+  pdSec('reward','🎁 ごほうび設定','',secReward,false)+
+  pdSec('member','👥 メンバーときち','',secMember,false)+
+  pdSec('sync','☁️ かぞく同期',syncBadge(),syncSectionHTML(),false)+
+  pdSec('sys','🔧 データとシステム','',secSys,false)+
+  '<button class="btn" style="margin-top:16px" onclick="saveParent()">まとめて保存</button>');
  loadThumbs();}
 function parentSessRow(s){const b=S.bases.find(x=>x.id===s.base)||{em:"📍",name:"(まえの基地)"};
  return '<div class="sess" id="ps-'+s.id+'"><span class="em">'+b.em+'</span>'+
@@ -1341,23 +1647,73 @@ function parentSessRow(s){const b=S.bases.find(x=>x.id===s.base)||{em:"📍",nam
  '<button class="btn blue sm" style="width:56px;flex:0 0 auto" onclick="judge(\''+s.id+'\',\'approved\')">承認</button>'+
  '<button class="btn ghost sm" style="width:60px;flex:0 0 auto;color:#B04040" onclick="judge(\''+s.id+'\',\'rejected\')">却下</button></div>';}
 function judge(id,st){const s=P().sessions.find(x=>x.id===id);if(!s)return;
- s.status=st;save();
+ s.status=st;s.mt=Date.now();save();
  const row=$('#ps-'+id);if(row)row.remove();}
-function judgeBonus(id,ok){const p=P();const i=p.bonusSpins.findIndex(b=>b.id===id);
- if(i<0)return;
- if(ok)p.bonusSpins[i].status='approved';
- else p.bonusSpins.splice(i,1);
+function judgeBonus(id,ok){const p=P();const b=p.bonusSpins.find(x=>x.id===id);
+ if(!b)return;
+ b.status=ok?'approved':'rejected'; // 削除でなく状態マーク(マージでの蘇り防止)
+ b.mt=Date.now();
  save();const row=$('#pb-'+id);if(row)row.remove();}
+/* --- 特別ミッションの管理(パパ・ママモード内) --- */
+function missionAdminRows(p){checkMissionExpiry(p);
+ const list=(p.missions||[]).filter(m=>m.status==='open'||m.status==='claimed'||
+  (m.status==='expired'&&Date.now()-(m.expiredTs||0)<3*864e5));
+ if(!list.length)return '<div class="muted">現役のミッションはありません</div>';
+ return list.map(ms=>{
+  const st=ms.status==='claimed'?'<span class="badge b-pend">承認まち</span>':
+   ms.status==='expired'?'<span class="badge b-ng">期限切れ</span>':'<span class="badge b-ok">出題中</span>';
+  return '<div class="ticket-item"><span style="flex:1">'+esc(ms.title)+' <b>+'+ms.pts+'pt</b> '+
+  '<span class="muted">'+missionDueLabel(ms)+'</span> '+st+'</span>'+
+  (ms.status!=='claimed'?'<button style="background:#EEF4FA;color:#2F6FB0" onclick="missionDueModal(\''+ms.id+'\')">🗓️期限</button>':'')+
+  '<button onclick="delMission(\''+ms.id+'\')">削除</button></div>';}).join('');}
+function addMission(){const p=P();
+ const t=($('#ms-title')?$('#ms-title').value.trim():'');
+ const pts=Math.floor(Number($('#ms-pts')?$('#ms-pts').value:0));
+ const type=($('#ms-due')?$('#ms-due').value:'today');
+ const date=($('#ms-date')?$('#ms-date').value:'');
+ if(!t){alert('ミッションのタイトルを入れてください');return;}
+ if(!(pts>=1)){alert('ポイントは1以上の数字にしてください');return;}
+ if(type==='date'&&!/^\d{4}-\d{2}-\d{2}$/.test(date)){alert('期限の日付を選んでください');return;}
+ const ms={id:'ms'+Date.now()+Math.floor(Math.random()*1e4),title:t,pts:pts,
+  due:{type:type,date:type==='date'?date:null},
+  status:'open',createdTs:Date.now(),claimedTs:null,approvedTs:null,ack:false,mt:Date.now()};
+ if(type==='date'&&missionDueTs(ms)<Date.now()){alert('期限がすでに過ぎています。日付を確認してください');return;}
+ (p.missions=p.missions||[]).push(ms);save();openParent();}
+function delMission(id){const p=P();const i=(p.missions||[]).findIndex(m=>m.id===id);
+ if(i<0)return;
+ if(!confirm('「'+p.missions[i].title+'」を削除しますか?'))return;
+ p.missions.splice(i,1);p.deleted[id]=Date.now();save();openParent();} // 墓標=マージで蘇らない
+function missionDueModal(id){const p=P();const ms=(p.missions||[]).find(m=>m.id===id);if(!ms)return;
+ const cur=(ms.due&&ms.due.type)||'today';
+ openModal('<h3>🗓️ 期限の変更('+esc(ms.title)+')</h3>'+
+ '<div class="muted">期限を延ばすと、期限切れのミッションも復活します。「きょう中」「こんしゅう中」は今日を起点にします。</div>'+
+ '<select id="msd-type" style="margin-top:8px" onchange="var d=document.getElementById(\'msd-date\');if(d)d.style.display=this.value===\'date\'?\'\':\'none\'">'+
+  '<option value="today"'+(cur==='today'?' selected':'')+'>きょう中</option>'+
+  '<option value="week"'+(cur==='week'?' selected':'')+'>こんしゅう中(週の土曜まで)</option>'+
+  '<option value="date"'+(cur==='date'?' selected':'')+'>日付指定</option></select>'+
+ '<input id="msd-date" type="date" value="'+esc((ms.due&&ms.due.date)||'')+'" style="margin-top:6px;'+(cur==='date'?'':'display:none')+'">'+
+ '<button class="btn blue sm" style="margin-top:12px" onclick="missionDueSave(\''+id+'\')">決定</button>'+
+ '<button class="btn ghost sm" style="margin-top:8px" onclick="openParent()">← もどる</button>');}
+function missionDueSave(id){const p=P();const ms=(p.missions||[]).find(m=>m.id===id);if(!ms)return;
+ const type=$('#msd-type').value;const date=$('#msd-date').value;
+ if(type==='date'&&!/^\d{4}-\d{2}-\d{2}$/.test(date)){alert('日付を選んでください');return;}
+ // きょう中/こんしゅう中は「今日起点」で判定し直す。検証OKになってから本体へ反映
+ const trial={createdTs:ms.createdTs,dueBaseTs:Date.now(),due:{type:type,date:type==='date'?date:null}};
+ if(missionDueTs(trial)<Date.now()){alert('その期限はすでに過ぎています。別の期限にしてください');return;}
+ ms.due=trial.due;ms.dueBaseTs=trial.dueBaseTs;
+ if(ms.status==='expired'){ms.status='open';delete ms.expiredTs;}
+ ms.mt=Date.now();
+ save();openParent();}
 function addBook(){const v=$('#book-new').value.trim();if(!v)return;
- P().books.push(v);save();openParent();}
-function delBook(i){P().books.splice(i,1);save();openParent();}
+ P().books.push(v);P().metaMt=Date.now();save();openParent();}
+function delBook(i){P().books.splice(i,1);P().metaMt=Date.now();save();openParent();}
 function addPool(){const v=$('#pool-new').value.trim();if(!v)return;
  const pr=Math.max(0,Number($('#pool-price').value)||500);
- P().pool.push({name:v,price:pr});save();openParent();}
-function delPool(i){P().pool.splice(i,1);save();openParent();}
+ P().pool.push({name:v,price:pr});P().metaMt=Date.now();save();openParent();}
+function delPool(i){P().pool.splice(i,1);P().metaMt=Date.now();save();openParent();}
 function changePin(){const v=$('#pin-chg').value;
  if(!/^\d{4}$/.test(v)){alert('4けたの数字で!');return;}
- S.parentPin=v;save();$('#pin-chg').value='';alert('PINを変更しました🔐');}
+ S.parentPin=v;S.pinMt=Date.now();save();$('#pin-chg').value='';alert('PINを変更しました🔐');}
 /* --- APIキー取得ガイド --- */
 function keyGuide(){openModal('<h3>🔑 AI相棒のカギ(APIキー)のもらいかた</h3>'+
  '<div class="muted" style="margin-bottom:10px">GoogleのAI「Gemini」の無料キーを使います。クレジットカード登録は不要で、個人利用なら無料枠で十分です。保護者の方が操作してください。</div>'+
@@ -1400,12 +1756,299 @@ function saveParent(){
  
  if($('#gm-key')) S.gemini.key=$('#gm-key').value.trim();
  if($('#gm-model')) S.gemini.model=$('#gm-model').value.trim()||'gemini-3.5-flash';
- 
+
+ // マージ用の更新時刻(フォームの値を全プロフィール・きちに書き込むため全部に打つ)
+ const _mt=Date.now();
+ Object.values(S.profiles).forEach(pr=>{pr.metaMt=_mt;});
+ S.basesMt=_mt;
+
  save();      // localStorageへ保存
  closeModal(); // モーダルを閉じる
  render();     // 画面を再描画
  alert('保存しました！これでお子様もAI相棒と話せますよ🤖✨');
 }
+/* ---------- 🔀マージ基盤(A-5) ----------
+   mergeState(a,b): a,bを破壊しない純関数。同期対象フィールドは可換(a,b入替で同結果)。
+   端末ローカル項目(gemini/tab/currentProfile/activeSession)は a(呼び出し側)の値を維持する */
+function unionDead(x,y){const o={};[x||{},y||{}].forEach(d=>Object.entries(d).forEach(([k,v])=>{if(!o[k]||v>o[k])o[k]=v;}));return o;}
+function pickDet(a,b){ // 同ID・同mtで内容が違うとき、引数順に依らず同じ方を選ぶ(JSON辞書順の大きい方)
+ return JSON.stringify(a)>=JSON.stringify(b)?a:b;}
+function unionById(x,y){const map={};const order=[];
+ (x||[]).concat(y||[]).forEach(e=>{if(!e||e.id==null)return;
+  const cur=map[e.id];
+  if(!cur){map[e.id]=e;order.push(e.id);}
+  else map[e.id]=pickDet(cur,e);}); // 同IDは1件に収束(例:同一セッションを2端末でスピン)
+ return order.map(id=>map[id]);}
+function mergeById(x,y,dead){ // 和集合+同IDはmt(更新時刻)が新しい方。墓標は除外
+ const map={};const order=[];
+ (x||[]).concat(y||[]).forEach(e=>{if(!e||e.id==null)return;
+  if(dead&&dead[e.id])return;
+  const cur=map[e.id];
+  if(!cur){map[e.id]=e;order.push(e.id);}
+  else if((e.mt||0)>(cur.mt||0))map[e.id]=e;
+  else if((e.mt||0)===(cur.mt||0))map[e.id]=pickDet(cur,e);});
+ return order.map(id=>map[id]);}
+function mergeWeeks(wa,wb){const out={};
+ new Set([...Object.keys(wa||{}),...Object.keys(wb||{})]).forEach(k=>{
+  const x=(wa||{})[k],y=(wb||{})[k];
+  if(!x||!y){out[k]=JSON.parse(JSON.stringify(x||y));return;}
+  const w={};
+  /* planブロック: planMt LWW(同値なら planTs で決着=旧データも決定的に) */
+  const px=(x.planMt||0)>(y.planMt||0)?x:(y.planMt||0)>(x.planMt||0)?y:((x.planTs||0)>=(y.planTs||0)?x:y);
+  w.subjects=(px.subjects||[]).slice();w.items=JSON.parse(JSON.stringify(px.items||[]));
+  w.range=px.range||'';w.goal=px.goal||'';w.planTs=px.planTs||null;
+  w.planMt=Math.max(x.planMt||0,y.planMt||0);
+  /* testブロック(reviewsの構成含む): testMt LWW */
+  const tx=(x.testMt||0)>(y.testMt||0)?x:(y.testMt||0)>(x.testMt||0)?y:(((x.test&&x.test.ts)||0)>=((y.test&&y.test.ts)||0)?x:y);
+  w.test=tx.test?JSON.parse(JSON.stringify(tx.test)):null;
+  w.reviews=JSON.parse(JSON.stringify(tx.reviews||[]));
+  w.testMt=Math.max(x.testMt||0,y.testMt||0);
+  /* reviewsのdoneは教科名でつき合わせOR(trueが勝ち) */
+  const dn={};[x,y].forEach(s=>(s.reviews||[]).forEach(r=>{if(r.done)dn[r.text]=1;}));
+  w.reviews.forEach(r=>{if(dn[r.text])r.done=true;});
+  /* granted: キー単位OR(ボーナス実体は決定的IDで重複しない) */
+  w.granted=Object.assign({},x.granted||{},y.granted||{});
+  /* report: tsが新しい方 */
+  const rx=x.report,ry=y.report;
+  w.report=(!rx)?(ry?JSON.parse(JSON.stringify(ry)):undefined):(!ry)?JSON.parse(JSON.stringify(rx)):
+   JSON.parse(JSON.stringify(((rx.ts||0)>=(ry.ts||0))?rx:ry));
+  if(w.report===undefined)delete w.report;
+  out[k]=w;});
+ return out;}
+function mergeProfile(pa,pb){
+ const dead=unionDead(pa.deleted,pb.deleted);
+ const newer=(pb.metaMt||0)>(pa.metaMt||0);
+ const p=JSON.parse(JSON.stringify(newer?pb:pa)); // スカラー群(name/em/grade/pin/aiName/examTarget/bigGoals/pool/books/theme)はmetaMt LWWで丸ごと
+ const A=JSON.parse(JSON.stringify(pa)),B=JSON.parse(JSON.stringify(pb));
+ p.metaMt=Math.max(pa.metaMt||0,pb.metaMt||0);
+ p.deleted=dead;
+ p.ownedThemes=[...new Set([...(A.ownedThemes||[]),...(B.ownedThemes||[])])]; // 例外: 購入を失わない和集合
+ const byId=(x,y)=>x.id>y.id?1:x.id<y.id?-1:0; // 同時刻はIDで決着(順序を引数順に依存させない)
+ p.sessions=mergeById(A.sessions,B.sessions,dead).sort((x,y)=>((y.startTs||0)-(x.startTs||0))||byId(x,y));
+ p.exams=mergeById(A.exams,B.exams,dead).sort((x,y)=>(exSortKey(x)-exSortKey(y))||byId(x,y));
+ p.tickets=mergeById(A.tickets,B.tickets,dead).sort((x,y)=>((x.ts||0)-(y.ts||0))||byId(x,y));
+ p.missions=mergeById(A.missions,B.missions,dead).sort((x,y)=>((x.createdTs||0)-(y.createdTs||0))||byId(x,y));
+ p.bonusSpins=mergeById(A.bonusSpins,B.bonusSpins,dead).sort(byId);
+ p.ledger=unionById(A.ledger,B.ledger).sort((x,y)=>((x.ts||0)-(y.ts||0))||byId(x,y)); // 追記専用
+ p.chat=unionById(A.chat,B.chat).sort((x,y)=>((x.ts||0)-(y.ts||0))||byId(x,y));
+ p.chatArchive=mergeById(A.chatArchive,B.chatArchive,dead).sort((x,y)=>((x.ts||0)-(y.ts||0))||byId(x,y));
+ p.weeks=mergeWeeks(A.weeks,B.weeks);
+ p.lastGoldenMilestone=Math.max(A.lastGoldenMilestone||0,B.lastGoldenMilestone||0);
+ recalcPoints(p); // 残高=台帳合計
+ return p;}
+function mergeState(a,b){
+ const m=JSON.parse(JSON.stringify(a));const B=JSON.parse(JSON.stringify(b));
+ m.deleted=unionDead(m.deleted,B.deleted);
+ /* きち: basesMtが新しい方の配列+墓標適用 */
+ const aw=(m.basesMt||0)>=(B.basesMt||0);
+ m.bases=(aw?m.bases:B.bases).filter(b2=>!m.deleted['base-'+b2.id]);
+ m.basesMt=Math.max(m.basesMt||0,B.basesMt||0);
+ /* 親PIN: pinMtが新しい方 */
+ if((B.pinMt||0)>(m.pinMt||0))m.parentPin=B.parentPin;
+ m.pinMt=Math.max(m.pinMt||0,B.pinMt||0);
+ /* profiles: IDの和集合+墓標。両方に居ればフィールド毎マージ */
+ m.profiles=m.profiles||{};
+ new Set([...Object.keys(m.profiles),...Object.keys(B.profiles||{})]).forEach(id=>{
+  if(m.deleted['pf-'+id]){delete m.profiles[id];return;}
+  const pa=m.profiles[id],pb=(B.profiles||{})[id];
+  if(!pa&&pb){m.profiles[id]=pb;return;}
+  if(pa&&pb)m.profiles[id]=mergeProfile(pa,pb);});
+ if(!m.profiles[m.currentProfile])m.currentProfile=Object.keys(m.profiles)[0];
+ /* gemini/tab/currentProfile/activeSession はローカル維持(mはaのコピーなのでそのまま) */
+ return m;}
+/* 同期対象の抽出(端末ローカル項目を除いた複製) */
+function syncable(st){const c=JSON.parse(JSON.stringify(st));
+ delete c.gemini;delete c.tab;delete c.currentProfile;delete c.activeSession;return c;}
+
+/* ---------- ☁️かぞく同期(v13-b / Firebase Realtime Database + 家族コード) ----------
+   クラウドには stableStr(syncable(S)) のJSON文字列を丸ごと置く(RTDBのnull削除の影響を受けない)。
+   家族コード = 推測不能な26文字。DBルールは「認証済み かつ パスを知っている者のみ」で、コードが鍵。 */
+const FIREBASE_CONFIG={
+ /* このconfigは公開されて問題ない情報です(守りはRealtime Databaseのルール+家族コードが行います) */
+ apiKey:"AIzaSyAAq4E5EJyUyksn0mDcaCn3bBym0tInk4s",
+ authDomain:"study-kichy.firebaseapp.com",
+ databaseURL:"https://study-kichy-default-rtdb.asia-southeast1.firebasedatabase.app",
+ projectId:"study-kichy",
+ storageBucket:"study-kichy.firebasestorage.app",
+ messagingSenderId:"254325574772",
+ appId:"1:254325574772:web:5be57f34e4a420744f1521",
+ measurementId:"G-J8NXPJNJX8"
+};
+const SYNC_LS_KEY='studykichi_sync'; // 家族コードはSと別キー保存=バックアップJSONに含めない(コード漏洩防止)
+let sync={code:null,lastTs:0};
+let syncTransport=null,syncDirty=false,syncTimer=null,syncApplying=false,syncRenderPending=false,syncStatus='off';
+function setSyncTransport(t){syncTransport=t;} // テスト用フック(モックtransport注入)
+function syncConfigured(){const c=window.FB_CONFIG_TEST||FIREBASE_CONFIG;
+ return !!(c&&c.apiKey&&c.databaseURL);}
+function syncLoad(){try{const raw=localStorage.getItem(SYNC_LS_KEY);
+ if(raw)sync=Object.assign(sync,JSON.parse(raw));}catch(e){}}
+function syncSave(){try{localStorage.setItem(SYNC_LS_KEY,JSON.stringify({code:sync.code,lastTs:sync.lastTs}));}catch(e){}}
+function genFamilyCode(){const chars='abcdefghijklmnopqrstuvwxyz234567';const a=new Uint8Array(26);
+ if(window.crypto&&crypto.getRandomValues)crypto.getRandomValues(a);
+ else for(let i=0;i<26;i++)a[i]=Math.floor(Math.random()*256);
+ return Array.from(a,x=>chars[x%32]).join('');}
+/* キー順を正規化したJSON(端末間・RTDB往復で同一内容なら必ず同一文字列になる) */
+function stableStr(v){if(Array.isArray(v))return '['+v.map(stableStr).join(',')+']';
+ if(v&&typeof v==='object')return '{'+Object.keys(v).sort().map(k=>JSON.stringify(k)+':'+stableStr(v[k])).join(',')+'}';
+ return v===undefined?'null':JSON.stringify(v);}
+/* --- Firebase SDK(compat)の動的ロード: configが空なら一切読み込まない。失敗しても本体は動く --- */
+let _fbLoad=null;
+function loadFirebaseSdk(){
+ if(window.firebase&&window.firebase.database)return Promise.resolve();
+ if(_fbLoad)return _fbLoad;
+ const V='10.14.1';
+ _fbLoad=['firebase-app-compat','firebase-auth-compat','firebase-database-compat'].reduce((pr,n)=>pr.then(()=>new Promise((res,rej)=>{
+  const s=document.createElement('script');
+  s.src='https://www.gstatic.com/firebasejs/'+V+'/'+n+'.js';
+  s.onload=res;s.onerror=()=>{_fbLoad=null;rej(new Error('SDK load failed'));};
+  document.head.appendChild(s);})),Promise.resolve());
+ return _fbLoad;}
+function firebaseTransport(){
+ let ref=null,cb=null;
+ return {
+  async start(code,onRemote){
+   await loadFirebaseSdk();
+   const c=window.FB_CONFIG_TEST||FIREBASE_CONFIG;
+   if(!firebase.apps.length)firebase.initializeApp(c);
+   await firebase.auth().signInAnonymously(); // 匿名認証必須(ルール: auth != null)
+   ref=firebase.database().ref('families/'+code);
+   cb=ref.on('value',snap=>onRemote(snap.val()));
+  },
+  stop(){if(ref&&cb)ref.off('value',cb);ref=null;cb=null;},
+  push(fn){if(!ref)return Promise.reject(new Error('not connected'));
+   return ref.transaction(fn).then(()=>{});} // トランザクション=同時書込の取りこぼしなし
+ };}
+/* --- 同期エンジン(B-3) --- */
+function syncSchedulePush(){ // save()から毎回呼ばれる。受信適用中はスケジュールしない(ループ防止)
+ if(!syncConfigured()||!sync.code||syncApplying)return;
+ syncDirty=true;
+ if(syncTimer)clearTimeout(syncTimer);
+ syncTimer=setTimeout(syncPushNow,2000);} // 2秒デバウンス
+function syncPushNow(){if(syncTimer){clearTimeout(syncTimer);syncTimer=null;}
+ if(!syncConfigured()||!sync.code||!syncTransport||!syncDirty)return;
+ syncDirty=false;
+ Promise.resolve(syncTransport.push(node=>({
+  state:syncMergeRemoteStr(node&&node.state),
+  meta:{rev:((node&&node.meta&&node.meta.rev)||0)+1,updatedAt:Date.now()}})))
+ .then(()=>{sync.lastTs=Date.now();syncSave();syncStatusRefresh();})
+ .catch(()=>{syncDirty=true;});} // 失敗は保留→online復帰・次の保存で再送
+function syncMergeRemoteStr(remoteStr){ // クラウド現在値とローカルをマージした文字列を返す(トランザクション内で使用)
+ const local=syncable(S);
+ if(!remoteStr)return stableStr(local);
+ try{const inc=Object.assign(JSON.parse(JSON.stringify(DEFAULT_STATE)),JSON.parse(remoteStr));
+  migrate(inc); // クラウド側が旧スキーマでも安全に
+  return stableStr(syncable(mergeState(inc,local)));
+ }catch(e){return stableStr(local);}}
+function syncOnRemote(node){ // Pull: onValue受信
+ const remoteStr=node&&node.state;
+ if(!remoteStr||typeof remoteStr!=='string')return;
+ let rem;try{rem=JSON.parse(remoteStr);}catch(e){return;}
+ if(!rem||!rem.profiles)return;
+ const inc=Object.assign(JSON.parse(JSON.stringify(DEFAULT_STATE)),rem);
+ migrate(inc);
+ const merged=mergeState(S,inc); // APIキー等の端末ローカル項目は維持される
+ const mergedStr=stableStr(syncable(merged));
+ const curStr=stableStr(syncable(S));
+ sync.lastTs=Date.now();syncSave();
+ if(mergedStr!==curStr){ // クラウドに新しいものがある→取り込み
+  syncApplying=true;
+  try{S=merged;save();}finally{syncApplying=false;}
+  syncSafeRender();}
+ if(mergedStr!==stableStr(syncable(inc))){ // こちらだけが持つものがある→送り返す(収束したら止まる)
+  syncDirty=true;
+  if(syncTimer)clearTimeout(syncTimer);
+  syncTimer=setTimeout(syncPushNow,2000);}
+ syncStatusRefresh();}
+function syncSafeRender(){ // 描画ポリシー: 入力を壊さない(モーダル/タイマー/作戦・バトル編集中はSだけ更新)
+ if($('#modal-root').innerHTML||S.activeSession||S.tab==='goal'){syncRenderPending=true;return;}
+ render();}
+async function syncConnect(){
+ if(!syncConfigured()||!sync.code)return;
+ if(!syncTransport)syncTransport=firebaseTransport();
+ syncStatus='connecting';syncStatusRefresh();
+ try{await syncTransport.start(sync.code,syncOnRemote);
+  syncStatus='on';syncDirty=true;syncPushNow();} // 接続したらまずローカルを合流させる
+ catch(e){syncStatus='error';}
+ syncStatusRefresh();}
+/* --- ☁️UI(パパ・ママモード内) --- */
+function syncBadge(){if(!syncConfigured()||!sync.code)return'';
+ return syncStatus==='on'?'接続中':syncStatus==='connecting'?'接続中…':syncStatus==='error'?'エラー':'未接続';}
+function syncStatusLine(){
+ const st=syncStatus==='on'?'🟢 接続中':syncStatus==='connecting'?'🟡 接続中…':
+  syncStatus==='error'?'🔴 エラー(電波とFirebase設定を確認して、開き直してください)':'⚪ 未接続';
+ if(!sync.lastTs)return st;
+ const d=new Date(sync.lastTs);
+ return st+' ／ 最終同期 '+d.getHours()+':'+String(d.getMinutes()).padStart(2,'0');}
+function syncStatusRefresh(){const el=$('#sync-status');if(el)el.innerHTML=syncStatusLine();}
+function syncSectionHTML(){
+ if(!syncConfigured())return '<div class="muted">☁️ じゅんび中です(アプリにFirebase設定がまだ入っていません)。それまでは「🔧データとシステム」のバックアップ保存と合体(マージ)で複数端末を運用できます。</div>';
+ if(!sync.code)return ''+
+  '<div class="muted">家族みんなの記録・ポイント・承認を、数秒でおたがいの端末にそろえます。写真・計算メモの画像とAPIキーは各端末の中だけに残ります。</div>'+
+  '<button class="btn blue sm" style="margin-top:8px" onclick="syncStart()">☁️ 同期をはじめる(この端末が1台目)</button>'+
+  '<div class="muted" style="margin-top:10px">2台目からは、1台目の「かぞくコード」を入れてつながります:</div>'+
+  '<div class="row" style="margin-top:6px"><input id="sync-code-in" placeholder="かぞくコードを入力" autocapitalize="none" autocomplete="off">'+
+  '<button class="btn blue sm" style="flex:0 0 90px" onclick="syncJoin()">つながる</button></div>';
+ return '<div id="sync-status" class="muted">'+syncStatusLine()+'</div>'+
+  '<button class="btn ghost sm" style="margin-top:8px" onclick="syncShowCode()">🔑 かぞくコードを見る(端末追加用)</button>'+
+  '<button class="btn ghost sm" style="margin-top:8px;color:#B04040" onclick="syncDisconnect()">切断する(この端末のデータは残ります)</button>'+
+  '<div class="muted" style="margin-top:8px">※写真・計算メモの画像は撮った端末の中だけにあるため、他の端末ではサムネイルが出ません(記録じたいは同期されます)。</div>';}
+function syncStart(){
+ if(!confirm('この端末のデータをクラウドに置いて、かぞく同期をはじめますか?'))return;
+ sync.code=genFamilyCode();syncSave();syncConnect();openParent();
+ const pd=$('#pd-sync');if(pd)pd.open=true;}
+function syncJoin(){const v=($('#sync-code-in')?$('#sync-code-in').value.trim().toLowerCase():'');
+ if(!/^[a-z2-7]{20,32}$/.test(v)){alert('かぞくコードの形式が違うようです(英小文字と数字、26文字くらい)');return;}
+ if(!confirm('クラウドにある家族のデータと、この端末のデータを合体して同期をはじめます。よろしいですか?'))return;
+ sync.code=v;syncSave();syncConnect();openParent();
+ const pd=$('#pd-sync');if(pd)pd.open=true;}
+function syncShowCode(){
+ openModal('<h3>🔑 かぞくコード</h3>'+
+ '<div style="font-family:var(--disp);font-weight:800;font-size:18px;word-break:break-all;background:#F4F9FE;border:2px dashed var(--line);border-radius:12px;padding:12px;text-align:center">'+esc(sync.code||'')+'</div>'+
+ '<div class="row" style="margin-top:10px">'+
+ '<button class="btn blue sm" onclick="syncCopyCode()">📋 コピー</button>'+
+ (navigator.share?'<button class="btn blue sm" onclick="syncShareCode()">📤 共有</button>':'')+'</div>'+
+ '<div class="muted" style="margin-top:10px">⚠️ このコードを知っている人はデータを読み書きできます。<b>家族以外に教えないでください。</b><br>追加したい端末の「パパ・ママモード → かぞく同期 → つながる」に入力します(26文字の手入力がたいへんなときは、コピーしてLINE等の家族グループへ)。</div>'+
+ '<button class="btn ghost sm" style="margin-top:12px" onclick="openParent();var pd=document.getElementById(\'pd-sync\');if(pd)pd.open=true;">← もどる</button>');}
+function syncCopyCode(){if(!sync.code)return;
+ if(navigator.clipboard&&navigator.clipboard.writeText)
+  navigator.clipboard.writeText(sync.code).then(()=>alert('コピーしました📋'),()=>prompt('ながおしでコピーしてください',sync.code));
+ else prompt('ながおしでコピーしてください',sync.code);}
+function syncShareCode(){if(navigator.share&&sync.code)
+ navigator.share({text:'スタディきちの かぞくコード:\n'+sync.code}).catch(()=>{});}
+function syncDisconnect(){
+ if(!confirm('同期を切断しますか?(この端末のデータは残ります。もう一度つなぐにはかぞくコードが必要です)'))return;
+ if(syncTransport)try{syncTransport.stop();}catch(e){}
+ sync.code=null;syncStatus='off';syncSave();openParent();
+ const pd=$('#pd-sync');if(pd)pd.open=true;}
+/* ---------- 📮フィードバック(保護者→開発者。書き込み専用ノード=作者だけがコンソールで閲覧) ---------- */
+const FEEDBACK_LS_KEY='studykichi_fb_ts';
+function feedbackSectionHTML(){
+ if(!syncConfigured())return '';
+ return '<h2 style="margin-top:14px">📮 かいはつ者への感想・要望</h2>'+
+ '<div class="muted">アプリ改善のため、作者だけが読める形で送られます(他の利用者には見えません)。返信はできません。お名前・個人情報は書かないでください。送信は1日1回まで。</div>'+
+ '<label>よかった点</label><input id="fb-good" maxlength="300" placeholder="例:子どもが自分から勉強するようになった">'+
+ '<label>こまったこと・こうなったら嬉しい</label><textarea id="fb-bad" maxlength="800" style="height:64px" placeholder="例:〇〇の画面がわかりにくい/△△がほしい"></textarea>'+
+ '<label>ニックネーム(任意)</label><input id="fb-name" maxlength="30">'+
+ '<button class="btn blue sm" style="margin-top:8px" onclick="sendFeedback()">📮 送信</button>';}
+async function sendFeedback(){
+ const good=($('#fb-good')?$('#fb-good').value.trim():'');
+ const bad=($('#fb-bad')?$('#fb-bad').value.trim():'');
+ const name=($('#fb-name')?$('#fb-name').value.trim():'');
+ if(!good&&!bad){alert('内容を入力してください');return;}
+ try{const last=Number(localStorage.getItem(FEEDBACK_LS_KEY))||0;
+  if(Date.now()-last<864e5){alert('送信は1日1回までです。また明日お願いします🙏');return;}}catch(e){}
+ const payload={text:((good?'[よかった] '+good+'\n':'')+(bad?'[要望] '+bad:'')).slice(0,2000),ts:Date.now(),ver:APP_VER};
+ if(name)payload.name=name.slice(0,30);
+ try{
+  await loadFirebaseSdk();
+  const c=window.FB_CONFIG_TEST||FIREBASE_CONFIG;
+  if(!firebase.apps.length)firebase.initializeApp(c);
+  await firebase.auth().signInAnonymously();
+  await firebase.database().ref('feedback').push(payload);
+  try{localStorage.setItem(FEEDBACK_LS_KEY,String(Date.now()));}catch(e){}
+  alert('送信しました。ありがとうございます!📮');openParent();
+ }catch(e){alert('送信できませんでした。でんぱのあるところで もう一度ためしてください');}}
+
 /* ---------- バックアップ ---------- */
 function exportData(){const blob=new Blob([JSON.stringify(S,null,1)],{type:'application/json'});
  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
@@ -1417,6 +2060,39 @@ function importData(inp){const f=inp.files&&inp.files[0];if(!f)return;
    S=Object.assign(JSON.parse(JSON.stringify(DEFAULT_STATE)),s);migrate(S);save();closeModal();render();}}
   catch(e){alert('ファイルが読めませんでした');}};
  r.readAsText(f);}
+/* ---------- 🔀手動マージ(A-6): べつの端末のバックアップと合体 ---------- */
+let pendingMerge=null;
+function importMerge(inp){const f=inp.files&&inp.files[0];if(!f)return;
+ const r=new FileReader();
+ r.onload=()=>{try{const s=JSON.parse(r.result);if(!s.profiles)throw 0;
+  const inc=Object.assign(JSON.parse(JSON.stringify(DEFAULT_STATE)),s);
+  migrate(inc); // マージ入力にも同じmigrateを通す
+  const merged=mergeState(S,inc);
+  pendingMerge=merged;
+  const rows=Object.entries(merged.profiles).map(([id,mp])=>{
+   const cp=S.profiles[id];
+   const d=f2=>Math.max(0,(mp[f2]||[]).length-((cp&&cp[f2])||[]).length);
+   return '<div class="sess"><span class="em">'+mp.em+'</span><div class="info"><b>'+esc(mp.name)+'</b>'+(cp?'':' <span class="badge b-pend">新メンバー</span>')+'<br>'+
+    'セッション+'+d('sessions')+' ／ 模試+'+d('exams')+' ／ ミッション+'+d('missions')+' ／ 取引+'+d('ledger')+
+    '<br>ポイント '+(cp?cp.points:0)+' → <b>'+mp.points+'</b></div></div>';}).join('');
+  openModal('<h3>🔀 合体プレビュー</h3>'+
+   '<div class="muted">べつの端末のデータと足し合わせます(上書きしません)。同じ記録は1件にまとまり、消したものは復活しません。</div>'+
+   rows+
+   '<button class="btn" style="margin-top:12px" onclick="applyMerge()">合体する</button>'+
+   '<button class="btn ghost sm" style="margin-top:8px" onclick="pendingMerge=null;openParent()">← やめる</button>');
+ }catch(e){alert('ファイルが読めませんでした');}};
+ r.readAsText(f);inp.value='';}
+function applyMerge(){if(!pendingMerge)return;
+ S=pendingMerge;pendingMerge=null;
+ save();closeModal();render();
+ alert('合体しました🔀 ポイントは通帳(台帳)の合計に再計算されています');}
+/* ---------- ⭐親の手動ポイント調整(A-4) ---------- */
+function adjustPoints(){const p=P();
+ const d=Math.round(Number($('#adj-delta').value));
+ if(!d){alert('プラスかマイナスの数字を入れてください(例: 50 / -30)');return;}
+ const memo=$('#adj-memo').value.trim();
+ addLedger(p,d,'adjust',memo||null);
+ save();openParent();}
 
 /* ---------- PWA ---------- */
 if('serviceWorker' in navigator&&location.protocol==='https:'){
@@ -1427,8 +2103,14 @@ window.addEventListener('beforeinstallprompt',e=>{
  if(S.tab==='set')render();});
 
 /* ---------- 起動 ---------- */
+showSplash(); /* 🚀ロケットOP → launchGate(だれがつかう?) → ホーム の順 */
 render();
 launchGate();
+if(!guideSeen()&&!$('#modal-root').innerHTML)showGuide(0); /* 🎈初回だけガイド(PINゲート表示中は出さない) */
+/* ☁️かぞく同期: 設定済みかつコード保存済みなら自動接続。オンライン復帰で保留分を再送 */
+syncLoad();
+if(syncConfigured()&&sync.code)syncConnect();
+window.addEventListener('online',()=>{if(syncConfigured()&&sync.code){syncDirty=true;syncPushNow();}});
 
 </script>
 </body>
