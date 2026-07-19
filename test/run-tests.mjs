@@ -377,8 +377,9 @@ console.log('\n[8] 🔀mergeState');
 /* ---------- 9. ☁️かぞく同期エンジン(v13-b / モックtransport) ---------- */
 console.log('\n[9] ☁️かぞく同期');
 {
-  // config未設定: 同期UIは「じゅんび中」・他機能は従来どおり
+  // config未設定相当(FB_CONFIG_TEST={}で本番configを無効化): 同期UIは「じゅんび中」・他機能は従来どおり
   const { w, errors } = boot();
+  w.FB_CONFIG_TEST = {};
   w.openParent();
   ok(w.document.querySelector('#modal-root').innerHTML.includes('じゅんび中'), 'config空なら同期セクションは「じゅんび中」');
   w.closeModal();

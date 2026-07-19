@@ -1838,12 +1838,15 @@ function syncable(st){const c=JSON.parse(JSON.stringify(st));
    クラウドには stableStr(syncable(S)) のJSON文字列を丸ごと置く(RTDBのnull削除の影響を受けない)。
    家族コード = 推測不能な26文字。DBルールは「認証済み かつ パスを知っている者のみ」で、コードが鍵。 */
 const FIREBASE_CONFIG={
- /* ↓↓ ここに Firebase Webアプリのconfigを貼り付けてください(石橋さん作業) ↓↓
-    例: apiKey:"AIza...", authDomain:"study-kichy.firebaseapp.com",
-        databaseURL:"https://study-kichy-default-rtdb.asia-southeast1.firebasedatabase.app",
-        projectId:"study-kichy", ...
-    このconfigは公開されて問題ない情報です(守りはRealtime Databaseのルールが行います)。
-    空のままなら同期UIは「じゅんび中」表示になり、他の機能は従来どおり動きます。 */
+ /* このconfigは公開されて問題ない情報です(守りはRealtime Databaseのルール+家族コードが行います) */
+ apiKey:"AIzaSyAAq4E5EJyUyksn0mDcaCn3bBym0tInk4s",
+ authDomain:"study-kichy.firebaseapp.com",
+ databaseURL:"https://study-kichy-default-rtdb.asia-southeast1.firebasedatabase.app",
+ projectId:"study-kichy",
+ storageBucket:"study-kichy.firebasestorage.app",
+ messagingSenderId:"254325574772",
+ appId:"1:254325574772:web:5be57f34e4a420744f1521",
+ measurementId:"G-J8NXPJNJX8"
 };
 const SYNC_LS_KEY='studykichi_sync'; // 家族コードはSと別キー保存=バックアップJSONに含めない(コード漏洩防止)
 let sync={code:null,lastTs:0};
