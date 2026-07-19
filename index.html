@@ -15,7 +15,9 @@
 <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
 :root{
+  /* きせかえで applyTheme() が上書きするテーマ変数(既定=sky) */
   --sky-bg:#EAF4FC; --sky-deep:#CDE5F7;
+  --bg-top:#BBDDF5; --hd1:#8EC8F2; --hd2:#B9DFF8;
   --ink:#2B3A55; --ink-soft:#6B7C99;
   --blue:#3E8FD8; --blue-d:#2F6FB0;
   --orange:#FF8A5C; --orange-d:#F0703F;
@@ -30,14 +32,14 @@
 html,body{height:100%}
 body{
   font-family:var(--body);color:var(--ink);
-  background:linear-gradient(180deg,#BBDDF5 0%,#EAF4FC 40%);
+  background:linear-gradient(180deg,var(--bg-top) 0%,var(--sky-bg) 40%);
   background-attachment:fixed;
 }
 #shell{max-width:480px;margin:0 auto;min-height:100dvh;background:var(--sky-bg);
   box-shadow:0 0 40px rgba(62,143,216,.15);position:relative;padding-bottom:84px}
 /* ---------- sky header ---------- */
 .sky{position:relative;overflow:hidden;padding:18px 18px 22px;
-  background:linear-gradient(180deg,#8EC8F2 0%,#B9DFF8 70%,var(--sky-bg) 100%);
+  background:linear-gradient(180deg,var(--hd1) 0%,var(--hd2) 70%,var(--sky-bg) 100%);
   border-radius:0 0 28px 28px}
 .cloud{position:absolute;background:#fff;border-radius:50px;opacity:.85;filter:blur(1px)}
 .cloud::before,.cloud::after{content:"";position:absolute;background:#fff;border-radius:50%}
@@ -183,6 +185,23 @@ nav button.on .i{transform:scale(1.2)}
 /* confetti */
 .confetti{position:fixed;top:-10px;font-size:18px;z-index:200;animation:fall 2.4s linear forwards;pointer-events:none}
 @keyframes fall{to{transform:translateY(105vh) rotate(540deg);opacity:.7}}
+/* ---------- 🚀ロケットOP(起動スプラッシュ) ---------- */
+#splash{position:fixed;inset:0;z-index:500;overflow:hidden;cursor:pointer;
+  background:linear-gradient(180deg,var(--hd1) 0%,var(--hd2) 55%,var(--sky-bg) 100%)}
+.spl-cloud{position:absolute;background:#fff;border-radius:50px;opacity:.9}
+.spl-cloud::before,.spl-cloud::after{content:"";position:absolute;background:#fff;border-radius:50%}
+.spl-c1{width:96px;height:28px;top:22%;left:14%}
+.spl-c1::before{width:40px;height:40px;top:-19px;left:15px}
+.spl-c1::after{width:26px;height:26px;top:-12px;left:50px}
+.spl-c2{width:70px;height:22px;top:55%;right:12%;opacity:.7}
+.spl-c2::before{width:30px;height:30px;top:-14px;left:11px}
+.spl-c2::after{width:20px;height:20px;top:-9px;left:38px}
+.spl-rocket{position:absolute;left:50%;bottom:-120px;transform:translateX(-50%);
+  animation:spl-fly 1.1s cubic-bezier(.5,.05,.75,.9) .1s forwards}
+.spl-ship{display:block;font-size:58px;line-height:1;transform:rotate(-45deg)}
+.spl-flame{display:block;text-align:center;font-size:28px;margin-top:-4px;animation:spl-flick .14s linear infinite alternate}
+@keyframes spl-fly{to{transform:translateX(-50%) translateY(-140vh)}}
+@keyframes spl-flick{from{opacity:.55;transform:scale(.85)}to{opacity:1;transform:scale(1)}}
 .ticket-item{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px dashed var(--line);font-size:14px}
 .ticket-item button{border:none;background:#FBE1E1;color:#B04040;border-radius:8px;padding:4px 10px;font-size:11px;cursor:pointer}
 .won-ticket{background:linear-gradient(90deg,#FFF6E3,#FFEFD0);border:2px dashed var(--gold);border-radius:14px;padding:10px 12px;margin-bottom:8px;font-weight:700;font-size:14px;display:flex;justify-content:space-between;align-items:center}
@@ -228,6 +247,16 @@ const DEFAULT_BASES=[
 ];
 const TITLES=[[40,'ぬし'],[20,'たつじん'],[10,'じょうれん'],[3,'かよいはじめ']];
 const SUBJECTS=['算数','国語','理科','社会','英語','その他'];
+/* 🎨きせかえテーマ(単一マスタ)。night はインク色(#2B3A55)が読める明るさを保つ(紺〜藍の範囲) */
+const THEMES={
+ sky:   {name:'そら',    em:'☁️',vars:{'--sky-bg':'#EAF4FC','--sky-deep':'#CDE5F7','--bg-top':'#BBDDF5','--hd1':'#8EC8F2','--hd2':'#B9DFF8'}},
+ sakura:{name:'さくら',  em:'🌸',vars:{'--sky-bg':'#FDF1F5','--sky-deep':'#F8D8E6','--bg-top':'#F6CFDF','--hd1':'#F2A9C7','--hd2':'#F9D2E1'}},
+ sunset:{name:'ゆうやけ',em:'🌇',vars:{'--sky-bg':'#FDF4EB','--sky-deep':'#FADDC4','--bg-top':'#F8CBA4','--hd1':'#F5A671','--hd2':'#FACD9F'}},
+ night: {name:'よぞら',  em:'🌙',vars:{'--sky-bg':'#EAEEF7','--sky-deep':'#CCD5EB','--bg-top':'#93A3CB','--hd1':'#6478A8','--hd2':'#96A8D0'}},
+ sea:   {name:'うみ',    em:'🐠',vars:{'--sky-bg':'#E9F6F4','--sky-deep':'#C8EAE5','--bg-top':'#9CDCD4','--hd1':'#5BC2B7','--hd2':'#90DAD1'}},
+ forest:{name:'もり',    em:'🌲',vars:{'--sky-bg':'#EEF6EC','--sky-deep':'#D4EAD1','--bg-top':'#B0DBAC','--hd1':'#78C273','--hd2':'#A8D9A4'}},
+};
+const THEME_PRICE=300; // こうかんじょでの入手価格(全テーマ共通)
 /* AI相棒へのワンタップ質問 */
 const QUICKS=[
  {id:'hint',label:'💡ヒントちょうだい',text:'この問題のヒントを、答えは言わずにひとつだけ教えて。'},
@@ -252,9 +281,12 @@ function mkProfile(name,em,grade){return{
  weeks:{},
  bonusSpins:[],
  books:[],
+ theme:'sky',
+ ownedThemes:['sky','sakura'],
+ missions:[],
 };}
 const DEFAULT_STATE={
-v:3, tab:'home', currentProfile:'sora', parentPin:null,
+v:4, tab:'home', currentProfile:'sora', parentPin:null,
  bases:JSON.parse(JSON.stringify(DEFAULT_BASES)),
  gemini:{key:'',model:'gemini-3.5-flash'}, // ※Googleの現行モデル名。エラーになる場合は最新のモデル名に変更してください
  profiles:{ sora:mkProfile('空花','🌸','小5'), fuka:mkProfile('風花','🍃','小3') },
@@ -267,7 +299,7 @@ function load(){
  }catch(e){}
  return JSON.parse(JSON.stringify(DEFAULT_STATE));
 }
-/* v1→v3 移行:券の値札・チャットアーカイブ・編集可能な基地 */
+/* v1→v4 移行:券の値札・チャットアーカイブ・編集可能な基地・きせかえ・特別ミッション */
 function migrate(st){
  Object.values(st.profiles||{}).forEach(pr=>{
   if(Array.isArray(pr.pool))pr.pool=pr.pool.map(t=>typeof t==='string'?{name:t,price:500}:t);
@@ -279,6 +311,10 @@ function migrate(st){
   pr.bonusSpins.forEach(b=>{if(!b.id)b.id='bs'+Math.random().toString(36).slice(2);
    if(!b.status)b.status='approved';});
   if(!Array.isArray(pr.books))pr.books=[];
+  if(!Array.isArray(pr.ownedThemes))pr.ownedThemes=['sky','sakura'];
+  ['sky','sakura'].forEach(t=>{if(pr.ownedThemes.indexOf(t)<0)pr.ownedThemes.push(t);});
+  if(!pr.theme||pr.ownedThemes.indexOf(pr.theme)<0)pr.theme='sky';
+  if(!Array.isArray(pr.missions))pr.missions=[];
   Object.values(pr.weeks).forEach(wx=>{if(!Array.isArray(wx.items))wx.items=[];});
   (pr.exams||[]).forEach(e=>{
    if(!e.scores){e.scores={'総合':Number(e.score)||0};delete e.score;}});
@@ -287,7 +323,7 @@ function migrate(st){
  if(!Array.isArray(st.bases)||!st.bases.length)st.bases=JSON.parse(JSON.stringify(DEFAULT_BASES));
  if(!st.currentProfile||!st.profiles[st.currentProfile])st.currentProfile=Object.keys(st.profiles)[0];
  if(st.gemini&&(!st.gemini.model||st.gemini.model==='gemini-2.5-flash'))st.gemini.model='gemini-3.5-flash';
- st.v=3;
+ st.v=4;
 }
 function save(){
  try{localStorage.setItem('studykichi_v1',JSON.stringify(S));}
@@ -370,10 +406,68 @@ function checkWeekLoop(p,key){const wk=p.weeks[key];if(!wk||!wk.planTs||!wk.test
  if(wk.granted.loopChecked)return;wk.granted.loopChecked=1;
  const st=weekLoopStreak(p,key);
  if(WEEK_MS.indexOf(st)>=0)grantBonus(p,wk,'wstreak','🔥パーフェクトウィーク'+st+'週れんぞく!!',true);}
+/* ---------- 🎯パパ・ママからの特別ミッション ----------
+   報酬は承認ゲート必須(できた!=claimed → 親の承認 → ポイント付与)。
+   スロットを経由しない固定ポイント(臨時収入)。 */
+function missionDueTs(ms){ // 期限日の23:59:59。期限延長された場合は dueBaseTs 起点で再計算
+ if(!ms.due)return null;
+ const base=ms.dueBaseTs||ms.createdTs;
+ if(ms.due.type==='today'){const d=new Date(base);
+  return new Date(d.getFullYear(),d.getMonth(),d.getDate(),23,59,59).getTime();}
+ if(ms.due.type==='week'){const[y,m,dd]=weekKeyFor(base).split('-').map(Number);
+  return new Date(y,m-1,dd,23,59,59).getTime();} // その週の土曜23:59まで
+ if(ms.due.type==='date'&&ms.due.date){const[y,m,dd]=String(ms.due.date).split('-').map(Number);
+  return new Date(y,m-1,dd,23,59,59).getTime();}
+ return null;}
+function missionDueLabel(ms){if(!ms.due)return'';
+ if(ms.due.type==='today')return'きょう中!';
+ if(ms.due.type==='week')return'こんしゅう中!';
+ if(ms.due.type==='date'&&ms.due.date){const a=String(ms.due.date).split('-').map(Number);return a[1]+'/'+a[2]+'まで';}
+ return'';}
+function checkMissionExpiry(p){let ch=false;const now=Date.now(); // 表示時判定で open→expired
+ (p.missions||[]).forEach(ms=>{if(ms.status==='open'){const dt=missionDueTs(ms);
+  if(dt&&now>dt){ms.status='expired';ms.expiredTs=now;ch=true;}}});
+ if(ch)save();}
+function claimedMissions(p){return (p.missions||[]).filter(m=>m.status==='claimed');}
+let msCelebrated={}; // 達成カードのconfettiを1セッション1回にする
+function missionClaim(id){const p=P();const ms=(p.missions||[]).find(m=>m.id===id);
+ if(!ms||ms.status!=='open')return;
+ ms.status='claimed';ms.claimedTs=Date.now();save();render();}
+function missionAck(id){const p=P();const ms=(p.missions||[]).find(m=>m.id===id);
+ if(!ms)return;ms.ack=true;save();render();}
+function judgeMission(id,ok){const p=P();const ms=(p.missions||[]).find(m=>m.id===id);
+ if(!ms||ms.status!=='claimed')return;
+ if(ok){ms.status='approved';ms.approvedTs=Date.now();ms.ack=false;
+  p.points+=ms.pts; // TODO(v13 ポイント台帳化): ここで取引「ミッション: +pts」を台帳に記録する
+ }else{ms.status='open';ms.claimedTs=null;} // 却下は再挑戦可。消したいときは親が削除
+ save();const row=$('#pm-'+id);if(row)row.remove();}
 
+/* ---------- 🎨きせかえ ---------- */
+function applyTheme(){const p=P();const th=(p&&THEMES[p.theme])||THEMES.sky;
+ Object.entries(th.vars).forEach(([k,v])=>document.documentElement.style.setProperty(k,v));
+ const mt=document.querySelector('meta[name=theme-color]');if(mt)mt.setAttribute('content',th.vars['--hd1']);}
+function setTheme(id){const p=P();
+ if((p.ownedThemes||[]).indexOf(id)<0)return;
+ p.theme=id;save();render();}
+function buyTheme(id){const p=P();const th=THEMES[id];
+ if(!th||(p.ownedThemes||[]).indexOf(id)>=0||p.points<THEME_PRICE)return;
+ if(confirm('⭐'+THEME_PRICE+'ポイントで きせかえ「'+th.em+th.name+'」をゲットする?')){
+  p.points-=THEME_PRICE;p.ownedThemes.push(id);p.theme=id; // 買ったらすぐ着がえる
+  save();confetti();render();}}
+/* こうかんじょの常設「🎨きせかえ」セクション(システム品・親のpoolとは別枠) */
+function themeShopHTML(p){
+ const un=Object.keys(THEMES).filter(t=>(p.ownedThemes||[]).indexOf(t)<0);
+ return '<h2 style="margin-top:12px">🎨 きせかえ</h2>'+
+ (un.length?un.map(id=>{const th=THEMES[id];const can=p.points>=THEME_PRICE;
+  return '<div class="ticket-item"><span style="flex:1">'+th.em+' はいけい「'+th.name+'」</span>'+
+  '<b style="font-family:var(--disp);color:#B07800;font-size:13px">'+THEME_PRICE+'pt</b>'+
+  '<button style="background:'+(can?'#DDF3E6;color:#2C7A4E':'#EEF4FA;color:#9AA9BE')+'"'+(can?'':' disabled')+' onclick="buyTheme(\''+id+'\')">こうかん</button></div>';}).join('')+
+  '<div class="muted" style="margin-top:4px">ゲットしたきせかえは「せってい」でいつでも きがえられるよ</div>'
+ :'<div class="muted">きせかえは ぜんぶあつめたよ!すごい✨(きがえは「せってい」でできるよ)</div>');}
 /* ---------- 画面制御 ---------- */
 const NAV=[['home','🏠','きち'],['rec','🌱','きろく'],['goal','🏆','もくひょう'],['ai','🤖','AI相棒'],['set','⚙️','せってい']];
 function render(){
+ applyTheme(); /* メンバーごとのテーマ(起動時・プロフィール切替時もここで反映) */
  renderHeader();renderNav();
  const app=$('#app');
  if(S.activeSession&&S.tab==='home'){app.innerHTML=timerHTML();
@@ -455,14 +549,41 @@ function homeHTML(){const p=P();const m=minutesByDay(p);
  if(p.tickets.length){tix='<div class="card"><h2>🎟️ もっている券</h2>'+
   p.tickets.map((t,i)=>'<div class="won-ticket"><span>'+esc(t)+'</span><button onclick="useTicket('+i+')">つかう</button></div>').join('')+
   '<div class="muted">「つかう」はパパ・ママといっしょにおしてね</div></div>';}
- /* ⭐こうかんじょ */
- let shop='';
- if(p.pool.length){shop='<div class="card"><h2>⭐ こうかんじょ</h2>'+
-  p.pool.map((t,i)=>{const can=p.points>=t.price;
+ /* 🎯特別ミッション(情報が無いときはカードを出さない) */
+ checkMissionExpiry(p);
+ const msAll=p.missions||[];
+ const msAch=msAll.filter(x=>x.status==='approved'&&!x.ack);
+ let achCard='';
+ if(msAch.length){
+  if(msAch.some(x=>!msCelebrated[x.id])){msAch.forEach(x=>{msCelebrated[x.id]=1;});setTimeout(confetti,150);}
+  achCard='<div class="card" style="background:linear-gradient(135deg,#FFF6E3,#FFE9C0);border:2px solid var(--gold)">'+
+  '<h2>🎉 ミッションたっせい!</h2>'+
+  msAch.map(x=>'<div class="won-ticket"><span>🎯'+esc(x.title)+' <b style="color:#B07800">+'+x.pts+'pt</b></span>'+
+   '<button onclick="missionAck(\''+x.id+'\')">やったー!</button></div>').join('')+
+  '<div class="muted">パパ・ママが「よくやった!」って承認してくれたよ✨ポイントゲット!</div></div>';}
+ const msOpen=msAll.filter(x=>x.status==='open');
+ const msWait=claimedMissions(p);
+ const msExp=msAll.filter(x=>x.status==='expired'&&Date.now()-(x.expiredTs||0)<3*864e5); // 期限切れはグレー表示3日で自動非表示
+ let msCard='';
+ if(msOpen.length||msWait.length||msExp.length){
+  msCard='<div class="card" style="border:2px solid #CDE5F7"><h2>🎯 パパ・ママからの特別ミッション</h2>'+
+  msOpen.map(x=>'<div class="ticket-item"><span style="flex:1">'+esc(x.title)+'</span>'+
+   '<b style="font-family:var(--disp);color:#B07800;font-size:13px">+'+x.pts+'pt</b>'+
+   (missionDueLabel(x)?'<span class="badge b-pend">'+missionDueLabel(x)+'</span>':'')+
+   '<button style="background:#DDF3E6;color:#2C7A4E" onclick="missionClaim(\''+x.id+'\')">できた!</button></div>').join('')+
+  msWait.map(x=>'<div class="ticket-item" style="opacity:.75"><span style="flex:1">'+esc(x.title)+' <b style="font-family:var(--disp);font-size:12px">+'+x.pts+'pt</b></span>'+
+   '<span class="badge b-pend">パパ・ママの承認まち</span></div>').join('')+
+  msExp.map(x=>'<div class="ticket-item" style="opacity:.5"><span style="flex:1;text-decoration:line-through">'+esc(x.title)+'</span>'+
+   '<span class="badge b-ng">⌛きげんすぎちゃった</span></div>').join('')+
+  '<div class="muted" style="margin-top:4px">「できた!」→パパ・ママが承認すると ポイントがとどくよ</div></div>';}
+ /* ⭐こうかんじょ(ごほうび券+常設の🎨きせかえ) */
+ const shop='<div class="card"><h2>⭐ こうかんじょ</h2>'+
+  (p.pool.length?p.pool.map((t,i)=>{const can=p.points>=t.price;
    return '<div class="ticket-item"><span style="flex:1">'+esc(t.name)+'</span>'+
    '<b style="font-family:var(--disp);color:#B07800;font-size:13px">'+t.price+'pt</b>'+
-   '<button style="background:'+(can?'#DDF3E6;color:#2C7A4E':'#EEF4FA;color:#9AA9BE')+'"'+(can?'':' disabled')+' onclick="buyTicket('+i+')">こうかん</button></div>';}).join('')+
-  '<div class="muted" style="margin-top:6px">スロットでためたポイントで、すきな券とこうかんできるよ!</div></div>';}
+   '<button style="background:'+(can?'#DDF3E6;color:#2C7A4E':'#EEF4FA;color:#9AA9BE')+'"'+(can?'':' disabled')+' onclick="buyTicket('+i+')">こうかん</button></div>';}).join(''):'')+
+  themeShopHTML(p)+
+  '<div class="muted" style="margin-top:6px">スロットでためたポイントで、すきな券やきせかえと こうかんできるよ!</div></div>';
  /* ゴールデンスロット予告 */
  const nm=nextMilestone(p);
  let teaser='';
@@ -478,7 +599,7 @@ function homeHTML(){const p=P();const m=minutesByDay(p);
   '<div class="stat"><div class="n">🔥'+streak+'</div><div class="l">れんぞく日</div></div>'+
   '<div class="stat"><div class="n">'+today+'<span style="font-size:12px">分</span></div><div class="l">きょうの勉強</div></div>'+
   '<div class="stat"><div class="n">⭐'+p.points+'</div><div class="l">ポイント</div></div></div>'+
-  slotCard+tix+
+  achCard+slotCard+tix+msCard+
   '<div class="card"><h2>🚀 きょうの基地(きち)をえらぼう!</h2><div class="bases">'+
   S.bases.map(b=>{const n=baseCount(p,b.id);const t=titleFor(n);
    return '<div class="base" onclick="pickBase(\''+b.id+'\')"><div class="em">'+b.em+'</div>'+
@@ -721,6 +842,19 @@ function spinNext(){const p=P();const item=slotQueue[0];
   if(slotQueue.length){btn.textContent='つぎのスロットへ(あと'+slotQueue.length+'回)🎰';btn.onclick=showSlotModal;}
   else{btn.textContent='とじる';btn.onclick=()=>{closeModal();render();};}
  },1600);}
+/* ---------- 🚀ロケットOP(起動時1回だけのスプラッシュ) ---------- */
+function showSplash(){
+ if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+ const el=document.createElement('div');el.id='splash';
+ el.innerHTML='<div class="spl-cloud spl-c1"></div><div class="spl-cloud spl-c2"></div>'+
+  '<div class="spl-rocket"><span class="spl-ship">🚀</span><span class="spl-flame">🔥</span></div>';
+ let gone=false;
+ const done=()=>{if(gone)return;gone=true;el.remove();};
+ el.addEventListener('click',done); // タップで即スキップ
+ const rk=el.querySelector('.spl-rocket');
+ if(rk)rk.addEventListener('animationend',()=>setTimeout(done,120));
+ setTimeout(done,1300); // 保険タイマー
+ document.body.appendChild(el);}
 function confetti(){const em=['🎉','⭐','🌸','✨','🥟','🐟'];
  for(let i=0;i<28;i++){const s=document.createElement('span');s.className='confetti';
   s.textContent=em[i%em.length];s.style.left=(Math.random()*100)+'vw';
@@ -1211,10 +1345,18 @@ function clearChatPhoto(){chatPhotoData=null;const el=$('#chat-photo-prev');if(e
 
 /* ---------- せってい ---------- */
 function setHTML(){const p=P();
- const pend=p.sessions.filter(s=>s.status==='pending').length+pendingBonus(p).length;
+ const pend=p.sessions.filter(s=>s.status==='pending').length+pendingBonus(p).length+claimedMissions(p).length;
  return '<div class="card"><h2>🤖 AI相棒のなまえ</h2>'+
  '<input id="ai-name" value="'+esc(p.aiName)+'">'+
  '<button class="btn blue sm" style="margin-top:8px" onclick="saveAiName()">きめた!</button></div>'+
+ '<div class="card"><h2>🎨 きせかえ</h2>'+
+ '<div class="muted">タップで はいけいを きがえられるよ('+esc(p.name)+'せんよう)。</div>'+
+ '<div class="chips" style="margin-top:8px">'+Object.entries(THEMES).map(([id,th])=>{
+  const owned=(p.ownedThemes||[]).indexOf(id)>=0;const cur=p.theme===id;
+  return owned
+   ?'<div class="chip'+(cur?' on':'')+'" onclick="setTheme(\''+id+'\')">'+th.em+' '+th.name+(cur?' ✓':'')+'</div>'
+   :'<div class="chip" style="opacity:.5" onclick="go(\'home\')">'+th.em+' '+th.name+'(こうかんじょで'+THEME_PRICE+'pt)</div>';
+ }).join('')+'</div></div>'+
  '<div class="card"><h2>👨 パパ・ママモード'+(pend?' <span class="badge b-pend">承認まち '+pend+'</span>':'')+'</h2>'+
  '<div class="muted">承認・ごほうび券・目標・APIキー・メンバーやきちの編集はこちら(おうちの人せんよう)</div>'+
  '<button class="btn sm" style="margin-top:10px" onclick="parentGate()">🔐 ひらく</button></div>'+
@@ -1226,7 +1368,7 @@ function setHTML(){const p=P();
  '<div class="card"><h2>💾 データ</h2>'+
  '<div class="muted">データはこの端末の中にだけ保存されます。ときどきバックアップしてね(写真・メモボードはふくまれません)。</div>'+
  '<button class="btn ghost sm" style="margin-top:10px" onclick="exportData()">バックアップを保存(JSON)</button>'+
- '<div class="muted" style="margin-top:8px;text-align:right">スタディきち v11</div></div>';}
+ '<div class="muted" style="margin-top:8px;text-align:right">スタディきち v12</div></div>';}
 function saveAiName(){P().aiName=$('#ai-name').value.trim()||'そらとも';save();render();}
 /* --- メンバー編集(パパ・ママモード内) --- */
 function addProfile(){const id='p'+Date.now();
@@ -1293,6 +1435,23 @@ function openParent(){const p=P();const pend=p.sessions.filter(s=>s.status==='pe
   '<button class="btn blue sm" style="width:56px;flex:0 0 auto" onclick="judgeBonus(\''+b.id+'\',1)">承認</button>'+
   '<button class="btn ghost sm" style="width:60px;flex:0 0 auto;color:#B04040" onclick="judgeBonus(\''+b.id+'\',0)">却下</button></div>').join(''):
   '<div class="muted">承認まちのボーナスはありません</div>')+'</div>'+
+ '<h2 style="margin-top:16px">🎯 ミッション承認まち('+claimedMissions(p).length+')</h2>'+
+ '<div class="muted">承認するとポイントを直接付与します(スロットは経由しません)。却下すると「出題中」に戻ります(消したいときは下の一覧から削除)。</div>'+
+ '<div>'+(claimedMissions(p).length?claimedMissions(p).map(ms=>'<div class="sess" id="pm-'+ms.id+'"><span class="em">🎯</span>'+
+  '<div class="info"><b>'+esc(ms.title)+'</b> +'+ms.pts+'pt'+(missionDueLabel(ms)?' <span class="muted">'+missionDueLabel(ms)+'</span>':'')+'</div>'+
+  '<button class="btn blue sm" style="width:56px;flex:0 0 auto" onclick="judgeMission(\''+ms.id+'\',1)">承認</button>'+
+  '<button class="btn ghost sm" style="width:60px;flex:0 0 auto;color:#B04040" onclick="judgeMission(\''+ms.id+'\',0)">却下</button></div>').join(''):
+  '<div class="muted">承認まちのミッションはありません</div>')+'</div>'+
+ '<h2 style="margin-top:16px">🎯 特別ミッションを出す('+esc(p.name)+')</h2>'+
+ '<div class="muted">お手伝いや+αの勉強など、臨時のミッションを出せます。達成→承認で固定ポイントを付与します。</div>'+
+ '<div>'+missionAdminRows(p)+'</div>'+
+ '<div class="row" style="margin-top:8px"><input id="ms-title" placeholder="例:漢字ドリル1ページ">'+
+ '<input id="ms-pts" type="number" min="1" inputmode="numeric" placeholder="pt" style="flex:0 0 74px"></div>'+
+ '<div class="row" style="margin-top:6px">'+
+ '<select id="ms-due" onchange="var d=document.getElementById(\'ms-date\');if(d)d.style.display=this.value===\'date\'?\'\':\'none\'">'+
+  '<option value="today">きょう中</option><option value="week">こんしゅう中(週の土曜まで)</option><option value="date">日付指定</option></select>'+
+ '<input id="ms-date" type="date" style="display:none"></div>'+
+ '<button class="btn blue sm" style="margin-top:8px" onclick="addMission()">🎯 ミッションを出す</button>'+
  '<h2 style="margin-top:16px">📚 テキストの登録('+esc(p.name)+')</h2>'+
  '<div class="muted">さくせん会議で「やるところ」に使うテキストの一覧です。</div>'+
  '<div>'+p.books.map((b,i)=>'<div class="ticket-item"><span style="flex:1">'+esc(b)+'</span>'+
@@ -1348,6 +1507,55 @@ function judgeBonus(id,ok){const p=P();const i=p.bonusSpins.findIndex(b=>b.id===
  if(ok)p.bonusSpins[i].status='approved';
  else p.bonusSpins.splice(i,1);
  save();const row=$('#pb-'+id);if(row)row.remove();}
+/* --- 特別ミッションの管理(パパ・ママモード内) --- */
+function missionAdminRows(p){checkMissionExpiry(p);
+ const list=(p.missions||[]).filter(m=>m.status==='open'||m.status==='claimed'||
+  (m.status==='expired'&&Date.now()-(m.expiredTs||0)<3*864e5));
+ if(!list.length)return '<div class="muted">現役のミッションはありません</div>';
+ return list.map(ms=>{
+  const st=ms.status==='claimed'?'<span class="badge b-pend">承認まち</span>':
+   ms.status==='expired'?'<span class="badge b-ng">期限切れ</span>':'<span class="badge b-ok">出題中</span>';
+  return '<div class="ticket-item"><span style="flex:1">'+esc(ms.title)+' <b>+'+ms.pts+'pt</b> '+
+  '<span class="muted">'+missionDueLabel(ms)+'</span> '+st+'</span>'+
+  (ms.status!=='claimed'?'<button style="background:#EEF4FA;color:#2F6FB0" onclick="missionDueModal(\''+ms.id+'\')">🗓️期限</button>':'')+
+  '<button onclick="delMission(\''+ms.id+'\')">削除</button></div>';}).join('');}
+function addMission(){const p=P();
+ const t=($('#ms-title')?$('#ms-title').value.trim():'');
+ const pts=Math.floor(Number($('#ms-pts')?$('#ms-pts').value:0));
+ const type=($('#ms-due')?$('#ms-due').value:'today');
+ const date=($('#ms-date')?$('#ms-date').value:'');
+ if(!t){alert('ミッションのタイトルを入れてください');return;}
+ if(!(pts>=1)){alert('ポイントは1以上の数字にしてください');return;}
+ if(type==='date'&&!/^\d{4}-\d{2}-\d{2}$/.test(date)){alert('期限の日付を選んでください');return;}
+ const ms={id:'ms'+Date.now()+Math.floor(Math.random()*1e4),title:t,pts:pts,
+  due:{type:type,date:type==='date'?date:null},
+  status:'open',createdTs:Date.now(),claimedTs:null,approvedTs:null,ack:false};
+ if(type==='date'&&missionDueTs(ms)<Date.now()){alert('期限がすでに過ぎています。日付を確認してください');return;}
+ (p.missions=p.missions||[]).push(ms);save();openParent();}
+function delMission(id){const p=P();const i=(p.missions||[]).findIndex(m=>m.id===id);
+ if(i<0)return;
+ if(!confirm('「'+p.missions[i].title+'」を削除しますか?'))return;
+ p.missions.splice(i,1);save();openParent();}
+function missionDueModal(id){const p=P();const ms=(p.missions||[]).find(m=>m.id===id);if(!ms)return;
+ const cur=(ms.due&&ms.due.type)||'today';
+ openModal('<h3>🗓️ 期限の変更('+esc(ms.title)+')</h3>'+
+ '<div class="muted">期限を延ばすと、期限切れのミッションも復活します。「きょう中」「こんしゅう中」は今日を起点にします。</div>'+
+ '<select id="msd-type" style="margin-top:8px" onchange="var d=document.getElementById(\'msd-date\');if(d)d.style.display=this.value===\'date\'?\'\':\'none\'">'+
+  '<option value="today"'+(cur==='today'?' selected':'')+'>きょう中</option>'+
+  '<option value="week"'+(cur==='week'?' selected':'')+'>こんしゅう中(週の土曜まで)</option>'+
+  '<option value="date"'+(cur==='date'?' selected':'')+'>日付指定</option></select>'+
+ '<input id="msd-date" type="date" value="'+esc((ms.due&&ms.due.date)||'')+'" style="margin-top:6px;'+(cur==='date'?'':'display:none')+'">'+
+ '<button class="btn blue sm" style="margin-top:12px" onclick="missionDueSave(\''+id+'\')">決定</button>'+
+ '<button class="btn ghost sm" style="margin-top:8px" onclick="openParent()">← もどる</button>');}
+function missionDueSave(id){const p=P();const ms=(p.missions||[]).find(m=>m.id===id);if(!ms)return;
+ const type=$('#msd-type').value;const date=$('#msd-date').value;
+ if(type==='date'&&!/^\d{4}-\d{2}-\d{2}$/.test(date)){alert('日付を選んでください');return;}
+ // きょう中/こんしゅう中は「今日起点」で判定し直す。検証OKになってから本体へ反映
+ const trial={createdTs:ms.createdTs,dueBaseTs:Date.now(),due:{type:type,date:type==='date'?date:null}};
+ if(missionDueTs(trial)<Date.now()){alert('その期限はすでに過ぎています。別の期限にしてください');return;}
+ ms.due=trial.due;ms.dueBaseTs=trial.dueBaseTs;
+ if(ms.status==='expired'){ms.status='open';delete ms.expiredTs;}
+ save();openParent();}
 function addBook(){const v=$('#book-new').value.trim();if(!v)return;
  P().books.push(v);save();openParent();}
 function delBook(i){P().books.splice(i,1);save();openParent();}
@@ -1427,6 +1635,7 @@ window.addEventListener('beforeinstallprompt',e=>{
  if(S.tab==='set')render();});
 
 /* ---------- 起動 ---------- */
+showSplash(); /* 🚀ロケットOP → launchGate(だれがつかう?) → ホーム の順 */
 render();
 launchGate();
 
