@@ -284,13 +284,17 @@ function mkProfile(name,em,grade){return{
  theme:'sky',
  ownedThemes:['sky','sakura'],
  missions:[],
+ ledger:[],   /* ポイント取引台帳。p.points は台帳合計のキャッシュ */
+ deleted:{},  /* 墓標 {id:削除ts}。マージでの蘇り防止 */
+ metaMt:0,    /* スカラー群(name/pool/books/theme等)の更新時刻。マージはLWW */
 };}
 const DEFAULT_STATE={
-v:4, tab:'home', currentProfile:'sora', parentPin:null,
+v:5, tab:'home', currentProfile:'sora', parentPin:null,
  bases:JSON.parse(JSON.stringify(DEFAULT_BASES)),
  gemini:{key:'',model:'gemini-3.5-flash'}, // ※Googleの現行モデル名。エラーになる場合は最新のモデル名に変更してください
  profiles:{ sora:mkProfile('空花','🌸','小5'), fuka:mkProfile('風花','🍃','小3') },
  activeSession:null,
+ deleted:{}, basesMt:0, pinMt:0, /* v13: マージ用(きち・プロフィール削除の墓標 / bases・親PINの更新時刻) */
 };
 let S=load();
 function load(){
@@ -299,9 +303,10 @@ function load(){
  }catch(e){}
  return JSON.parse(JSON.stringify(DEFAULT_STATE));
 }
-/* v1→v4 移行:券の値札・チャットアーカイブ・編集可能な基地・きせかえ・特別ミッション */
+/* v1→v5 移行:券の値札・チャットアーカイブ・編集可能な基地・きせかえ・特別ミッション・台帳とマージ基盤
+   通常起動(load)・バックアップ復元(importData)・マージ入力(importMerge)の3経路すべてで呼ばれる */
 function migrate(st){
- Object.values(st.profiles||{}).forEach(pr=>{
+ Object.entries(st.profiles||{}).forEach(([pid,pr])=>{
   if(Array.isArray(pr.pool))pr.pool=pr.pool.map(t=>typeof t==='string'?{name:t,price:500}:t);
   if(pr.lastGoldenMilestone==null)pr.lastGoldenMilestone=0;
   if(!Array.isArray(pr.chatArchive))pr.chatArchive=[];
@@ -319,13 +324,41 @@ function migrate(st){
   (pr.exams||[]).forEach(e=>{
    if(!e.scores){e.scores={'総合':Number(e.score)||0};delete e.score;}});
   if(Array.isArray(pr.exams))pr.exams.sort((a,b)=>exSortKey(a)-exSortKey(b));
+  /* --- v5(v13-a): 台帳・マージ基盤 --- */
+  if(!Array.isArray(pr.ledger)){pr.ledger=[]; // 既存残高は繰越取引に(決定的ID=2端末で同時migrateしても収束)
+   const bal=Math.round(Number(pr.points)||0);
+   if(bal!==0)pr.ledger.push({id:'tx-init-'+pid,ts:Date.now(),delta:bal,reason:'carryover',ref:null});}
+  if(!pr.deleted||typeof pr.deleted!=='object')pr.deleted={};
+  if(pr.metaMt==null)pr.metaMt=0;
+  /* ID採番(内容由来の決定的IDにし、同じ旧データを別端末でmigrateしても収束させる) */
+  (pr.exams||[]).forEach((e,i)=>{if(!e.id)e.id='ex-'+(e.date||'x')+'-'+i; if(e.mt==null)e.mt=0;});
+  (pr.chat||[]).forEach((m2,i)=>{if(!m2.id)m2.id='cm-'+(m2.ts||0)+'-'+i;});
+  (pr.chatArchive||[]).forEach((a,i)=>{if(!a.id)a.id='ca-'+(a.ts||0)+'-'+i;});
+  if(Array.isArray(pr.tickets))pr.tickets=pr.tickets.map((t,i)=> // 所持券をオブジェクト化(つかう=usedTs記録)
+   typeof t==='string'?{id:'tk-mig-'+i+'-'+t,name:t,ts:0,usedTs:null,mt:0}:t);
+  (pr.sessions||[]).forEach(s=>{if(s.mt==null)s.mt=0;});
+  (pr.bonusSpins||[]).forEach(b=>{if(b.mt==null)b.mt=0;});
+  (pr.missions||[]).forEach(m2=>{if(m2.mt==null)m2.mt=0;});
+  Object.values(pr.weeks).forEach(wx=>{if(wx.planMt==null)wx.planMt=0;if(wx.testMt==null)wx.testMt=0;});
+  recalcPoints(pr); // points=台帳合計のキャッシュ
  });
+ if(!st.deleted||typeof st.deleted!=='object')st.deleted={};
+ if(st.basesMt==null)st.basesMt=0;
+ if(st.pinMt==null)st.pinMt=0;
  if(!Array.isArray(st.bases)||!st.bases.length)st.bases=JSON.parse(JSON.stringify(DEFAULT_BASES));
  if(!st.currentProfile||!st.profiles[st.currentProfile])st.currentProfile=Object.keys(st.profiles)[0];
  if(st.gemini&&(!st.gemini.model||st.gemini.model==='gemini-2.5-flash'))st.gemini.model='gemini-3.5-flash';
- st.v=4;
+ st.v=5;
 }
 function save(){
+ try{const now=Date.now(); // 古い墓標(90日)と使用済み/却下ボーナス(60日)の間引き
+  Object.values(S.profiles||{}).forEach(pr=>{
+   Object.entries(pr.deleted||{}).forEach(([k,ts])=>{if(now-ts>90*864e5)delete pr.deleted[k];});
+   if(Array.isArray(pr.bonusSpins))pr.bonusSpins=pr.bonusSpins.filter(b=>
+    !((b.status==='used'||b.status==='rejected')&&now-(b.mt||0)>60*864e5));
+  });
+  Object.entries(S.deleted||{}).forEach(([k,ts])=>{if(now-ts>90*864e5)delete S.deleted[k];});
+ }catch(e){}
  try{localStorage.setItem('studykichi_v1',JSON.stringify(S));}
  catch(e){ // ほぼ写真での容量オーバー。各プロフィールの古い写真をはがして再試行
   try{Object.values(S.profiles).forEach(pr=>{
@@ -336,6 +369,17 @@ function save(){
   localStorage.setItem('studykichi_v1',JSON.stringify(S));}catch(_){}}
 }
 function P(){return S.profiles[S.currentProfile];}
+
+/* ---------- ⭐ポイント台帳(全ポイント変動をここに集約) ----------
+   fixedId(決定的ID)を渡すと冪等: 同じ取引が2端末で発生してもマージで1件に収束する */
+function addLedger(p,delta,reason,ref,fixedId){
+ const id=fixedId||('tx-'+reason+'-'+Date.now().toString(36)+Math.random().toString(36).slice(2,7));
+ if(!Array.isArray(p.ledger))p.ledger=[];
+ if(p.ledger.some(t=>t.id===id))return false;
+ p.ledger.push({id,ts:Date.now(),delta:Math.round(delta),reason,ref:ref==null?null:ref});
+ p.points+=Math.round(delta);
+ return true;}
+function recalcPoints(p){p.points=(p.ledger||[]).reduce((a,t)=>a+(Math.round(t.delta)||0),0);}
 
 /* ---------- 写真ストレージ (IndexedDB) ---------- */
 let _db=null;
@@ -393,9 +437,11 @@ function testTargetKey(){const d=new Date();
  return d.getDay()===0?weekKeyFor(Date.now()-864e5):weekKeyFor(Date.now());} // 日曜は「きのう終わった週」のバトル
 function getWeek(p,key){if(!p.weeks[key])p.weeks[key]={subjects:[],range:'',goal:'',planTs:null,test:null,reviews:[],granted:{}};
  if(!p.weeks[key].granted)p.weeks[key].granted={};return p.weeks[key];}
-function grantBonus(p,wk,kind,reason,golden){if(wk.granted[kind])return false;
+function grantBonus(p,key,wk,kind,reason,golden){if(wk.granted[kind])return false;
+ const id='bs-'+key+'-'+kind; // 決定的ID: 2端末が同条件で独立発行してもマージで1件に収束
+ if((p.bonusSpins||[]).some(b=>b.id===id))return false;
  wk.granted[kind]=1;
- p.bonusSpins.push({id:'bs'+Date.now()+Math.floor(Math.random()*1e4),reason,golden:!!golden,status:'pending'});
+ p.bonusSpins.push({id,reason,golden:!!golden,status:'pending',mt:Date.now()});
  return true;}
 function approvedBonus(p){return (p.bonusSpins||[]).filter(b=>b.status==='approved');}
 function pendingBonus(p){return (p.bonusSpins||[]).filter(b=>b.status==='pending');}
@@ -405,7 +451,7 @@ function weekLoopStreak(p,key){let n=0,k=key;
 function checkWeekLoop(p,key){const wk=p.weeks[key];if(!wk||!wk.planTs||!wk.test)return;
  if(wk.granted.loopChecked)return;wk.granted.loopChecked=1;
  const st=weekLoopStreak(p,key);
- if(WEEK_MS.indexOf(st)>=0)grantBonus(p,wk,'wstreak','🔥パーフェクトウィーク'+st+'週れんぞく!!',true);}
+ if(WEEK_MS.indexOf(st)>=0)grantBonus(p,key,wk,'wstreak','🔥パーフェクトウィーク'+st+'週れんぞく!!',true);}
 /* ---------- 🎯パパ・ママからの特別ミッション ----------
    報酬は承認ゲート必須(できた!=claimed → 親の承認 → ポイント付与)。
    スロットを経由しない固定ポイント(臨時収入)。 */
@@ -432,14 +478,15 @@ function claimedMissions(p){return (p.missions||[]).filter(m=>m.status==='claime
 let msCelebrated={}; // 達成カードのconfettiを1セッション1回にする
 function missionClaim(id){const p=P();const ms=(p.missions||[]).find(m=>m.id===id);
  if(!ms||ms.status!=='open')return;
- ms.status='claimed';ms.claimedTs=Date.now();save();render();}
+ ms.status='claimed';ms.claimedTs=Date.now();ms.mt=Date.now();save();render();}
 function missionAck(id){const p=P();const ms=(p.missions||[]).find(m=>m.id===id);
- if(!ms)return;ms.ack=true;save();render();}
+ if(!ms)return;ms.ack=true;ms.mt=Date.now();save();render();}
 function judgeMission(id,ok){const p=P();const ms=(p.missions||[]).find(m=>m.id===id);
  if(!ms||ms.status!=='claimed')return;
  if(ok){ms.status='approved';ms.approvedTs=Date.now();ms.ack=false;
-  p.points+=ms.pts; // TODO(v13 ポイント台帳化): ここで取引「ミッション: +pts」を台帳に記録する
+  addLedger(p,ms.pts,'mission',ms.title,'tx-ms-'+ms.id); // 決定的ID=マージで二重付与しない
  }else{ms.status='open';ms.claimedTs=null;} // 却下は再挑戦可。消したいときは親が削除
+ ms.mt=Date.now();
  save();const row=$('#pm-'+id);if(row)row.remove();}
 
 /* ---------- 🎨きせかえ ---------- */
@@ -448,11 +495,12 @@ function applyTheme(){const p=P();const th=(p&&THEMES[p.theme])||THEMES.sky;
  const mt=document.querySelector('meta[name=theme-color]');if(mt)mt.setAttribute('content',th.vars['--hd1']);}
 function setTheme(id){const p=P();
  if((p.ownedThemes||[]).indexOf(id)<0)return;
- p.theme=id;save();render();}
+ p.theme=id;p.metaMt=Date.now();save();render();}
 function buyTheme(id){const p=P();const th=THEMES[id];
  if(!th||(p.ownedThemes||[]).indexOf(id)>=0||p.points<THEME_PRICE)return;
  if(confirm('⭐'+THEME_PRICE+'ポイントで きせかえ「'+th.em+th.name+'」をゲットする?')){
-  p.points-=THEME_PRICE;p.ownedThemes.push(id);p.theme=id; // 買ったらすぐ着がえる
+  addLedger(p,-THEME_PRICE,'theme',th.em+th.name,'tx-theme-'+S.currentProfile+'-'+id); // 決定的ID=二重購入をマージで防止
+  p.ownedThemes.push(id);p.theme=id;p.metaMt=Date.now(); // 買ったらすぐ着がえる
   save();confetti();render();}}
 /* こうかんじょの常設「🎨きせかえ」セクション(システム品・親のpoolとは別枠) */
 function themeShopHTML(p){
@@ -546,8 +594,9 @@ function homeHTML(){const p=P();const m=minutesByDay(p);
   '<button class="btn" style="margin-top:10px" onclick="openSlots()">まわす! 🎰</button>'+
   '<div style="text-align:center;margin-top:6px"><span class="muted" style="text-decoration:underline;cursor:pointer" onclick="slotRules()">❓なにが当たるの?</span></div></div>';}
  let tix='';
- if(p.tickets.length){tix='<div class="card"><h2>🎟️ もっている券</h2>'+
-  p.tickets.map((t,i)=>'<div class="won-ticket"><span>'+esc(t)+'</span><button onclick="useTicket('+i+')">つかう</button></div>').join('')+
+ const tixLive=p.tickets.filter(t=>!t.usedTs); // 未使用のみ表示
+ if(tixLive.length){tix='<div class="card"><h2>🎟️ もっている券</h2>'+
+  tixLive.map(t=>'<div class="won-ticket"><span>'+esc(t.name)+'</span><button onclick="useTicket(\''+t.id+'\')">つかう</button></div>').join('')+
   '<div class="muted">「つかう」はパパ・ママといっしょにおしてね</div></div>';}
  /* 🎯特別ミッション(情報が無いときはカードを出さない) */
  checkMissionExpiry(p);
@@ -598,7 +647,7 @@ function homeHTML(){const p=P();const m=minutesByDay(p);
  return '<div class="stats">'+
   '<div class="stat"><div class="n">🔥'+streak+'</div><div class="l">れんぞく日</div></div>'+
   '<div class="stat"><div class="n">'+today+'<span style="font-size:12px">分</span></div><div class="l">きょうの勉強</div></div>'+
-  '<div class="stat"><div class="n">⭐'+p.points+'</div><div class="l">ポイント</div></div></div>'+
+  '<div class="stat" style="cursor:pointer" onclick="openLedger()"><div class="n">⭐'+p.points+'</div><div class="l">ポイント📖</div></div></div>'+
   achCard+slotCard+tix+msCard+
   '<div class="card"><h2>🚀 きょうの基地(きち)をえらぼう!</h2><div class="bases">'+
   S.bases.map(b=>{const n=baseCount(p,b.id);const t=titleFor(n);
@@ -608,6 +657,18 @@ function homeHTML(){const p=P();const m=minutesByDay(p);
   '</div><div class="muted" style="margin-top:10px">💡 まずは「5分だけ」でOK!はじめるのが いちばんえらい!'+teaser+planLine+
   '<br><span style="text-decoration:underline;cursor:pointer;color:var(--blue-d)" onclick="slotRules()">❓スロットとポイントのルール</span></div></div>'+
   shop;}
+/* ---------- ⭐ポイントつうちょう(A-2) ---------- */
+function ledgerLabel(t){const L={slot:'🎰スロット',shop:'⭐こうかんじょ',theme:'🎨きせかえ',mission:'🎯ミッション',adjust:'🔧ちょうせい',carryover:'くりこし'};
+ return (L[t.reason]||t.reason)+(t.ref?'('+t.ref+')':'');}
+function openLedger(){const p=P();
+ const list=(p.ledger||[]).slice().sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,30);
+ openModal('<h3>⭐ ポイントつうちょう</h3>'+
+ '<div style="font-family:var(--disp);font-weight:800;font-size:18px;color:var(--blue-d);margin-bottom:6px">いま ⭐'+p.points+'pt</div>'+
+ (list.length?list.map(t=>'<div class="ticket-item"><span class="muted" style="flex:0 0 40px">'+fmtDate(t.ts)+'</span>'+
+  '<span style="flex:1;font-size:13px">'+esc(ledgerLabel(t))+'</span>'+
+  '<b style="font-family:var(--disp);color:'+(t.delta>=0?'#2C7A4E':'#B04040')+'">'+(t.delta>=0?'+':'')+t.delta+'</b></div>').join(''):
+  '<div class="muted">まだ きろくがないよ。スロットをまわすと ここにたまっていくよ!</div>')+
+ '<div class="muted" style="margin-top:6px">さいきんの30けんまで みられるよ</div>');}
 function slotRules(){openModal('<h3>🎰 スロットのルール</h3>'+
  '<div class="sess"><span class="em">🎟️</span><div class="info"><b>🎟️🎟️🎟️ 券ジャックポット(超レア🌈)</b><br>こうかんじょの券が1まい<b>タダ</b>でもらえる!その日ぜんぶで<b>25分いじょう</b>勉強した日だけチャンスがあるよ</div></div>'+
  '<div class="sess"><span class="em">👑</span><div class="info"><b>👑👑👑 大当たり(レア)</b><br>+100ポイント!</div></div>'+
@@ -621,9 +682,14 @@ function slotRules(){openModal('<h3>🎰 スロットのルール</h3>'+
 function buyTicket(i){const p=P();const t=p.pool[i];
  if(!t||p.points<t.price)return;
  if(confirm('⭐'+t.price+'ポイントで「'+t.name+'」とこうかんする?')){
-  p.points-=t.price;p.tickets.push(t.name);save();confetti();render();}}
-function useTicket(i){const p=P();
- if(confirm('「'+p.tickets[i]+'」をつかう?(おうちの人といっしょにね)')){p.tickets.splice(i,1);save();render();}}
+  addLedger(p,-t.price,'shop',t.name); // 正当な複数購入があるためランダムID
+  p.tickets.push({id:'tk'+Date.now().toString(36)+Math.random().toString(36).slice(2,7),
+   name:t.name,ts:Date.now(),usedTs:null,mt:Date.now()});
+  save();confetti();render();}}
+function useTicket(id){const p=P();const t=p.tickets.find(x=>x.id===id);
+ if(!t||t.usedTs)return;
+ if(confirm('「'+t.name+'」をつかう?(おうちの人といっしょにね)')){
+  t.usedTs=Date.now();t.mt=Date.now();save();render();}} // 削除でなく使用マーク(履歴が残る)
 
 /* ---------- 出撃(セッション) ---------- */
 let pendingBase=null;
@@ -717,7 +783,7 @@ async function saveSession(min){const a=S.activeSession;
  P().sessions.unshift({id,base:a.base,plannedMin:a.plannedMin,startTs:a.startTs,endTs:Date.now(),
   minutes:min,subjects:subs,memo:$('#end-memo').value.trim(),photoId,boards:(a.boards||[]),
   focus:(document.querySelector('#focus-chips .chip.on')||{dataset:{}}).dataset.f||null,
-  status:'pending',spin:null});
+  status:'pending',spin:null,mt:Date.now()});
  S.activeSession=null;save();closeModal();render();
  openModal('<h3>きろくしたよ! ✍️</h3>'+
  '<div class="muted">パパ・ママが「がんばったね」って承認してくれたら、つぎにアプリをひらいたときに 🎰スロットがまわせるよ。たのしみにまっててね!</div>'+
@@ -831,11 +897,14 @@ function spinNext(){const p=P();const item=slotQueue[0];
  setTimeout(()=>{clearInterval(spinI);
   reels.forEach((r,i)=>{r.classList.remove('spin');r.textContent=res.face[i];});
   $('#slot-res').textContent=res.msg;
-  p.points+=res.pts;
-  if(res.ticket)p.tickets.push(res.ticket);
-  if(sess){sess.spin=(golden?'🔥':'')+res.msg;
+  const spinKey=(item.t==='s'?item.id:item.bid); // 決定的ID: 同一スピンは台帳・券とも1件に収束
+  if(res.pts)addLedger(p,res.pts,'slot',null,'tx-spin-'+spinKey);
+  if(res.ticket&&!p.tickets.some(t=>t.id==='tk-spin-'+spinKey))
+   p.tickets.push({id:'tk-spin-'+spinKey,name:res.ticket,ts:Date.now(),usedTs:null,mt:Date.now()});
+  if(sess){sess.spin=(golden?'🔥':'')+res.msg;sess.mt=Date.now();
    if(golden){p.lastGoldenMilestone=goldenM;goldenM=0;}}
-  else{p.bonusSpins=p.bonusSpins.filter(b=>b.id!==item.bid);}
+  else{const bb=p.bonusSpins.find(b2=>b2.id===item.bid);
+   if(bb){bb.status='used';bb.mt=Date.now();}} // 削除でなく消費マーク(マージでの蘇り防止)
   slotQueue.shift();save();
   if(res.big)confetti();
   btn.disabled=false;
@@ -1027,7 +1096,8 @@ function savePlan(){const p=P();const d=ensureDraft(p);const key=d.key;
  wk.range=d.range;
  let first=false;
  if(!wk.planTs){wk.planTs=Date.now();
-  first=grantBonus(p,wk,'plan','📅作戦けってい ボーナス',false);}
+  first=grantBonus(p,key,wk,'plan','📅作戦けってい ボーナス',false);}
+ wk.planMt=Date.now();
  checkWeekLoop(p,key);save();render();
  if(first)alert('作戦けってい⚔️ パパ・ママが承認すると 🎁ボーナススロットが とどくよ!');}
 let btDraft=null;
@@ -1075,8 +1145,9 @@ function battleSave(){const p=P();const d=btDraft;if(!d)return;const key=d.key;
  if(!wk.test)wk.test={};
  wk.test.total=total;wk.test.correct=correct;wk.test.items=items;
  if(!wk.test.ts)wk.test.ts=Date.now();
- let got=grantBonus(p,wk,'test','⚔️ボスバトル ボーナス',false);
- if(correct===total){if(grantBonus(p,wk,'perfect','💯まんてん!パーフェクトボーナス',true)){got=true;confetti();}}
+ wk.testMt=Date.now();
+ let got=grantBonus(p,key,wk,'test','⚔️ボスバトル ボーナス',false);
+ if(correct===total){if(grantBonus(p,key,wk,'perfect','💯まんてん!パーフェクトボーナス',true)){got=true;confetti();}}
  checkWeekLoop(p,key);save();closeModal();btDraft=null;render();
  if(got)alert('きろくしたよ⚔️ パパ・ママが承認すると 🎁スロットが とどくよ!');}
 function revengeHTML(p){const items=[];
@@ -1094,7 +1165,7 @@ function revToggle(k,i){const p=P();const wk=p.weeks[k];
  if(!wk||!wk.reviews||!wk.reviews[i])return;
  wk.reviews[i].done=!wk.reviews[i].done;
  if(wk.reviews.length&&wk.reviews.every(r=>r.done)){
-  if(grantBonus(p,wk,'review','🔁リベンジぜんぶクリア ボーナス',false))confetti();}
+  if(grantBonus(p,k,wk,'review','🔁リベンジぜんぶクリア ボーナス',false))confetti();}
  save();render();}
 function weekDetail(k){const p=P();const w2=p.weeks[k];if(!w2)return;
  openModal('<h3>🗓️ '+weekRangeLabel(k)+' のきろく</h3>'+
@@ -1215,13 +1286,17 @@ function examSave(i){const scores={};let any=false;
  document.querySelectorAll('[data-ex-s]').forEach(inp=>{const v=inp.value.trim();
   if(v!==''){scores[inp.dataset.exS]=Number(v);any=true;}});
  if(!any){alert('どれかひとつは スコアをいれてね');return;}
- const rec={name:$('#ex-name').value.trim()||'模試',date:$('#ex-date').value||todayKey(),
-  scores,memo:$('#ex-memo').value.trim()};
+ const old=(i!=null)?P().exams[i]:null;
+ const rec={id:old&&old.id?old.id:'ex'+Date.now()+Math.random().toString(36).slice(2,6), // 編集でIDを失わない
+  name:$('#ex-name').value.trim()||'模試',date:$('#ex-date').value||todayKey(),
+  scores,memo:$('#ex-memo').value.trim(),mt:Date.now()};
  if(i==null)P().exams.push(rec);else P().exams[i]=rec;
  P().exams.sort((a,b)=>exSortKey(a)-exSortKey(b)); // 日づけ順にならべる
  save();closeModal();render();}
 function examDel(i){if(confirm('このけっかを削除する?(もどせないよ)')){
- P().exams.splice(i,1);save();closeModal();render();}}
+ const p=P();const e=p.exams[i];
+ if(e&&e.id)p.deleted[e.id]=Date.now(); // 墓標=マージで蘇らない
+ p.exams.splice(i,1);save();closeModal();render();}}
 
 /* ---------- AI相棒 ---------- */
 function chatLogHTML(msgs,aiName){let out='';let lastDay='';
@@ -1259,7 +1334,7 @@ function aiHTML(){const p=P();const hasKey=!!S.gemini.key;
 function newChat(){const p=P();
  if(!p.chat.length){alert('まだ会話がないよ');return;}
  if(confirm('いまの会話を「まえの会話」にしまって、新しい会話をはじめる?')){
-  (p.chatArchive=p.chatArchive||[]).push({ts:Date.now(),msgs:p.chat});
+  (p.chatArchive=p.chatArchive||[]).push({id:'ca'+Date.now()+Math.random().toString(36).slice(2,6),ts:Date.now(),msgs:p.chat,mt:Date.now()});
   p.chat=[];save();render();}}
 function openArchive(){const p=P();const arch=p.chatArchive||[];
  if(!arch.length){openModal('<h3>📚 まえの会話</h3><div class="muted">アーカイブはまだないよ。「新しい会話をはじめる」をおすと、それまでの会話がここにたまっていくよ。</div>');return;}
@@ -1275,7 +1350,9 @@ function viewArchive(i){const p=P();const a=(p.chatArchive||[])[i];if(!a)return;
  '<div class="chat-log" style="max-height:60vh">'+chatLogHTML(a.msgs,p.aiName)+'</div>'+
  '<button class="btn ghost sm" style="margin-top:10px" onclick="openArchive()">← いちらんに もどる</button>');}
 function delArchive(i){const p=P();
- if(confirm('この会話をけす?(もどせないよ)')){p.chatArchive.splice(i,1);save();openArchive();}}
+ if(confirm('この会話をけす?(もどせないよ)')){
+  const a=p.chatArchive[i];if(a&&a.id)p.deleted[a.id]=Date.now(); // 墓標
+  p.chatArchive.splice(i,1);save();openArchive();}}
 /* --- 音声入力 (Web Speech API / 対応ブラウザのみ) --- */
 let recog=null,recOn=false;
 function voiceSupported(){return ('SpeechRecognition' in window)||('webkitSpeechRecognition' in window);}
@@ -1315,7 +1392,7 @@ async function sendChat(forceText){const p=P();const ta=$('#chat-in');
  const img=chatPhotoData;
  if(!t&&!img)return;
  if(!S.gemini.key){alert('パパ・ママモードでAPIキーを設定してもらってね');return;}
- p.chat.push({r:'user',t:t||'（この写真を見てね）',img:img||null,ts:Date.now()});
+ p.chat.push({id:'cm'+Date.now()+Math.random().toString(36).slice(2,6),r:'user',t:t||'（この写真を見てね）',img:img||null,ts:Date.now()});
  chatPhotoData=null;save();render();scrollChat();
  const ty=$('#typing');if(ty)ty.textContent=p.aiName+' がかんがえ中…';
  try{
@@ -1332,8 +1409,8 @@ async function sendChat(forceText){const p=P();const ta=$('#chat-in');
   if(data.error){txt='エラーみたい:'+(data.error.message||'')+'\nパパにカギ(APIキー)やモデル名を見てもらってね。';}
   else{txt=(data.candidates&&data.candidates[0]&&data.candidates[0].content&&data.candidates[0].content.parts||[])
    .map(x=>x.text||'').join('')||'(うまく へんじできなかった…もういちど ためしてね)';}
-  p.chat.push({r:'model',t:txt,ts:Date.now()});
- }catch(e){p.chat.push({r:'model',t:'つうしんエラーだよ。でんぱのあるところで もういちど ためしてね📡',ts:Date.now()});}
+  p.chat.push({id:'cm'+Date.now()+Math.random().toString(36).slice(2,6),r:'model',t:txt,ts:Date.now()});
+ }catch(e){p.chat.push({id:'cm'+Date.now()+Math.random().toString(36).slice(2,6),r:'model',t:'つうしんエラーだよ。でんぱのあるところで もういちど ためしてね📡',ts:Date.now()});}
  save();render();scrollChat();}
 function quickAsk(id){const q=QUICKS.find(x=>x.id===id);if(!q)return;sendChat(q.text);}
 function onChatPhoto(inp){const f=inp.files&&inp.files[0];if(!f)return;
@@ -1368,8 +1445,8 @@ function setHTML(){const p=P();
  '<div class="card"><h2>💾 データ</h2>'+
  '<div class="muted">データはこの端末の中にだけ保存されます。ときどきバックアップしてね(写真・メモボードはふくまれません)。</div>'+
  '<button class="btn ghost sm" style="margin-top:10px" onclick="exportData()">バックアップを保存(JSON)</button>'+
- '<div class="muted" style="margin-top:8px;text-align:right">スタディきち v12</div></div>';}
-function saveAiName(){P().aiName=$('#ai-name').value.trim()||'そらとも';save();render();}
+ '<div class="muted" style="margin-top:8px;text-align:right">スタディきち v13</div></div>';}
+function saveAiName(){P().aiName=$('#ai-name').value.trim()||'そらとも';P().metaMt=Date.now();save();render();}
 /* --- メンバー編集(パパ・ママモード内) --- */
 function addProfile(){const id='p'+Date.now();
  S.profiles[id]=mkProfile('あたらしい人','🙂','小1');save();openParent();}
@@ -1377,14 +1454,16 @@ function delProfile(id){const pr=S.profiles[id];if(!pr)return;
  if(Object.keys(S.profiles).length<=1)return;
  if(!confirm('「'+pr.name+'」をけす?きろく・ポイント・券もぜんぶ消えて、もどせないよ!'))return;
  if(!confirm('ほんとうに いい?(さいごの確認)'))return;
+ S.deleted['pf-'+id]=Date.now(); // 墓標=マージで蘇らない
  delete S.profiles[id];
  if(S.currentProfile===id)S.currentProfile=Object.keys(S.profiles)[0];
  save();openParent();}
 /* --- きち編集(パパ・ママモード内) --- */
-function addBase(){S.bases.push({id:'b'+Date.now(),name:'あたらしい基地',em:'📍'});save();openParent();}
+function addBase(){S.bases.push({id:'b'+Date.now(),name:'あたらしい基地',em:'📍'});S.basesMt=Date.now();save();openParent();}
 function delBase(i){const b=S.bases[i];if(!b||S.bases.length<=1)return;
  if(!confirm('「'+b.name+'」をけす?(まえのきろくは のこるよ)'))return;
- S.bases.splice(i,1);save();openParent();}
+ S.deleted['base-'+b.id]=Date.now(); // 墓標
+ S.bases.splice(i,1);S.basesMt=Date.now();save();openParent();}
 function installApp(){if(!window.deferredPrompt)return;
  window.deferredPrompt.prompt();window.deferredPrompt=null;render();}
 /* --- 初期化 --- */
@@ -1406,7 +1485,7 @@ function parentGate(){
  '<button class="btn" style="margin-top:12px" onclick="checkPin()">ひらく</button>');}
 function setPin(){const v=$('#pin-new').value;
  if(!/^\d{4}$/.test(v)){alert('4けたの数字で!');return;}
- S.parentPin=v;save();closeModal();openParent();}
+ S.parentPin=v;S.pinMt=Date.now();save();closeModal();openParent();}
 function checkPin(){if($('#pin-in').value===S.parentPin){closeModal();openParent();}else alert('ちがうみたい…');}
 function openParent(){const p=P();const pend=p.sessions.filter(s=>s.status==='pending');
  openModal('<h3>👨 パパ・ママモード('+esc(p.name)+')</h3>'+
@@ -1484,8 +1563,17 @@ function openParent(){const p=P();const pend=p.sessions.filter(s=>s.status==='pe
  '<h2 style="margin-top:16px">🔐 暗証番号(PIN)の変更</h2>'+
  '<div class="row"><input id="pin-chg" type="password" inputmode="numeric" maxlength="4" placeholder="新しい4けたの数字">'+
  '<button class="btn blue sm" style="flex:0 0 90px" onclick="changePin()">変更</button></div>'+
- '<h2 style="margin-top:16px">💾 バックアップから復元</h2>'+
+ '<h2 style="margin-top:16px">⭐ ポイントちょうせい('+esc(p.name)+')</h2>'+
+ '<div class="muted">マージ後のズレなどを直す安全弁です。±どちらも可。お子さんの通帳に理由つきで記録されます。</div>'+
+ '<div class="row" style="margin-top:6px"><input id="adj-delta" type="number" inputmode="numeric" placeholder="例: 50 / -30" style="flex:0 0 110px">'+
+ '<input id="adj-memo" placeholder="理由(例:二重購入の補正)"></div>'+
+ '<button class="btn blue sm" style="margin-top:8px" onclick="adjustPoints()">反映</button>'+
+ '<h2 style="margin-top:16px">💾 バックアップから復元(上書き)</h2>'+
+ '<div class="muted">今のデータを消して、ファイルの内容に置き換えます。</div>'+
  '<input type="file" accept=".json" onchange="importData(this)">'+
+ '<h2 style="margin-top:16px">🔀 べつの端末のデータと合体(マージ)</h2>'+
+ '<div class="muted">べつの端末で保存したバックアップJSONを選ぶと、足し合わせのプレビューが出ます。同期完成までは「週1でJSONを送って合体」で複数端末運用ができます。</div>'+
+ '<input type="file" accept=".json" onchange="importMerge(this)">'+
  '<h2 style="margin-top:16px">🧨 初期化</h2>'+
  '<div class="muted">全メンバーのきろく・ポイント・券・会話・写真・PIN・APIキーをすべて消して、はじめての状態にもどします。</div>'+
  '<button class="btn ghost sm" style="margin-top:6px;color:#B04040" onclick="factoryReset()">初期設定にもどす</button>'+
@@ -1500,12 +1588,12 @@ function parentSessRow(s){const b=S.bases.find(x=>x.id===s.base)||{em:"📍",nam
  '<button class="btn blue sm" style="width:56px;flex:0 0 auto" onclick="judge(\''+s.id+'\',\'approved\')">承認</button>'+
  '<button class="btn ghost sm" style="width:60px;flex:0 0 auto;color:#B04040" onclick="judge(\''+s.id+'\',\'rejected\')">却下</button></div>';}
 function judge(id,st){const s=P().sessions.find(x=>x.id===id);if(!s)return;
- s.status=st;save();
+ s.status=st;s.mt=Date.now();save();
  const row=$('#ps-'+id);if(row)row.remove();}
-function judgeBonus(id,ok){const p=P();const i=p.bonusSpins.findIndex(b=>b.id===id);
- if(i<0)return;
- if(ok)p.bonusSpins[i].status='approved';
- else p.bonusSpins.splice(i,1);
+function judgeBonus(id,ok){const p=P();const b=p.bonusSpins.find(x=>x.id===id);
+ if(!b)return;
+ b.status=ok?'approved':'rejected'; // 削除でなく状態マーク(マージでの蘇り防止)
+ b.mt=Date.now();
  save();const row=$('#pb-'+id);if(row)row.remove();}
 /* --- 特別ミッションの管理(パパ・ママモード内) --- */
 function missionAdminRows(p){checkMissionExpiry(p);
@@ -1529,13 +1617,13 @@ function addMission(){const p=P();
  if(type==='date'&&!/^\d{4}-\d{2}-\d{2}$/.test(date)){alert('期限の日付を選んでください');return;}
  const ms={id:'ms'+Date.now()+Math.floor(Math.random()*1e4),title:t,pts:pts,
   due:{type:type,date:type==='date'?date:null},
-  status:'open',createdTs:Date.now(),claimedTs:null,approvedTs:null,ack:false};
+  status:'open',createdTs:Date.now(),claimedTs:null,approvedTs:null,ack:false,mt:Date.now()};
  if(type==='date'&&missionDueTs(ms)<Date.now()){alert('期限がすでに過ぎています。日付を確認してください');return;}
  (p.missions=p.missions||[]).push(ms);save();openParent();}
 function delMission(id){const p=P();const i=(p.missions||[]).findIndex(m=>m.id===id);
  if(i<0)return;
  if(!confirm('「'+p.missions[i].title+'」を削除しますか?'))return;
- p.missions.splice(i,1);save();openParent();}
+ p.missions.splice(i,1);p.deleted[id]=Date.now();save();openParent();} // 墓標=マージで蘇らない
 function missionDueModal(id){const p=P();const ms=(p.missions||[]).find(m=>m.id===id);if(!ms)return;
  const cur=(ms.due&&ms.due.type)||'today';
  openModal('<h3>🗓️ 期限の変更('+esc(ms.title)+')</h3>'+
@@ -1555,17 +1643,18 @@ function missionDueSave(id){const p=P();const ms=(p.missions||[]).find(m=>m.id==
  if(missionDueTs(trial)<Date.now()){alert('その期限はすでに過ぎています。別の期限にしてください');return;}
  ms.due=trial.due;ms.dueBaseTs=trial.dueBaseTs;
  if(ms.status==='expired'){ms.status='open';delete ms.expiredTs;}
+ ms.mt=Date.now();
  save();openParent();}
 function addBook(){const v=$('#book-new').value.trim();if(!v)return;
- P().books.push(v);save();openParent();}
-function delBook(i){P().books.splice(i,1);save();openParent();}
+ P().books.push(v);P().metaMt=Date.now();save();openParent();}
+function delBook(i){P().books.splice(i,1);P().metaMt=Date.now();save();openParent();}
 function addPool(){const v=$('#pool-new').value.trim();if(!v)return;
  const pr=Math.max(0,Number($('#pool-price').value)||500);
- P().pool.push({name:v,price:pr});save();openParent();}
-function delPool(i){P().pool.splice(i,1);save();openParent();}
+ P().pool.push({name:v,price:pr});P().metaMt=Date.now();save();openParent();}
+function delPool(i){P().pool.splice(i,1);P().metaMt=Date.now();save();openParent();}
 function changePin(){const v=$('#pin-chg').value;
  if(!/^\d{4}$/.test(v)){alert('4けたの数字で!');return;}
- S.parentPin=v;save();$('#pin-chg').value='';alert('PINを変更しました🔐');}
+ S.parentPin=v;S.pinMt=Date.now();save();$('#pin-chg').value='';alert('PINを変更しました🔐');}
 /* --- APIキー取得ガイド --- */
 function keyGuide(){openModal('<h3>🔑 AI相棒のカギ(APIキー)のもらいかた</h3>'+
  '<div class="muted" style="margin-bottom:10px">GoogleのAI「Gemini」の無料キーを使います。クレジットカード登録は不要で、個人利用なら無料枠で十分です。保護者の方が操作してください。</div>'+
@@ -1608,12 +1697,110 @@ function saveParent(){
  
  if($('#gm-key')) S.gemini.key=$('#gm-key').value.trim();
  if($('#gm-model')) S.gemini.model=$('#gm-model').value.trim()||'gemini-3.5-flash';
- 
+
+ // マージ用の更新時刻(フォームの値を全プロフィール・きちに書き込むため全部に打つ)
+ const _mt=Date.now();
+ Object.values(S.profiles).forEach(pr=>{pr.metaMt=_mt;});
+ S.basesMt=_mt;
+
  save();      // localStorageへ保存
  closeModal(); // モーダルを閉じる
  render();     // 画面を再描画
  alert('保存しました！これでお子様もAI相棒と話せますよ🤖✨');
 }
+/* ---------- 🔀マージ基盤(A-5) ----------
+   mergeState(a,b): a,bを破壊しない純関数。同期対象フィールドは可換(a,b入替で同結果)。
+   端末ローカル項目(gemini/tab/currentProfile/activeSession)は a(呼び出し側)の値を維持する */
+function unionDead(x,y){const o={};[x||{},y||{}].forEach(d=>Object.entries(d).forEach(([k,v])=>{if(!o[k]||v>o[k])o[k]=v;}));return o;}
+function pickDet(a,b){ // 同ID・同mtで内容が違うとき、引数順に依らず同じ方を選ぶ(JSON辞書順の大きい方)
+ return JSON.stringify(a)>=JSON.stringify(b)?a:b;}
+function unionById(x,y){const map={};const order=[];
+ (x||[]).concat(y||[]).forEach(e=>{if(!e||e.id==null)return;
+  const cur=map[e.id];
+  if(!cur){map[e.id]=e;order.push(e.id);}
+  else map[e.id]=pickDet(cur,e);}); // 同IDは1件に収束(例:同一セッションを2端末でスピン)
+ return order.map(id=>map[id]);}
+function mergeById(x,y,dead){ // 和集合+同IDはmt(更新時刻)が新しい方。墓標は除外
+ const map={};const order=[];
+ (x||[]).concat(y||[]).forEach(e=>{if(!e||e.id==null)return;
+  if(dead&&dead[e.id])return;
+  const cur=map[e.id];
+  if(!cur){map[e.id]=e;order.push(e.id);}
+  else if((e.mt||0)>(cur.mt||0))map[e.id]=e;
+  else if((e.mt||0)===(cur.mt||0))map[e.id]=pickDet(cur,e);});
+ return order.map(id=>map[id]);}
+function mergeWeeks(wa,wb){const out={};
+ new Set([...Object.keys(wa||{}),...Object.keys(wb||{})]).forEach(k=>{
+  const x=(wa||{})[k],y=(wb||{})[k];
+  if(!x||!y){out[k]=JSON.parse(JSON.stringify(x||y));return;}
+  const w={};
+  /* planブロック: planMt LWW(同値なら planTs で決着=旧データも決定的に) */
+  const px=(x.planMt||0)>(y.planMt||0)?x:(y.planMt||0)>(x.planMt||0)?y:((x.planTs||0)>=(y.planTs||0)?x:y);
+  w.subjects=(px.subjects||[]).slice();w.items=JSON.parse(JSON.stringify(px.items||[]));
+  w.range=px.range||'';w.goal=px.goal||'';w.planTs=px.planTs||null;
+  w.planMt=Math.max(x.planMt||0,y.planMt||0);
+  /* testブロック(reviewsの構成含む): testMt LWW */
+  const tx=(x.testMt||0)>(y.testMt||0)?x:(y.testMt||0)>(x.testMt||0)?y:(((x.test&&x.test.ts)||0)>=((y.test&&y.test.ts)||0)?x:y);
+  w.test=tx.test?JSON.parse(JSON.stringify(tx.test)):null;
+  w.reviews=JSON.parse(JSON.stringify(tx.reviews||[]));
+  w.testMt=Math.max(x.testMt||0,y.testMt||0);
+  /* reviewsのdoneは教科名でつき合わせOR(trueが勝ち) */
+  const dn={};[x,y].forEach(s=>(s.reviews||[]).forEach(r=>{if(r.done)dn[r.text]=1;}));
+  w.reviews.forEach(r=>{if(dn[r.text])r.done=true;});
+  /* granted: キー単位OR(ボーナス実体は決定的IDで重複しない) */
+  w.granted=Object.assign({},x.granted||{},y.granted||{});
+  /* report: tsが新しい方 */
+  const rx=x.report,ry=y.report;
+  w.report=(!rx)?(ry?JSON.parse(JSON.stringify(ry)):undefined):(!ry)?JSON.parse(JSON.stringify(rx)):
+   JSON.parse(JSON.stringify(((rx.ts||0)>=(ry.ts||0))?rx:ry));
+  if(w.report===undefined)delete w.report;
+  out[k]=w;});
+ return out;}
+function mergeProfile(pa,pb){
+ const dead=unionDead(pa.deleted,pb.deleted);
+ const newer=(pb.metaMt||0)>(pa.metaMt||0);
+ const p=JSON.parse(JSON.stringify(newer?pb:pa)); // スカラー群(name/em/grade/pin/aiName/examTarget/bigGoals/pool/books/theme)はmetaMt LWWで丸ごと
+ const A=JSON.parse(JSON.stringify(pa)),B=JSON.parse(JSON.stringify(pb));
+ p.metaMt=Math.max(pa.metaMt||0,pb.metaMt||0);
+ p.deleted=dead;
+ p.ownedThemes=[...new Set([...(A.ownedThemes||[]),...(B.ownedThemes||[])])]; // 例外: 購入を失わない和集合
+ const byId=(x,y)=>x.id>y.id?1:x.id<y.id?-1:0; // 同時刻はIDで決着(順序を引数順に依存させない)
+ p.sessions=mergeById(A.sessions,B.sessions,dead).sort((x,y)=>((y.startTs||0)-(x.startTs||0))||byId(x,y));
+ p.exams=mergeById(A.exams,B.exams,dead).sort((x,y)=>(exSortKey(x)-exSortKey(y))||byId(x,y));
+ p.tickets=mergeById(A.tickets,B.tickets,dead).sort((x,y)=>((x.ts||0)-(y.ts||0))||byId(x,y));
+ p.missions=mergeById(A.missions,B.missions,dead).sort((x,y)=>((x.createdTs||0)-(y.createdTs||0))||byId(x,y));
+ p.bonusSpins=mergeById(A.bonusSpins,B.bonusSpins,dead).sort(byId);
+ p.ledger=unionById(A.ledger,B.ledger).sort((x,y)=>((x.ts||0)-(y.ts||0))||byId(x,y)); // 追記専用
+ p.chat=unionById(A.chat,B.chat).sort((x,y)=>((x.ts||0)-(y.ts||0))||byId(x,y));
+ p.chatArchive=mergeById(A.chatArchive,B.chatArchive,dead).sort((x,y)=>((x.ts||0)-(y.ts||0))||byId(x,y));
+ p.weeks=mergeWeeks(A.weeks,B.weeks);
+ p.lastGoldenMilestone=Math.max(A.lastGoldenMilestone||0,B.lastGoldenMilestone||0);
+ recalcPoints(p); // 残高=台帳合計
+ return p;}
+function mergeState(a,b){
+ const m=JSON.parse(JSON.stringify(a));const B=JSON.parse(JSON.stringify(b));
+ m.deleted=unionDead(m.deleted,B.deleted);
+ /* きち: basesMtが新しい方の配列+墓標適用 */
+ const aw=(m.basesMt||0)>=(B.basesMt||0);
+ m.bases=(aw?m.bases:B.bases).filter(b2=>!m.deleted['base-'+b2.id]);
+ m.basesMt=Math.max(m.basesMt||0,B.basesMt||0);
+ /* 親PIN: pinMtが新しい方 */
+ if((B.pinMt||0)>(m.pinMt||0))m.parentPin=B.parentPin;
+ m.pinMt=Math.max(m.pinMt||0,B.pinMt||0);
+ /* profiles: IDの和集合+墓標。両方に居ればフィールド毎マージ */
+ m.profiles=m.profiles||{};
+ new Set([...Object.keys(m.profiles),...Object.keys(B.profiles||{})]).forEach(id=>{
+  if(m.deleted['pf-'+id]){delete m.profiles[id];return;}
+  const pa=m.profiles[id],pb=(B.profiles||{})[id];
+  if(!pa&&pb){m.profiles[id]=pb;return;}
+  if(pa&&pb)m.profiles[id]=mergeProfile(pa,pb);});
+ if(!m.profiles[m.currentProfile])m.currentProfile=Object.keys(m.profiles)[0];
+ /* gemini/tab/currentProfile/activeSession はローカル維持(mはaのコピーなのでそのまま) */
+ return m;}
+/* 同期対象の抽出(端末ローカル項目を除いた複製)。テストの可換性検証・将来のStep Bで使用 */
+function syncable(st){const c=JSON.parse(JSON.stringify(st));
+ delete c.gemini;delete c.tab;delete c.currentProfile;delete c.activeSession;return c;}
+
 /* ---------- バックアップ ---------- */
 function exportData(){const blob=new Blob([JSON.stringify(S,null,1)],{type:'application/json'});
  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
@@ -1625,6 +1812,39 @@ function importData(inp){const f=inp.files&&inp.files[0];if(!f)return;
    S=Object.assign(JSON.parse(JSON.stringify(DEFAULT_STATE)),s);migrate(S);save();closeModal();render();}}
   catch(e){alert('ファイルが読めませんでした');}};
  r.readAsText(f);}
+/* ---------- 🔀手動マージ(A-6): べつの端末のバックアップと合体 ---------- */
+let pendingMerge=null;
+function importMerge(inp){const f=inp.files&&inp.files[0];if(!f)return;
+ const r=new FileReader();
+ r.onload=()=>{try{const s=JSON.parse(r.result);if(!s.profiles)throw 0;
+  const inc=Object.assign(JSON.parse(JSON.stringify(DEFAULT_STATE)),s);
+  migrate(inc); // マージ入力にも同じmigrateを通す
+  const merged=mergeState(S,inc);
+  pendingMerge=merged;
+  const rows=Object.entries(merged.profiles).map(([id,mp])=>{
+   const cp=S.profiles[id];
+   const d=f2=>Math.max(0,(mp[f2]||[]).length-((cp&&cp[f2])||[]).length);
+   return '<div class="sess"><span class="em">'+mp.em+'</span><div class="info"><b>'+esc(mp.name)+'</b>'+(cp?'':' <span class="badge b-pend">新メンバー</span>')+'<br>'+
+    'セッション+'+d('sessions')+' ／ 模試+'+d('exams')+' ／ ミッション+'+d('missions')+' ／ 取引+'+d('ledger')+
+    '<br>ポイント '+(cp?cp.points:0)+' → <b>'+mp.points+'</b></div></div>';}).join('');
+  openModal('<h3>🔀 合体プレビュー</h3>'+
+   '<div class="muted">べつの端末のデータと足し合わせます(上書きしません)。同じ記録は1件にまとまり、消したものは復活しません。</div>'+
+   rows+
+   '<button class="btn" style="margin-top:12px" onclick="applyMerge()">合体する</button>'+
+   '<button class="btn ghost sm" style="margin-top:8px" onclick="pendingMerge=null;openParent()">← やめる</button>');
+ }catch(e){alert('ファイルが読めませんでした');}};
+ r.readAsText(f);inp.value='';}
+function applyMerge(){if(!pendingMerge)return;
+ S=pendingMerge;pendingMerge=null;
+ save();closeModal();render();
+ alert('合体しました🔀 ポイントは通帳(台帳)の合計に再計算されています');}
+/* ---------- ⭐親の手動ポイント調整(A-4) ---------- */
+function adjustPoints(){const p=P();
+ const d=Math.round(Number($('#adj-delta').value));
+ if(!d){alert('プラスかマイナスの数字を入れてください(例: 50 / -30)');return;}
+ const memo=$('#adj-memo').value.trim();
+ addLedger(p,d,'adjust',memo||null);
+ save();openParent();}
 
 /* ---------- PWA ---------- */
 if('serviceWorker' in navigator&&location.protocol==='https:'){

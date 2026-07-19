@@ -39,7 +39,7 @@ function boot(preState) {
 console.log('\n[1] 起動 + 🚀ロケットOP');
 {
   const { w, errors } = boot();
-  const St=w.eval('S');ok(St && St.v === 4, '起動できて S.v=4');
+  const St=w.eval('S');ok(St && St.v === 5, '起動できて S.v=5');
   ok(w.document.querySelector('#app').innerHTML.length > 100, 'ホームが描画される');
   ok(w.document.querySelector('#splash'), '起動直後にスプラッシュが表示される');
   await sleep(1600);
@@ -63,7 +63,7 @@ console.log('\n[2] migrate');
   // 旧v11相当: theme/ownedThemes/missions が無いプロフィール
   const old = {
     v: 3, currentProfile: 'sora',
-    profiles: { sora: { name: '空花', em: '🌸', grade: '小5', points: 120, sessions: [], exams: [], chat: [], pool: ['旧文字列券'], tickets: [], weeks: {}, bonusSpins: [], books: [] } },
+    profiles: { sora: { name: '空花', em: '🌸', grade: '小5', points: 120, sessions: [], exams: [{ name: '合不合', date: '2026-06-01', scores: { 総合: 55 } }], chat: [], pool: ['旧文字列券'], tickets: ['小籠包ディナー券'], weeks: {}, bonusSpins: [], books: [] } },
   };
   const { w, errors } = boot(old);
   const p = w.eval('S').profiles.sora;
@@ -72,6 +72,15 @@ console.log('\n[2] migrate');
   ok(Array.isArray(p.missions) && p.missions.length === 0, '旧データに missions=[] が付与される');
   eq(p.points, 120, '既存ポイントは壊れない');
   eq(p.pool[0].name, '旧文字列券', '既存migrate(券の値札化)も引き続き動く');
+  /* v13-a: 台帳・マージ基盤のmigrate */
+  eq(p.ledger.length, 1, '既存残高が繰越取引になる');
+  eq(p.ledger[0].id, 'tx-init-sora', '繰越取引は決定的ID(tx-init-<pid>)');
+  eq(p.ledger[0].delta, 120, '繰越額=旧残高');
+  ok(p.tickets[0] && p.tickets[0].name === '小籠包ディナー券' && p.tickets[0].id, '所持券がID付きオブジェクトに変換される');
+  ok(p.exams[0].id && p.exams[0].mt === 0, '模試にIDとmtが採番される');
+  ok(p.deleted && typeof p.deleted === 'object' && p.metaMt === 0, '墓標とmetaMtが初期化される');
+  const St2 = w.eval('S');
+  ok(St2.deleted && St2.basesMt === 0 && St2.pinMt === 0, 'S直下の墓標/basesMt/pinMtが初期化される');
   eq(errors.length, 0, 'runtime errors: none');
   // importData 経路と同じ migrate() を直接検証(所持外テーマの防御も)
   const st2 = { profiles: { x: { theme: 'night', ownedThemes: ['sky'], pool: [], weeks: {}, exams: [] } } };
@@ -205,9 +214,10 @@ console.log('\n[5] 既存回帰');
   eq(w.coefFor(50), 1.5, 'coefFor: 45分以上は×1.5');
   // ボーナス二重付与防止
   const wk = w.getWeek(p, '2026-7-18');
-  ok(w.grantBonus(p, wk, 'plan', 'テスト', false) === true, 'grantBonus 初回は付与される');
-  ok(w.grantBonus(p, wk, 'plan', 'テスト', false) === false, 'grantBonus 2回目は拒否(週grantedフラグ)');
+  ok(w.grantBonus(p, '2026-7-18', wk, 'plan', 'テスト', false) === true, 'grantBonus 初回は付与される');
+  ok(w.grantBonus(p, '2026-7-18', wk, 'plan', 'テスト', false) === false, 'grantBonus 2回目は拒否(週grantedフラグ)');
   eq(p.bonusSpins.length, 1, 'bonusSpinsは1件のみ');
+  eq(p.bonusSpins[0].id, 'bs-2026-7-18-plan', 'ボーナスIDは決定的(bs-<weekKey>-<kind>)');
   // セッション承認フロー
   p.sessions.unshift({ id: 'stest', base: 'home', plannedMin: 25, startTs: Date.now() - 25 * 60000, endTs: Date.now(), minutes: 25, subjects: ['算数'], memo: '', photoId: null, boards: [], focus: 'hi', status: 'pending', spin: null });
   w.judge('stest', 'approved');
@@ -222,6 +232,144 @@ console.log('\n[5] 既存回帰');
   await sleep(1800);
   ok(p.sessions[0].spin != null, 'スピン結果がセッションに記録される');
   ok(p.points >= ptsBefore, 'ポイントが減らない(加算のみ)');
+  ok(p.ledger.some(t => t.id === 'tx-spin-stest'), 'スピンが決定的IDで台帳に記録される');
+  eq(p.points, p.ledger.reduce((a, t) => a + t.delta, 0), '残高=台帳合計');
+  // ボーナス却下は削除でなく状態マーク
+  const wk2 = w.getWeek(p, '2026-7-11');
+  w.grantBonus(p, '2026-7-11', wk2, 'plan', 'テスト2', false);
+  w.judgeBonus('bs-2026-7-11-plan', 0);
+  const rej = p.bonusSpins.find(b => b.id === 'bs-2026-7-11-plan');
+  ok(rej && rej.status === 'rejected', '却下ボーナスはrejectedマークで残る(マージで蘇らない)');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+
+/* ---------- 7. 台帳・つうちょう・券(v13-a) ---------- */
+console.log('\n[7] ⭐台帳・つうちょう・券');
+{
+  const { w, errors } = boot();
+  const p = w.P();
+  w.addLedger(p, 500, 'adjust', 'テスト付与');
+  eq(p.points, 500, 'addLedgerで残高が動く');
+  ok(w.addLedger(p, 100, 'slot', null, 'tx-fixed-1') === true, '決定的IDの初回は追加される');
+  ok(w.addLedger(p, 100, 'slot', null, 'tx-fixed-1') === false, '同じ決定的IDは冪等(二重加算なし)');
+  eq(p.points, 600, '冪等チェック後の残高が正しい');
+  // 券の購入→使用(削除でなくusedTs)
+  w.buyTicket(2); // パパと30分あそぶ券 300pt
+  eq(p.points, 300, '券購入で減算される');
+  eq(p.tickets.length, 1, '券がオブジェクトで追加される');
+  ok(p.ledger.some(t => t.reason === 'shop' && t.delta === -300), '購入が台帳に記録される');
+  w.useTicket(p.tickets[0].id);
+  ok(p.tickets.length === 1 && p.tickets[0].usedTs, '「つかう」は削除でなく使用マーク(履歴が残る)');
+  w.eval('S').tab = 'home'; w.render();
+  ok(!w.document.querySelector('#app').innerHTML.includes('もっている券'), '使用済み券はホームに出ない');
+  // つうちょうモーダル
+  w.openLedger();
+  const mr = w.document.querySelector('#modal-root').innerHTML;
+  ok(mr.includes('ポイントつうちょう') && mr.includes('ちょうせい') && mr.includes('こうかんじょ'), 'つうちょうに取引が子ども語彙で並ぶ');
+  w.closeModal();
+  eq(p.points, p.ledger.reduce((a, t) => a + t.delta, 0), '残高=台帳合計');
+  // ソース照合: points直書きが addLedger 内の1箇所だけ
+  const writes = (html.match(/\.points\s*[+\-]=/g) || []).length;
+  eq(writes, 1, 'p.points直書きはaddLedger内の1箇所のみ(grep照合)');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+
+/* ---------- 8. mergeState シナリオ①〜⑩(A-5) ---------- */
+console.log('\n[8] 🔀mergeState');
+{
+  const { w, errors } = boot();
+  const clone = o => JSON.parse(JSON.stringify(o));
+  const base = JSON.parse(w.eval('JSON.stringify(S)'));
+  // 正規化stringify(キー順を揃えて比較)
+  const sortk = v => Array.isArray(v) ? v.map(sortk)
+    : (v && typeof v === 'object') ? Object.keys(v).sort().reduce((o, k) => (o[k] = sortk(v[k]), o), {}) : v;
+  const canon = o => JSON.stringify(sortk(o));
+  const mkSess = (id, over) => Object.assign({ id, base: 'home', plannedMin: 25, startTs: 1000, endTs: 2000, minutes: 25, subjects: ['算数'], memo: '', photoId: null, boards: [], focus: 'hi', status: 'pending', spin: null, mt: 10 }, over);
+
+  // ① 片方だけ新セッション
+  let A = clone(base), B = clone(base);
+  A.profiles.sora.sessions.unshift(mkSess('s1'));
+  let M = w.mergeState(A, B);
+  ok(M.profiles.sora.sessions.some(s => s.id === 's1'), '①片方だけの新セッションが入る');
+
+  // ② 同一セッションを両方で判定(mtが新しい方が勝つ)
+  A = clone(base); B = clone(base);
+  A.profiles.sora.sessions.unshift(mkSess('s2', { status: 'approved', mt: 200 }));
+  B.profiles.sora.sessions.unshift(mkSess('s2', { status: 'rejected', mt: 300 }));
+  M = w.mergeState(A, B);
+  eq(M.profiles.sora.sessions.find(s => s.id === 's2').status, 'rejected', '②同一セッションの判定はmtが新しい方(却下)が勝つ');
+
+  // ③ 同一セッションを両方でスピン → ledger 1件に収束
+  A = clone(base); B = clone(base);
+  A.profiles.sora.ledger.push({ id: 'tx-spin-s3', ts: 100, delta: 50, reason: 'slot', ref: null });
+  B.profiles.sora.ledger.push({ id: 'tx-spin-s3', ts: 110, delta: 30, reason: 'slot', ref: null });
+  M = w.mergeState(A, B);
+  eq(M.profiles.sora.ledger.filter(t => t.id === 'tx-spin-s3').length, 1, '③二重スピンは台帳1件に収束');
+  eq(M.profiles.sora.points, M.profiles.sora.ledger.reduce((a, t) => a + t.delta, 0), '③残高=台帳合計に再計算');
+
+  // ④ 片方で券使用+片方で新規獲得
+  A = clone(base); B = clone(base);
+  const t1 = { id: 't1', name: '券1', ts: 1, usedTs: null, mt: 1 };
+  A.profiles.sora.tickets = [Object.assign({}, t1, { usedTs: 500, mt: 500 })];
+  B.profiles.sora.tickets = [clone(t1), { id: 't2', name: '券2', ts: 2, usedTs: null, mt: 2 }];
+  M = w.mergeState(A, B);
+  ok(M.profiles.sora.tickets.find(t => t.id === 't1').usedTs === 500, '④使用済みマークが残る');
+  ok(M.profiles.sora.tickets.some(t => t.id === 't2'), '④新規獲得の券も残る');
+
+  // ⑤ 同週に別端末で作戦とバトル
+  A = clone(base); B = clone(base);
+  A.profiles.sora.weeks['2026-7-18'] = { subjects: ['算数'], items: [], range: 'P1〜5', goal: '', planTs: 111, planMt: 111, testMt: 0, test: null, reviews: [], granted: { plan: 1 } };
+  B.profiles.sora.weeks['2026-7-18'] = { subjects: [], items: [], range: '', goal: '', planTs: null, planMt: 0, testMt: 222, test: { total: 10, correct: 8, ts: 222, items: [{ subj: '算数', total: 10, correct: 8 }] }, reviews: [{ text: '算数', done: false }], granted: { test: 1 } };
+  M = w.mergeState(A, B);
+  const mw = M.profiles.sora.weeks['2026-7-18'];
+  ok(mw.planTs === 111 && mw.subjects[0] === '算数', '⑤作戦ブロックが残る');
+  ok(mw.test && mw.test.correct === 8, '⑤バトルブロックも残る');
+  ok(mw.granted.plan === 1 && mw.granted.test === 1, '⑤grantedはOR');
+
+  // ⑥ 両端末が独立に同種ボーナス発行 → 1件に収束
+  A = clone(base); B = clone(base);
+  A.profiles.sora.bonusSpins = [{ id: 'bs-2026-7-18-plan', reason: 'x', golden: false, status: 'pending', mt: 10 }];
+  B.profiles.sora.bonusSpins = [{ id: 'bs-2026-7-18-plan', reason: 'x', golden: false, status: 'approved', mt: 20 }];
+  M = w.mergeState(A, B);
+  eq(M.profiles.sora.bonusSpins.length, 1, '⑥同種ボーナスは1件に収束');
+  eq(M.profiles.sora.bonusSpins[0].status, 'approved', '⑥状態が進んだ方(mt新)が勝つ');
+
+  // ⑦ 片方で模試削除 → 蘇らない
+  A = clone(base); B = clone(base);
+  const ex = { id: 'ex1', name: '模試', date: '2026-06-01', scores: { 総合: 55 }, memo: '', mt: 1 };
+  A.profiles.sora.exams = []; A.profiles.sora.deleted = { ex1: 999 };
+  B.profiles.sora.exams = [clone(ex)];
+  M = w.mergeState(A, B);
+  eq(M.profiles.sora.exams.length, 0, '⑦削除した模試はマージで蘇らない(墓標)');
+
+  // ⑧ A端末で−800購入 + B端末で+50獲得
+  A = clone(base); B = clone(base);
+  A.profiles.sora.ledger.push({ id: 'tx-shop-a', ts: 1, delta: -800, reason: 'shop', ref: '大物' });
+  B.profiles.sora.ledger.push({ id: 'tx-spin-b', ts: 2, delta: 50, reason: 'slot', ref: null });
+  M = w.mergeState(A, B);
+  eq(M.profiles.sora.points, -750, '⑧残高が台帳合計と一致(マイナスも台帳が真実)');
+
+  // ⑨ 可換性 / ⑩ 冪等性(同期対象フィールドで比較)
+  A = clone(base); B = clone(base);
+  A.profiles.sora.sessions.unshift(mkSess('s9', { mt: 100 }));
+  A.profiles.sora.ledger.push({ id: 'tx-spin-s9', ts: 5, delta: 50, reason: 'slot', ref: null });
+  A.profiles.sora.deleted = { old1: 123 };
+  B.profiles.sora.sessions.unshift(mkSess('s9b', { mt: 90 }));
+  B.profiles.sora.ledger.push({ id: 'tx-spin-s9', ts: 6, delta: 30, reason: 'slot', ref: null });
+  B.profiles.fuka.missions.push({ id: 'ms9', title: 'm', pts: 10, due: { type: 'today', date: null }, status: 'open', createdTs: 1, claimedTs: null, approvedTs: null, ack: false, mt: 1 });
+  B.basesMt = 50; B.bases = base.bases.slice(0, 4);
+  const M1 = w.mergeState(A, B), M2 = w.mergeState(B, A);
+  eq(canon(w.syncable(M1)), canon(w.syncable(M2)), '⑨可換性: merge(a,b)≡merge(b,a)');
+  const M3 = w.mergeState(M1, A);
+  eq(canon(w.syncable(M3)), canon(w.syncable(M1)), '⑩冪等性: merge(m,a)≡m');
+
+  // 端末ローカル項目は呼び出し側を維持
+  A = clone(base); B = clone(base);
+  A.gemini = { key: 'LOCAL', model: 'm1' }; B.gemini = { key: 'OTHER', model: 'm2' }; B.tab = 'ai';
+  M = w.mergeState(A, B);
+  ok(M.gemini.key === 'LOCAL' && M.tab === A.tab, 'gemini/tab等はマージ対象外(ローカル維持)');
   eq(errors.length, 0, 'runtime errors: none');
   w.close();
 }
