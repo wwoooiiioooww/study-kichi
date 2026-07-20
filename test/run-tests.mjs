@@ -602,6 +602,51 @@ console.log('\n[12] 🔒saveParent×同期');
   w.close();
 }
 
+/* ---------- 13. 🔐親PINの同期除外 + 📷写真プレースホルダ ---------- */
+console.log('\n[13] 🔐PIN同期除外 + 📷写真');
+{
+  // 親PINはクラウドに載せない・受け取っても適用しない(端末ローカル)
+  const { w, errors } = boot(undefined, { studykichi_guide: '1' });
+  w.FB_CONFIG_TEST = { apiKey: 'test', databaseURL: 'https://test' };
+  const mock = {
+    node: null, pushes: 0,
+    start(code, cb) { this.onRemote = cb; return Promise.resolve(); },
+    stop() {},
+    push(fn) { this.pushes++; this.node = fn(this.node); return Promise.resolve(); },
+  };
+  w.setSyncTransport(mock);
+  w.eval('S').parentPin = '7777'; w.eval('S').pinMt = 111;
+  w.syncStart();
+  await sleep(120);
+  ok(mock.node && !mock.node.state.includes('parentPin') && !mock.node.state.includes('7777'), '親PINはクラウドstateに含まれない');
+  w.closeModal();
+  // 旧バージョンのクラウドに親PINが残っていても取り込まない
+  const rem = JSON.parse(mock.node.state);
+  rem.parentPin = '9999'; rem.pinMt = 9999999999999;
+  mock.onRemote({ state: w.stableStr(rem), meta: { rev: 2, updatedAt: Date.now() } });
+  await sleep(50);
+  eq(w.eval('S').parentPin, '7777', '旧クラウドの親PINを受信してもこの端末のPINを維持');
+  // syncableの除外リスト(コード照合)
+  ok(w.syncable(w.eval('S')).parentPin === undefined, 'syncable()がparentPinを除外する');
+  ok(w.syncable(w.eval('S')).pinMt === undefined, 'syncable()がpinMtを除外する');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  // 写真がこの端末に無いとき(他端末で撮影/復元直後)はプレースホルダ表示
+  const { w, errors } = boot(undefined, { studykichi_guide: '1' });
+  const p = w.P();
+  p.sessions.unshift({ id: 'sph', base: 'home', plannedMin: 25, startTs: 1, endTs: 2, minutes: 25, subjects: ['算数'], memo: '', photoId: 'p-not-here', boards: ['m-not-here'], focus: 'hi', status: 'approved', spin: null, mt: 1 });
+  w.eval('S').tab = 'rec'; w.render();
+  await sleep(120);
+  const misses = w.document.querySelectorAll('.thumb-miss');
+  eq(misses.length, 2, '写真・計算メモの両方がプレースホルダになる(こわれた画像を出さない)');
+  eq(misses[0].textContent, '📷', 'プレースホルダは📷マーク');
+  ok(!w.document.querySelector('img[data-photo]'), 'src無しの壊れたimgが残らない');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+
 /* ---------- 6. リリース規約(6ファイル構成 + バージョン同時更新) ---------- */
 console.log('\n[6] リリース規約');
 {

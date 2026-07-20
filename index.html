@@ -133,6 +133,7 @@ label{font-size:12px;font-weight:700;color:var(--ink-soft);display:block;margin:
 .b-ok{background:#DDF3E6;color:#2C7A4E}
 .b-ng{background:#FBE1E1;color:#B04040}
 .thumb{width:42px;height:42px;object-fit:cover;border-radius:10px;cursor:pointer;border:2px solid var(--line)}
+.thumb-miss{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;background:var(--sky-deep);border-style:dashed;opacity:.8;font-size:17px}
 /* ---------- goals ---------- */
 .goal-card{background:linear-gradient(135deg,#FFF6E3,#FFEAC2);border:2px solid #FFD98A;border-radius:var(--r);padding:14px;margin-bottom:12px}
 .goal-card .rw{font-family:var(--disp);font-weight:800;font-size:15px;color:#9A6B00}
@@ -1023,7 +1024,14 @@ function sessRow(s){const b=S.bases.find(x=>x.id===s.base)||{em:"📍",name:"(�
  '</div>';}
 async function loadThumbs(){
  for(const img of document.querySelectorAll('img[data-photo]')){
-  const d=await getPhoto(img.dataset.photo);if(d)img.src=d;}}
+  const d=await getPhoto(img.dataset.photo).catch(()=>null);
+  if(d){img.src=d;continue;}
+  /* 写真はIndexedDB=端末ローカル(同期・バックアップJSONに入らない)。他端末では壊れた画像に見えて
+     バグと誤解されるため、説明つきプレースホルダに置きかえる */
+  const ph=document.createElement('span');ph.className='thumb thumb-miss';ph.textContent='📷';
+  ph.title='しゃしんは とった たんまつで みられるよ';
+  ph.onclick=()=>alert('この しゃしんは、とった たんまつの中に ほぞんされているよ📷\n(しゃしんは かぞく同期や バックアップには はいらないんだ)');
+  img.replaceWith(ph);}}
 
 /* ---------- もくひょう(教科別・編集可) ---------- */
 const PLAN_SUBJ=['算数','国語','理科','社会','英語'];
@@ -1881,7 +1889,9 @@ function mergeState(a,b){
  return m;}
 /* 同期対象の抽出(端末ローカル項目を除いた複製) */
 function syncable(st){const c=JSON.parse(JSON.stringify(st));
- delete c.gemini;delete c.tab;delete c.currentProfile;delete c.activeSession;return c;}
+ delete c.gemini;delete c.tab;delete c.currentProfile;delete c.activeSession;
+ delete c.parentPin;delete c.pinMt; // 🔐親PINは端末ローカル(かぞく同期に載せない)。バックアップJSONには従来どおり含まれる
+ return c;}
 
 /* ---------- ☁️かぞく同期(v13-b / Firebase Realtime Database + 家族コード) ----------
    クラウドには stableStr(syncable(S)) のJSON文字列を丸ごと置く(RTDBのnull削除の影響を受けない)。
@@ -1960,6 +1970,7 @@ function syncMergeRemoteStr(remoteStr){ // クラウド現在値とローカル�
  if(!remoteStr)return stableStr(local);
  try{const inc=Object.assign(JSON.parse(JSON.stringify(DEFAULT_STATE)),JSON.parse(remoteStr));
   migrate(inc); // クラウド側が旧スキーマでも安全に
+  delete inc.parentPin;delete inc.pinMt; // 旧バージョンのクラウドに残った親PINも取り込まない
   return stableStr(syncable(mergeState(inc,local)));
  }catch(e){return stableStr(local);}}
 function syncOnRemote(node){ // Pull: onValue受信
@@ -1969,6 +1980,7 @@ function syncOnRemote(node){ // Pull: onValue受信
  if(!rem||!rem.profiles)return;
  const inc=Object.assign(JSON.parse(JSON.stringify(DEFAULT_STATE)),rem);
  migrate(inc);
+ delete inc.parentPin;delete inc.pinMt; // 旧バージョンのクラウドに残った親PINも取り込まない(この端末のPINを維持)
  const merged=mergeState(S,inc); // APIキー等の端末ローカル項目は維持される
  const mergedStr=stableStr(syncable(merged));
  const curStr=stableStr(syncable(S));
@@ -2014,7 +2026,7 @@ function syncSectionHTML(){
  return '<div id="sync-status" class="muted">'+syncStatusLine()+'</div>'+
   '<button class="btn ghost sm" style="margin-top:8px" onclick="syncShowCode()">🔑 かぞくコードを見る(端末追加用)</button>'+
   '<button class="btn ghost sm" style="margin-top:8px;color:#B04040" onclick="syncDisconnect()">切断する(この端末のデータは残ります)</button>'+
-  '<div class="muted" style="margin-top:8px">※写真・計算メモの画像は撮った端末の中だけにあるため、他の端末ではサムネイルが出ません(記録じたいは同期されます)。</div>';}
+  '<div class="muted" style="margin-top:8px">※写真・計算メモの画像は撮った端末の中だけにあるため、他の端末では📷マークになります(記録じたいは同期されます)。<br>🔐 パパ・ママモードのPINは同期されません。端末ごとに設定してください(お子さんのPINは同期されます)。</div>';}
 function syncStart(){
  if(!confirm('この端末のデータをクラウドに置いて、かぞく同期をはじめますか?'))return;
  sync.code=genFamilyCode();syncSave();syncConnect();openParent();
