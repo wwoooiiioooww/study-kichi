@@ -544,6 +544,64 @@ console.log('\n[11] 🎈v15');
   w.close();
 }
 
+/* ---------- 12. saveParent: 未編集のmetaMt/basesMtを進めない(家族同期の上書き事故・再発防止) ----------
+   実障害: まとめて保存が全プロフィール+きちに一律スタンプ→未編集端末のデフォルト値がLWWで本物に勝ち、
+   名前・きち・ごほうび・目標・テキストが上書きされた */
+console.log('\n[12] 🔒saveParent×同期');
+{
+  const { w, errors } = boot(undefined, { studykichi_guide: '1' });
+  const St = w.eval('S');
+  St.profiles.sora.metaMt = 111; St.profiles.fuka.metaMt = 222; St.basesMt = 333;
+  // 何も編集せず「まとめて保存」
+  w.openParent();
+  w.saveParent();
+  eq(St.profiles.sora.metaMt, 111, '未編集: soraのmetaMtが進まない');
+  eq(St.profiles.fuka.metaMt, 222, '未編集: fukaのmetaMtが進まない');
+  eq(St.basesMt, 333, '未編集: basesMtが進まない');
+  // soraの名前だけ編集
+  w.openParent();
+  w.document.querySelector('[data-pf-nm="sora"]').value = '空花';
+  w.saveParent();
+  ok(St.profiles.sora.metaMt > 111, '編集したsoraのmetaMtは進む');
+  eq(St.profiles.fuka.metaMt, 222, '編集していないfukaのmetaMtは進まない');
+  eq(St.basesMt, 333, 'きち未編集ならbasesMtは進まない');
+  // きちの名前だけ編集
+  w.openParent();
+  w.document.querySelector('[data-bs-nm="0"]').value = 'ソリッドスクエア';
+  w.saveParent();
+  ok(St.basesMt > 333, 'きちを編集したらbasesMtが進む');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  // 事故シナリオ直撃: 未編集端末(全部デフォルト・mt0) × 実データ端末(旧v3移行相当・mt0)の同点マージ
+  const { w, errors } = boot(undefined, { studykichi_guide: '1' });
+  const clone = o => JSON.parse(JSON.stringify(o));
+  const sortk = v => Array.isArray(v) ? v.map(sortk)
+    : (v && typeof v === 'object') ? Object.keys(v).sort().reduce((o, k) => (o[k] = sortk(v[k]), o), {}) : v;
+  const canon = o => JSON.stringify(sortk(o));
+  const base = JSON.parse(w.eval('JSON.stringify(S)'));
+  const fresh = clone(base); // デフォルトのまま・metaMt/basesMt/pinMt=0(修正後はもうスタンプされない)
+  const real = clone(base);  // v3バックアップをmigrateした直後の形(実データだがmt=0)
+  real.parentPin = '1975';
+  real.profiles.sora.name = '空花';
+  real.profiles.sora.books = ['基本トレーニング計算📏'];
+  real.profiles.sora.pool = [{ name: '小籠包ディナー券 🥟', price: 800 }];
+  real.bases = [{ id: 'solid', name: 'ソリッドスクエア', em: '🏢' }];
+  const M1 = w.mergeState(clone(fresh), clone(real));
+  const M2 = w.mergeState(clone(real), clone(fresh));
+  eq(M1.profiles.sora.name, '空花', 'mt同点: デフォルトの名前が本物に負ける');
+  eq(M1.profiles.sora.books[0], '基本トレーニング計算📏', 'mt同点: テキストが守られる');
+  eq(M1.profiles.sora.pool[0].name, '小籠包ディナー券 🥟', 'mt同点: ごほうび券カタログが守られる');
+  eq(M1.bases[0].name, 'ソリッドスクエア', 'mt同点: デフォルトのきちが本物に負ける');
+  eq(M1.parentPin, '1975', 'mt同点: 未設定PIN(null)が設定済みPINに負ける');
+  eq(canon(w.syncable(M1)), canon(w.syncable(M2)), 'mt同点マージも可換(push無限ループしない)');
+  const M3 = w.mergeState(clone(M1), clone(real));
+  eq(canon(w.syncable(M3)), canon(w.syncable(M1)), 'mt同点マージも冪等');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+
 /* ---------- 6. リリース規約(6ファイル構成 + バージョン同時更新) ---------- */
 console.log('\n[6] リリース規約');
 {

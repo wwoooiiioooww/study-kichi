@@ -247,7 +247,7 @@ nav button.on .i{transform:scale(1.2)}
    データはこの端末の中だけに保存されます（localStorage / IndexedDB）
    ============================================================ */
 /* ---------- マスタ ---------- */
-const APP_VER='v15'; // せってい表示とフィードバックの共通バージョン。sw.js の CACHE と同時に上げること
+const APP_VER='v16'; // せってい表示とフィードバックの共通バージョン。sw.js の CACHE と同時に上げること
 /* 汎用サンプル(配布用)。既存端末の保存済みデータは上書きされない */
 const DEFAULT_BASES=[
  {id:'lib',name:'としょかん',em:'📚'},
@@ -1725,9 +1725,17 @@ function keyGuide(){openModal('<h3>🔑 AI相棒のカギ(APIキー)のもらい
  '<span class="btn blue sm" style="display:block;text-align:center">Google AI Studio をひらく ↗</span></a>'+
  '<div class="muted" style="margin-top:10px">⚠️ 注意:キーは<b>お子さんには教えず</b>、他の人と共有しないでください。キーはこの端末の中にだけ保存されます。無料枠を超える心配はほぼありませんが、Googleアカウントの管理画面からいつでもキーを削除(無効化)できます。</div>'+
  '<button class="btn ghost sm" style="margin-top:12px" onclick="closeModal();openParent()">← パパ・ママモードにもどる</button>');}
+/* metaMt(LWW)で丸ごと運ばれるスカラー群のスナップショット(mergeProfileの対象と一致させること)。
+   未編集プロフィールのmetaMtを進めると、家族同期で未編集側(デフォルト値のまま等)が本物のデータにLWWで勝ち
+   名前・きち・ごほうび・目標・テキストを上書きする事故になる(v15で実際に発生) */
+function metaSnap(pr){return stableStr({name:pr.name,em:pr.em,grade:pr.grade,pin:pr.pin,aiName:pr.aiName,
+ examTarget:pr.examTarget,bigGoals:pr.bigGoals,pool:pr.pool,books:pr.books,theme:pr.theme});}
 function saveParent(){
  const p=P();
- 
+ // 保存前スナップショット(実際に変わったプロフィール・きちだけmetaMt/basesMtを打つため)
+ const _snap={};Object.entries(S.profiles).forEach(([id,pr])=>{_snap[id]=metaSnap(pr);});
+ const _bSnap=stableStr(S.bases);
+
  // 入力された値を確実に取得して状態(S)に保存
  if($('#tgt-label')) p.examTarget.label=$('#tgt-label').value.trim();
  if($('#tgt-value')) p.examTarget.value=$('#tgt-value').value.trim();
@@ -1757,10 +1765,10 @@ function saveParent(){
  if($('#gm-key')) S.gemini.key=$('#gm-key').value.trim();
  if($('#gm-model')) S.gemini.model=$('#gm-model').value.trim()||'gemini-3.5-flash';
 
- // マージ用の更新時刻(フォームの値を全プロフィール・きちに書き込むため全部に打つ)
+ // マージ用の更新時刻: 実際に内容が変わったものにだけ打つ(未編集の一律スタンプ禁止→metaSnapのコメント参照)
  const _mt=Date.now();
- Object.values(S.profiles).forEach(pr=>{pr.metaMt=_mt;});
- S.basesMt=_mt;
+ Object.entries(S.profiles).forEach(([id,pr])=>{if(metaSnap(pr)!==_snap[id])pr.metaMt=_mt;});
+ if(stableStr(S.bases)!==_bSnap)S.basesMt=_mt;
 
  save();      // localStorageへ保存
  closeModal(); // モーダルを閉じる
@@ -1815,10 +1823,18 @@ function mergeWeeks(wa,wb){const out={};
   if(w.report===undefined)delete w.report;
   out[k]=w;});
  return out;}
-function mergeProfile(pa,pb){
+function isDefaultMeta(id,pr){const d=DEFAULT_STATE.profiles[id];return !!d&&metaSnap(pr)===metaSnap(d);}
+function metaSrc(id,pa,pb){ /* スカラー群の採用元: metaMt LWW。同点(旧データ移行直後や未編集は0同士)は
+   「工場出荷デフォルトのままの側」を負けさせ、決まらなければ内容の辞書順。同点を引数順で決めると
+   可換性が壊れ、2端末が互いに送り返し続けるpush無限ループになる */
+ const ma=pa.metaMt||0,mb=pb.metaMt||0;
+ if(mb>ma)return pb; if(ma>mb)return pa;
+ const da=isDefaultMeta(id,pa),db=isDefaultMeta(id,pb);
+ if(da&&!db)return pb; if(db&&!da)return pa;
+ return metaSnap(pa)>=metaSnap(pb)?pa:pb;}
+function mergeProfile(pa,pb,id){
  const dead=unionDead(pa.deleted,pb.deleted);
- const newer=(pb.metaMt||0)>(pa.metaMt||0);
- const p=JSON.parse(JSON.stringify(newer?pb:pa)); // スカラー群(name/em/grade/pin/aiName/examTarget/bigGoals/pool/books/theme)はmetaMt LWWで丸ごと
+ const p=JSON.parse(JSON.stringify(metaSrc(id,pa,pb))); // スカラー群(name/em/grade/pin/aiName/examTarget/bigGoals/pool/books/theme)はmetaMt LWWで丸ごと
  const A=JSON.parse(JSON.stringify(pa)),B=JSON.parse(JSON.stringify(pb));
  p.metaMt=Math.max(pa.metaMt||0,pb.metaMt||0);
  p.deleted=dead;
@@ -1839,12 +1855,19 @@ function mergeProfile(pa,pb){
 function mergeState(a,b){
  const m=JSON.parse(JSON.stringify(a));const B=JSON.parse(JSON.stringify(b));
  m.deleted=unionDead(m.deleted,B.deleted);
- /* きち: basesMtが新しい方の配列+墓標適用 */
- const aw=(m.basesMt||0)>=(B.basesMt||0);
- m.bases=(aw?m.bases:B.bases).filter(b2=>!m.deleted['base-'+b2.id]);
+ /* きち: basesMtが新しい方の配列+墓標適用。同点はデフォルトのままの側が負け→内容の辞書順(可換) */
+ const _ba=m.basesMt||0,_bb=B.basesMt||0;let _bs;
+ if(_ba>_bb)_bs=m.bases; else if(_bb>_ba)_bs=B.bases;
+ else{const D=stableStr(DEFAULT_BASES),sa=stableStr(m.bases),sb=stableStr(B.bases);
+  _bs=(sa===D&&sb!==D)?B.bases:(sb===D&&sa!==D)?m.bases:(sa>=sb?m.bases:B.bases);}
+ m.bases=_bs.filter(b2=>!m.deleted['base-'+b2.id]);
  m.basesMt=Math.max(m.basesMt||0,B.basesMt||0);
- /* 親PIN: pinMtが新しい方 */
- if((B.pinMt||0)>(m.pinMt||0))m.parentPin=B.parentPin;
+ /* 親PIN: pinMtが新しい方。同点は未設定(null)が負け→辞書順(可換) */
+ const _pma=m.pinMt||0,_pmb=B.pinMt||0;
+ if(_pmb>_pma)m.parentPin=B.parentPin;
+ else if(_pmb===_pma&&(m.parentPin||'')!==(B.parentPin||''))
+  m.parentPin=(m.parentPin==null)?B.parentPin:(B.parentPin==null)?m.parentPin:
+   ((m.parentPin>=B.parentPin)?m.parentPin:B.parentPin);
  m.pinMt=Math.max(m.pinMt||0,B.pinMt||0);
  /* profiles: IDの和集合+墓標。両方に居ればフィールド毎マージ */
  m.profiles=m.profiles||{};
@@ -1852,7 +1875,7 @@ function mergeState(a,b){
   if(m.deleted['pf-'+id]){delete m.profiles[id];return;}
   const pa=m.profiles[id],pb=(B.profiles||{})[id];
   if(!pa&&pb){m.profiles[id]=pb;return;}
-  if(pa&&pb)m.profiles[id]=mergeProfile(pa,pb);});
+  if(pa&&pb)m.profiles[id]=mergeProfile(pa,pb,id);});
  if(!m.profiles[m.currentProfile])m.currentProfile=Object.keys(m.profiles)[0];
  /* gemini/tab/currentProfile/activeSession はローカル維持(mはaのコピーなのでそのまま) */
  return m;}
