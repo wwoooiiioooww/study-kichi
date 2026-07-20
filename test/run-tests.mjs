@@ -544,6 +544,109 @@ console.log('\n[11] 🎈v15');
   w.close();
 }
 
+/* ---------- 12. saveParent: 未編集のmetaMt/basesMtを進めない(家族同期の上書き事故・再発防止) ----------
+   実障害: まとめて保存が全プロフィール+きちに一律スタンプ→未編集端末のデフォルト値がLWWで本物に勝ち、
+   名前・きち・ごほうび・目標・テキストが上書きされた */
+console.log('\n[12] 🔒saveParent×同期');
+{
+  const { w, errors } = boot(undefined, { studykichi_guide: '1' });
+  const St = w.eval('S');
+  St.profiles.sora.metaMt = 111; St.profiles.fuka.metaMt = 222; St.basesMt = 333;
+  // 何も編集せず「まとめて保存」
+  w.openParent();
+  w.saveParent();
+  eq(St.profiles.sora.metaMt, 111, '未編集: soraのmetaMtが進まない');
+  eq(St.profiles.fuka.metaMt, 222, '未編集: fukaのmetaMtが進まない');
+  eq(St.basesMt, 333, '未編集: basesMtが進まない');
+  // soraの名前だけ編集
+  w.openParent();
+  w.document.querySelector('[data-pf-nm="sora"]').value = '空花';
+  w.saveParent();
+  ok(St.profiles.sora.metaMt > 111, '編集したsoraのmetaMtは進む');
+  eq(St.profiles.fuka.metaMt, 222, '編集していないfukaのmetaMtは進まない');
+  eq(St.basesMt, 333, 'きち未編集ならbasesMtは進まない');
+  // きちの名前だけ編集
+  w.openParent();
+  w.document.querySelector('[data-bs-nm="0"]').value = 'ソリッドスクエア';
+  w.saveParent();
+  ok(St.basesMt > 333, 'きちを編集したらbasesMtが進む');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  // 事故シナリオ直撃: 未編集端末(全部デフォルト・mt0) × 実データ端末(旧v3移行相当・mt0)の同点マージ
+  const { w, errors } = boot(undefined, { studykichi_guide: '1' });
+  const clone = o => JSON.parse(JSON.stringify(o));
+  const sortk = v => Array.isArray(v) ? v.map(sortk)
+    : (v && typeof v === 'object') ? Object.keys(v).sort().reduce((o, k) => (o[k] = sortk(v[k]), o), {}) : v;
+  const canon = o => JSON.stringify(sortk(o));
+  const base = JSON.parse(w.eval('JSON.stringify(S)'));
+  const fresh = clone(base); // デフォルトのまま・metaMt/basesMt/pinMt=0(修正後はもうスタンプされない)
+  const real = clone(base);  // v3バックアップをmigrateした直後の形(実データだがmt=0)
+  real.parentPin = '1975';
+  real.profiles.sora.name = '空花';
+  real.profiles.sora.books = ['基本トレーニング計算📏'];
+  real.profiles.sora.pool = [{ name: '小籠包ディナー券 🥟', price: 800 }];
+  real.bases = [{ id: 'solid', name: 'ソリッドスクエア', em: '🏢' }];
+  const M1 = w.mergeState(clone(fresh), clone(real));
+  const M2 = w.mergeState(clone(real), clone(fresh));
+  eq(M1.profiles.sora.name, '空花', 'mt同点: デフォルトの名前が本物に負ける');
+  eq(M1.profiles.sora.books[0], '基本トレーニング計算📏', 'mt同点: テキストが守られる');
+  eq(M1.profiles.sora.pool[0].name, '小籠包ディナー券 🥟', 'mt同点: ごほうび券カタログが守られる');
+  eq(M1.bases[0].name, 'ソリッドスクエア', 'mt同点: デフォルトのきちが本物に負ける');
+  eq(M1.parentPin, '1975', 'mt同点: 未設定PIN(null)が設定済みPINに負ける');
+  eq(canon(w.syncable(M1)), canon(w.syncable(M2)), 'mt同点マージも可換(push無限ループしない)');
+  const M3 = w.mergeState(clone(M1), clone(real));
+  eq(canon(w.syncable(M3)), canon(w.syncable(M1)), 'mt同点マージも冪等');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+
+/* ---------- 13. 🔐親PINの同期除外 + 📷写真プレースホルダ ---------- */
+console.log('\n[13] 🔐PIN同期除外 + 📷写真');
+{
+  // 親PINはクラウドに載せない・受け取っても適用しない(端末ローカル)
+  const { w, errors } = boot(undefined, { studykichi_guide: '1' });
+  w.FB_CONFIG_TEST = { apiKey: 'test', databaseURL: 'https://test' };
+  const mock = {
+    node: null, pushes: 0,
+    start(code, cb) { this.onRemote = cb; return Promise.resolve(); },
+    stop() {},
+    push(fn) { this.pushes++; this.node = fn(this.node); return Promise.resolve(); },
+  };
+  w.setSyncTransport(mock);
+  w.eval('S').parentPin = '7777'; w.eval('S').pinMt = 111;
+  w.syncStart();
+  await sleep(120);
+  ok(mock.node && !mock.node.state.includes('parentPin') && !mock.node.state.includes('7777'), '親PINはクラウドstateに含まれない');
+  w.closeModal();
+  // 旧バージョンのクラウドに親PINが残っていても取り込まない
+  const rem = JSON.parse(mock.node.state);
+  rem.parentPin = '9999'; rem.pinMt = 9999999999999;
+  mock.onRemote({ state: w.stableStr(rem), meta: { rev: 2, updatedAt: Date.now() } });
+  await sleep(50);
+  eq(w.eval('S').parentPin, '7777', '旧クラウドの親PINを受信してもこの端末のPINを維持');
+  // syncableの除外リスト(コード照合)
+  ok(w.syncable(w.eval('S')).parentPin === undefined, 'syncable()がparentPinを除外する');
+  ok(w.syncable(w.eval('S')).pinMt === undefined, 'syncable()がpinMtを除外する');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  // 写真がこの端末に無いとき(他端末で撮影/復元直後)はプレースホルダ表示
+  const { w, errors } = boot(undefined, { studykichi_guide: '1' });
+  const p = w.P();
+  p.sessions.unshift({ id: 'sph', base: 'home', plannedMin: 25, startTs: 1, endTs: 2, minutes: 25, subjects: ['算数'], memo: '', photoId: 'p-not-here', boards: ['m-not-here'], focus: 'hi', status: 'approved', spin: null, mt: 1 });
+  w.eval('S').tab = 'rec'; w.render();
+  await sleep(120);
+  const misses = w.document.querySelectorAll('.thumb-miss');
+  eq(misses.length, 2, '写真・計算メモの両方がプレースホルダになる(こわれた画像を出さない)');
+  eq(misses[0].textContent, '📷', 'プレースホルダは📷マーク');
+  ok(!w.document.querySelector('img[data-photo]'), 'src無しの壊れたimgが残らない');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+
 /* ---------- 6. リリース規約(6ファイル構成 + バージョン同時更新) ---------- */
 console.log('\n[6] リリース規約');
 {
