@@ -647,6 +647,84 @@ console.log('\n[13] 🔐PIN同期除外 + 📷写真');
   w.close();
 }
 
+/* ---------- 14. 👨親モードの連続入力(折りたたみ・カーソル維持) ----------
+   実障害: 追加のたびにopenParent()でモーダルを作り直すため、開いていたセクションが閉じ
+   カーソルも外れて、テキストや券を続けて登録できなかった */
+console.log('\n[14] 👨親モード 連続入力');
+{
+  const { w, errors } = boot(undefined, { studykichi_guide: '1' });
+  const doc = w.document;
+  const mr = () => doc.querySelector('#modal-root');
+  w.openParent();
+  ok(mr().querySelector('#pd-approve').open && !mr().querySelector('#pd-reward').open, '初回オープンは既定の開閉状態');
+  // 📚テキストを続けて登録
+  mr().querySelector('#pd-reward').open = true;
+  doc.querySelector('#book-new').value = '予習シリーズ 算数(上)';
+  w.addBook();
+  ok(mr().querySelector('#pd-reward').open, 'テキスト追加後もセクションが開いたまま');
+  ok(!mr().querySelector('#pd-member').open, '閉じていたセクションは閉じたまま');
+  eq(doc.activeElement.id, 'book-new', '追加後は入力欄にカーソルが戻る(続けて打てる)');
+  eq(doc.querySelector('#book-new').value, '', '入力欄は空になっている');
+  doc.querySelector('#book-new').value = '基本トレーニング計算';
+  w.addBook();
+  eq(w.P().books.length, 2, '2つめも続けて登録できる');
+  ok(mr().querySelector('#pd-reward').open, '2回目もセクションが開いたまま');
+  w.delBook(0);
+  ok(mr().querySelector('#pd-reward').open, '削除でもセクションが開いたまま');
+  eq(w.P().books.length, 1, '削除が反映される');
+  // 🎟️ごほうび券でも同じ
+  doc.querySelector('#pool-new').value = '回転ずし券 🍣';
+  doc.querySelector('#pool-price').value = '600';
+  w.addPool();
+  ok(mr().querySelector('#pd-reward').open, '券の追加でもセクションが開いたまま');
+  eq(doc.activeElement.id, 'pool-new', '券追加後も入力欄にカーソルが戻る');
+  // 🎯ミッションでも同じ(複数セクションの開閉が同時に保たれる)
+  mr().querySelector('#pd-mission').open = true;
+  doc.querySelector('#ms-title').value = 'おてつだい';
+  doc.querySelector('#ms-pts').value = '20';
+  w.addMission();
+  ok(mr().querySelector('#pd-mission').open && mr().querySelector('#pd-reward').open, 'ミッション追加でも開閉状態が保たれる');
+  eq(doc.activeElement.id, 'ms-title', 'ミッション追加後も入力欄にカーソルが戻る');
+  // 🗺️きち・メンバーの追加でも維持
+  mr().querySelector('#pd-member').open = true;
+  w.addBase();
+  ok(mr().querySelector('#pd-member').open, 'きち追加でもセクションが開いたまま');
+  w.closeModal();
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+
+/* ---------- 15. 🚀FAB(ホーム以外からの近道 / しゅつげき中のタイマー復帰) ---------- */
+console.log('\n[15] 🚀FAB');
+{
+  const { w, errors } = boot(undefined, { studykichi_guide: '1' });
+  const doc = w.document;
+  const fab = () => doc.querySelector('#fab-wrap');
+  eq(fab().innerHTML, '', 'ホームではFABを出さない(きち一覧があるため)');
+  ok(!doc.body.classList.contains('has-fab'), 'ホームでは下余白を広げない');
+  w.go('rec');
+  ok(fab().innerHTML.includes('しゅつげき'), 'きろくタブに🚀しゅつげきFABが出る');
+  ok(doc.body.classList.contains('has-fab'), 'FAB表示中は下余白を広げる(最後のカードに かぶらない)');
+  w.fabBases();
+  ok(doc.querySelector('#modal-root').innerHTML.includes('どの きちで'), 'FABできち選択モーダルが開く');
+  w.pickBase('home', 1);
+  ok(doc.querySelector('#modal-root').innerHTML.includes('えらびなおす'), 'FAB経由の分数えらびに「もどる」がある');
+  w.pickBase('home');
+  ok(!doc.querySelector('#modal-root').innerHTML.includes('えらびなおす'), 'ホームからの分数えらびには出ない(従来どおり)');
+  w.startSession(25);
+  eq(w.eval('S').tab, 'home', 'しゅつげき開始でホームへ');
+  ok(w.eval('S').activeSession != null, 'セッションが始まっている');
+  eq(fab().innerHTML, '', 'ホームのタイマー画面ではFABを出さない');
+  // しゅつげき中に他タブへ行くとタイマーが見えなくなる問題をFABが埋める
+  w.go('ai');
+  ok(fab().innerHTML.includes('タイマーにもどる'), 'しゅつげき中は⏱タイマーにもどるFABになる');
+  ok(fab().querySelector('.fab.run'), 'しゅつげき中はFABの見た目が変わる');
+  fab().querySelector('.fab').dispatchEvent(new w.Event('click', { bubbles: true }));
+  eq(w.eval('S').tab, 'home', 'FABでホームのタイマーに戻れる');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+
 /* ---------- 6. リリース規約(6ファイル構成 + バージョン同時更新) ---------- */
 console.log('\n[6] リリース規約');
 {
