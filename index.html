@@ -175,6 +175,15 @@ nav button .i{display:block;font-size:20px;margin-bottom:1px;transition:.15s}
 nav button.on{color:var(--blue-d);background:linear-gradient(180deg,#DCEDFA,#FFFFFF)}
 nav button.on::before{content:"";position:absolute;top:0;left:22%;right:22%;height:3px;border-radius:0 0 4px 4px;background:var(--blue)}
 nav button.on .i{transform:scale(1.2)}
+/* ---------- FAB(ホーム以外のタブから しゅつげき / タイマーにもどる) ---------- */
+#fab-wrap{position:fixed;left:50%;transform:translateX(-50%);width:100%;max-width:480px;bottom:0;z-index:40;
+  display:flex;justify-content:flex-end;padding:0 14px 62px;pointer-events:none;
+  margin-bottom:env(safe-area-inset-bottom)}
+.fab{pointer-events:auto;border:none;border-radius:999px;padding:13px 20px;cursor:pointer;
+  font-family:var(--disp);font-weight:800;font-size:14px;color:#fff;
+  background:linear-gradient(135deg,var(--blue),var(--blue-d));box-shadow:0 6px 18px rgba(62,143,216,.45)}
+.fab.run{background:linear-gradient(135deg,#F5A671,#E07B3C);box-shadow:0 6px 18px rgba(224,123,60,.45)}
+body.has-fab #shell{padding-bottom:124px} /* FABが最後のカードに かぶらないように */
 /* ---------- modal ---------- */
 .overlay{position:fixed;inset:0;background:rgba(30,42,66,.5);z-index:100;display:flex;align-items:flex-end;justify-content:center}
 .modal{background:#fff;width:100%;max-width:480px;border-radius:24px 24px 0 0;padding:20px 18px 26px;max-height:88dvh;overflow-y:auto;animation:up .2s ease}
@@ -241,6 +250,7 @@ nav button.on .i{transform:scale(1.2)}
   <main id="app"></main>
   <nav id="nav"></nav>
 </div>
+<div id="fab-wrap"></div>
 <div id="modal-root"></div>
 <script>
 /* ============================================================
@@ -248,7 +258,7 @@ nav button.on .i{transform:scale(1.2)}
    データはこの端末の中だけに保存されます（localStorage / IndexedDB）
    ============================================================ */
 /* ---------- マスタ ---------- */
-const APP_VER='v16'; // せってい表示とフィードバックの共通バージョン。sw.js の CACHE と同時に上げること
+const APP_VER='v17'; // せってい表示とフィードバックの共通バージョン。sw.js の CACHE と同時に上げること
 /* 汎用サンプル(配布用)。既存端末の保存済みデータは上書きされない */
 const DEFAULT_BASES=[
  {id:'lib',name:'としょかん',em:'📚'},
@@ -529,7 +539,7 @@ function themeShopHTML(p){
 const NAV=[['home','🏠','きち'],['rec','🌱','きろく'],['goal','🏆','もくひょう'],['ai','🤖','AI相棒'],['set','⚙️','せってい']];
 function render(){
  applyTheme(); /* メンバーごとのテーマ(起動時・プロフィール切替時もここで反映) */
- renderHeader();renderNav();
+ renderHeader();renderNav();renderFab();
  const app=$('#app');
  if(S.activeSession&&S.tab==='home'){app.innerHTML=timerHTML();
   if(S.activeSession.startTs)startTick();else stopTick();return;}
@@ -578,6 +588,17 @@ function whoParent(){
 function renderNav(){$('#nav').innerHTML=NAV.map(([id,i,l])=>
  '<button class="'+(S.tab===id?'on':'')+'" onclick="go(\''+id+'\')"><span class="i">'+i+'</span>'+l+'</button>').join('');}
 function go(t){if(recOn)try{recog.stop();}catch(e){} S.tab=t;syncRenderPending=false;save();render();}
+/* 🚀FAB: ホーム以外のタブに出す近道。タイマーはホームでしか描画されないので、
+   しゅつげき中に他タブへ行くと見えなくなる問題もこれで埋める(コア動線は変えない) */
+function renderFab(){const el=$('#fab-wrap');if(!el)return;
+ const show=S.tab!=='home'; // ホームはきち一覧・タイマーがあるので出さない
+ el.innerHTML=!show?'':S.activeSession
+  ?'<button class="fab run" onclick="go(\'home\')">⏱ タイマーにもどる</button>'
+  :'<button class="fab" onclick="fabBases()">🚀 しゅつげき</button>';
+ document.body.classList.toggle('has-fab',show);}
+function fabBases(){openModal('<h3>🚀 どの きちで しゅつげき?</h3>'+
+ S.bases.map(b=>'<button class="btn ghost" style="margin-top:8px;display:flex;align-items:center;gap:12px;text-align:left" onclick="pickBase(\''+b.id+'\',1)">'+
+  '<span style="font-size:26px">'+b.em+'</span><span>'+esc(b.name)+'</span></button>').join(''));}
 
 /* ---------- モーダル ---------- */
 function openModal(html,closable=true){
@@ -707,11 +728,12 @@ function useTicket(id){const p=P();const t=p.tickets.find(x=>x.id===id);
 
 /* ---------- 出撃(セッション) ---------- */
 let pendingBase=null;
-function pickBase(id){pendingBase=id;const b=S.bases.find(x=>x.id===id);
+function pickBase(id,fromFab){pendingBase=id;const b=S.bases.find(x=>x.id===id);
  openModal('<h3>'+b.em+' '+b.name+' で しゅつげき!</h3><div class="muted">なんぷん やる?</div>'+
  '<div class="chips" style="margin-top:10px">'+
  [5,15,25,45,60].map(m=>'<div class="chip" onclick="startSession('+m+')">'+m+'分'+(m===5?' 🐣まずはこれ':'')+'</div>').join('')+
- '</div>');}
+ '</div>'+
+ (fromFab?'<button class="btn ghost sm" style="margin-top:12px" onclick="fabBases()">← きちを えらびなおす</button>':''));}
 function startSession(min){closeModal();
  S.activeSession={base:pendingBase,plannedMin:min,startTs:null,boards:[]};save();S.tab='home';render();}
 function startCountdown(){
@@ -1537,7 +1559,20 @@ function pdSec(id,title,badge,body,open2){
  return '<details class="pd" id="pd-'+id+'"'+(open2?' open':'')+'><summary>'+title+
   (badge?' <span class="badge b-pend">'+badge+'</span>':'')+'</summary>'+
   '<div class="pd-body">'+body+'</div></details>';}
-function openParent(){const p=P();const pend=p.sessions.filter(s=>s.status==='pending');
+/* 追加・削除のたびにopenParent()でモーダルを作り直すため、そのままだと開いていた
+   セクションが閉じ、スクロールも先頭に戻る(テキストや券の連続入力がつらい)。
+   再描画の前に開閉とスクロールを退避し、focusIdの入力欄にカーソルを返す */
+function pdSnapshot(){const ds=document.querySelectorAll('#modal-root details.pd');
+ if(!ds.length)return null; // パパ・ママモード以外からの呼び出し=新規オープン
+ const mo=document.querySelector('#modal-root .modal');
+ return {open:[...ds].filter(d=>d.open).map(d=>d.id),scroll:mo?mo.scrollTop:0};}
+function pdRestore(snap,focusId){
+ if(snap)document.querySelectorAll('#modal-root details.pd').forEach(d=>{d.open=snap.open.indexOf(d.id)>=0;});
+ const mo=document.querySelector('#modal-root .modal');
+ if(mo&&snap&&snap.scroll)mo.scrollTop=snap.scroll;
+ if(focusId){const el=$('#'+focusId);if(el)el.focus();}}
+function openParent(focusId){const p=P();const pend=p.sessions.filter(s=>s.status==='pending');
+ const _snap=pdSnapshot();
  const nApprove=pend.length+pendingBonus(p).length+claimedMissions(p).length;
  /* ① 承認センター */
  const secApprove=
@@ -1645,6 +1680,7 @@ function openParent(){const p=P();const pend=p.sessions.filter(s=>s.status==='pe
   pdSec('sync','☁️ かぞく同期',syncBadge(),syncSectionHTML(),false)+
   pdSec('sys','🔧 データとシステム','',secSys,false)+
   '<button class="btn" style="margin-top:16px" onclick="saveParent()">まとめて保存</button>');
+ pdRestore(_snap,focusId);
  loadThumbs();}
 function parentSessRow(s){const b=S.bases.find(x=>x.id===s.base)||{em:"📍",name:"(まえの基地)"};
  return '<div class="sess" id="ps-'+s.id+'"><span class="em">'+b.em+'</span>'+
@@ -1686,7 +1722,7 @@ function addMission(){const p=P();
   due:{type:type,date:type==='date'?date:null},
   status:'open',createdTs:Date.now(),claimedTs:null,approvedTs:null,ack:false,mt:Date.now()};
  if(type==='date'&&missionDueTs(ms)<Date.now()){alert('期限がすでに過ぎています。日付を確認してください');return;}
- (p.missions=p.missions||[]).push(ms);save();openParent();}
+ (p.missions=p.missions||[]).push(ms);save();openParent('ms-title');}
 function delMission(id){const p=P();const i=(p.missions||[]).findIndex(m=>m.id===id);
  if(i<0)return;
  if(!confirm('「'+p.missions[i].title+'」を削除しますか?'))return;
@@ -1713,11 +1749,11 @@ function missionDueSave(id){const p=P();const ms=(p.missions||[]).find(m=>m.id==
  ms.mt=Date.now();
  save();openParent();}
 function addBook(){const v=$('#book-new').value.trim();if(!v)return;
- P().books.push(v);P().metaMt=Date.now();save();openParent();}
+ P().books.push(v);P().metaMt=Date.now();save();openParent('book-new');}
 function delBook(i){P().books.splice(i,1);P().metaMt=Date.now();save();openParent();}
 function addPool(){const v=$('#pool-new').value.trim();if(!v)return;
  const pr=Math.max(0,Number($('#pool-price').value)||500);
- P().pool.push({name:v,price:pr});P().metaMt=Date.now();save();openParent();}
+ P().pool.push({name:v,price:pr});P().metaMt=Date.now();save();openParent('pool-new');}
 function delPool(i){P().pool.splice(i,1);P().metaMt=Date.now();save();openParent();}
 function changePin(){const v=$('#pin-chg').value;
  if(!/^\d{4}$/.test(v)){alert('4けたの数字で!');return;}
@@ -1732,7 +1768,7 @@ function keyGuide(){openModal('<h3>🔑 AI相棒のカギ(APIキー)のもらい
  '<a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" style="display:block;text-decoration:none;margin-top:12px">'+
  '<span class="btn blue sm" style="display:block;text-align:center">Google AI Studio をひらく ↗</span></a>'+
  '<div class="muted" style="margin-top:10px">⚠️ 注意:キーは<b>お子さんには教えず</b>、他の人と共有しないでください。キーはこの端末の中にだけ保存されます。無料枠を超える心配はほぼありませんが、Googleアカウントの管理画面からいつでもキーを削除(無効化)できます。</div>'+
- '<button class="btn ghost sm" style="margin-top:12px" onclick="closeModal();openParent()">← パパ・ママモードにもどる</button>');}
+ '<button class="btn ghost sm" style="margin-top:12px" onclick="closeModal();openParent();var pd=document.getElementById(\'pd-sys\');if(pd)pd.open=true;">← パパ・ママモードにもどる</button>');}
 /* metaMt(LWW)で丸ごと運ばれるスカラー群のスナップショット(mergeProfileの対象と一致させること)。
    未編集プロフィールのmetaMtを進めると、家族同期で未編集側(デフォルト値のまま等)が本物のデータにLWWで勝ち
    名前・きち・ごほうび・目標・テキストを上書きする事故になる(v15で実際に発生) */
