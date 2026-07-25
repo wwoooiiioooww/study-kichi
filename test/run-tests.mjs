@@ -463,12 +463,12 @@ console.log('\n[10] 👨親モードUI');
   p.sessions.unshift({ id: 'sp1', base: 'home', plannedMin: 25, startTs: 1, endTs: 2, minutes: 25, subjects: [], memo: '', photoId: null, boards: [], focus: null, status: 'pending', spin: null, mt: 1 });
   w.openParent();
   const mr = () => w.document.querySelector('#modal-root');
-  eq(mr().querySelectorAll('details.pd').length, 6, '6つの折りたたみセクションがある');
+  eq(mr().querySelectorAll('details.pd').length, 7, '7つの折りたたみセクションがある');
   const ap = mr().querySelector('#pd-approve');
   ok(ap && ap.open, '承認センターは初期展開');
   ok(ap.innerHTML.includes('承認まちはありません') === false && ap.innerHTML.includes('セッション(1)'), '承認センターに件数が出る');
   ok(mr().innerHTML.includes('承認まち 1'), 'サマリに承認まちバッジ');
-  for (const id of ['pd-mission', 'pd-reward', 'pd-member', 'pd-sync', 'pd-sys']) {
+  for (const id of ['pd-mission', 'pd-reward', 'pd-remind', 'pd-member', 'pd-sync', 'pd-sys']) {
     const d = mr().querySelector('#' + id);
     ok(d && !d.open, id + ' は初期折りたたみ');
   }
@@ -511,7 +511,7 @@ console.log('\n[11] 🎈v15');
 }
 {
   // 表示済みガイドは出ない/既存データは汎用デフォルト化の影響を受けない
-  const old = { v: 5, currentProfile: 'sora', bases: [{ id: 'solid', name: 'ソリッドスクエア', em: '🏢' }],
+  const old = { v: 5, currentProfile: 'sora', bases: [{ id: 'solid', name: 'ソリッドスクエア', em: '🏢' }], planRemind: { on: 0, day: 0, max: 3 },
     profiles: { sora: { name: '空花', em: '🌸', grade: '小5', points: 0, sessions: [], exams: [], chat: [], pool: [], tickets: [], weeks: {}, bonusSpins: [], books: [] } } };
   const { w, errors } = boot(old, { studykichi_guide: '1' });
   eq(w.document.querySelector('#modal-root').innerHTML, '', '表示済みならガイドは出ない');
@@ -721,6 +721,127 @@ console.log('\n[15] 🚀FAB');
   ok(fab().querySelector('.fab.run'), 'しゅつげき中はFABの見た目が変わる');
   fab().querySelector('.fab').dispatchEvent(new w.Event('click', { bubbles: true }));
   eq(w.eval('S').tab, 'home', 'FABでホームのタイマーに戻れる');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+
+/* ---------- 16. 📅さくせん会議リマインダー(v17) ---------- */
+console.log('\n[16] 📅さくせん会議リマインダー');
+{
+  const { w, errors } = boot(undefined, { studykichi_guide: '1' });
+  const St = w.eval('S');
+  const mr = () => w.document.querySelector('#modal-root').innerHTML;
+  eq(St.planRemind.day, 0, '既定は日曜から');
+  eq(St.planRemind.max, 3, '既定は3回まで');
+  eq(St.planRemind.on, 1, '既定はON');
+  // 起動時に1回出る(day=今日の曜日にして曜日ゲートを確実に通す)
+  ok(mr().includes('さくせん会議'), '作戦が未設定なら起動時に声をかける');
+  ok(!mr().includes('まだ') || !mr().includes('サボ'), 'せかす・責める文言を出さない');
+  eq(w.nudgeLoad()[w.eval('S.currentProfile') + '|' + w.planTargetKey()].n, 1, '表示回数が1になる');
+  // 同じ日に2回目は出ない
+  w.closeModal();
+  w.maybePlanNudge();
+  eq(mr(), '', 'きょうはもう出したので2回目は出ない');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  const { w, errors } = boot(undefined, { studykichi_guide: '1' });
+  const St = w.eval('S');
+  const today = new Date().getDay();
+  const mr = () => w.document.querySelector('#modal-root').innerHTML;
+  const key = w.planTargetKey();
+  const nk = () => w.eval('S.currentProfile') + '|' + key;
+  w.closeModal();
+  // 回数の上限で止まる
+  St.planRemind.day = today; // 曜日ゲートは通す
+  w.nudgeSave({ [nk()]: { n: 3, d: '' } });
+  w.maybePlanNudge();
+  eq(mr(), '', '3回出しきったら止まる(来週まで待つ)');
+  w.nudgeSave({ [nk()]: { n: 1, d: '' } });
+  w.maybePlanNudge();
+  ok(mr().includes('さくせん会議'), '上限前なら日をあらためて出る');
+  w.closeModal();
+  // 作戦をたてたら即停止
+  w.nudgeSave({ [nk()]: { n: 1, d: '' } });
+  w.getWeek(w.P(), key).planTs = Date.now();
+  w.maybePlanNudge();
+  eq(mr(), '', '作戦をたてたら止まる');
+  w.getWeek(w.P(), key).planTs = null;
+  // OFFなら出ない
+  w.nudgeSave({ [nk()]: { n: 0, d: '' } });
+  St.planRemind.on = 0;
+  w.maybePlanNudge();
+  eq(mr(), '', 'OFFなら出ない');
+  St.planRemind.on = 1;
+  // 設定曜日より前は出ない(未来の曜日を指定して判定を確認)
+  St.planRemind.day = 6;
+  ok(w.planNudgeDue(new Date(2026, 6, 20).getTime()) === null, '設定曜日(土)より前の月曜には出ない');
+  ok(w.planNudgeDue(new Date(2026, 6, 25).getTime()) !== null, '設定曜日(土)当日には出る');
+  St.planRemind.day = today;
+  // 割り込まない条件
+  w.eval('S').activeSession = { base: 'home', plannedMin: 25, startTs: Date.now(), boards: [] };
+  w.maybePlanNudge();
+  eq(mr(), '', 'しゅつげき中は割り込まない');
+  w.eval('S').activeSession = null;
+  w.eval('S').tab = 'goal';
+  w.maybePlanNudge();
+  eq(mr(), '', 'もくひょうタブ(作戦カードが見えている)では出さない');
+  w.eval('S').tab = 'home';
+  w.openModal('<h3>べつのモーダル</h3>');
+  w.maybePlanNudge();
+  ok(mr().includes('べつのモーダル'), '他のモーダル表示中は割り込まない');
+  w.closeModal();
+  // 「さくせんをたてる」でもくひょうタブへ
+  w.maybePlanNudge();
+  ok(mr().includes('さくせんをたてる'), 'さくせんをたてるボタンがある');
+  w.goPlan();
+  eq(w.eval('S').tab, 'goal', 'ボタンでもくひょうタブへ移動する');
+  eq(mr(), '', 'モーダルは閉じる');
+  ok(w.document.querySelector('#plan-card'), '作戦カードにジャンプ先のidがある');
+  // 回数カウンタは端末ローカル(同期データ・バックアップJSONを汚さない)
+  ok(!JSON.stringify(w.eval('S')).includes('studykichi_nudge'), 'カウンタはSに入らない');
+  ok(w.syncable(w.eval('S')).planRemind != null, 'リマインダー設定は同期される');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  // 設定UI + migrate + マージ(LWW / 同点は既定値が負ける)
+  const { w, errors } = boot(undefined, { studykichi_guide: '1' });
+  w.closeModal();
+  w.openParent();
+  const doc = w.document;
+  ok(doc.querySelector('#pd-remind'), 'パパ・ママモードにリマインダーのセクションがある');
+  ok(doc.querySelector('#rm-on') && doc.querySelector('#rm-day') && doc.querySelector('#rm-max'), 'ON/曜日/回数の3つを設定できる');
+  doc.querySelector('#rm-day').value = '3';
+  w.setPlanRemind();
+  eq(w.eval('S').planRemind.day, 3, '曜日の変更が即反映される');
+  ok(w.eval('S').planRemindMt > 0, '変更で更新時刻が打たれる(同期のLWW用)');
+  const mtAfter = w.eval('S').planRemindMt;
+  w.setPlanRemind();
+  eq(w.eval('S').planRemindMt, mtAfter, '変更がなければ更新時刻は進まない');
+  w.closeModal();
+  // migrate: 旧データ・壊れた値の防御
+  const st = { profiles: {}, planRemind: { on: 1, day: 99, max: 99 } };
+  w.migrate(st);
+  eq(st.planRemind.day, 6, '範囲外の曜日は上限に丸められる(import防御)');
+  eq(st.planRemind.max, 5, '範囲外の回数は上限に丸められる(import防御)');
+  const st0 = { profiles: {}, planRemind: { on: 1, day: -5, max: 0 } };
+  w.migrate(st0);
+  eq(st0.planRemind.day, 0, '負の曜日は0に丸められる');
+  eq(st0.planRemind.max, 3, '0回など不正な回数は既定の3に戻る(OFFにしたいときはonで切る)');
+  const st2 = { profiles: {} };
+  w.migrate(st2);
+  eq(st2.planRemind.day, 0, '旧データには既定値が付与される');
+  // マージ: mt同点なら「既定値のままの側」が負ける + 可換
+  const clone = o => JSON.parse(JSON.stringify(o));
+  const base = JSON.parse(w.eval('JSON.stringify(S)'));
+  const fresh = clone(base); fresh.planRemind = { on: 1, day: 0, max: 3 }; fresh.planRemindMt = 0;
+  const real = clone(base); real.planRemind = { on: 0, day: 4, max: 2 }; real.planRemindMt = 0;
+  eq(w.mergeState(clone(fresh), clone(real)).planRemind.day, 4, 'mt同点: 既定値のままの側が負ける');
+  eq(w.mergeState(clone(real), clone(fresh)).planRemind.day, 4, 'mt同点マージも可換');
+  const newer = clone(base); newer.planRemind = { on: 1, day: 5, max: 5 }; newer.planRemindMt = 9999;
+  eq(w.mergeState(clone(real), clone(newer)).planRemind.day, 5, 'mtが新しい方が勝つ');
   eq(errors.length, 0, 'runtime errors: none');
   w.close();
 }
