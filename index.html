@@ -258,7 +258,7 @@ body.has-fab #shell{padding-bottom:124px} /* FABが最後のカードに かぶ�
    データはこの端末の中だけに保存されます（localStorage / IndexedDB）
    ============================================================ */
 /* ---------- マスタ ---------- */
-const APP_VER='v17'; // せってい表示とフィードバックの共通バージョン。sw.js の CACHE と同時に上げること
+const APP_VER='v18'; // せってい表示とフィードバックの共通バージョン。sw.js の CACHE と同時に上げること
 /* 汎用サンプル(配布用)。既存端末の保存済みデータは上書きされない */
 const DEFAULT_BASES=[
  {id:'lib',name:'としょかん',em:'📚'},
@@ -317,6 +317,8 @@ v:5, tab:'home', currentProfile:'sora', parentPin:null,
  profiles:{ sora:mkProfile('そら','🌸','小5'), fuka:mkProfile('ふう','🍃','小3') },
  activeSession:null,
  deleted:{}, basesMt:0, pinMt:0, /* v13: マージ用(きち・プロフィール削除の墓標 / bases・親PINの更新時刻) */
+ /* v17: 📅さくせん会議リマインダー。day=0(日)〜6(土)、その曜日から作戦がたつまで1日1回・最大max回 */
+ planRemind:{on:1,day:0,max:3}, planRemindMt:0,
 };
 let S=load();
 function load(){
@@ -367,6 +369,12 @@ function migrate(st){
  if(!st.deleted||typeof st.deleted!=='object')st.deleted={};
  if(st.basesMt==null)st.basesMt=0;
  if(st.pinMt==null)st.pinMt=0;
+ /* v17: リマインダー設定(壊れた値で入ってきても既定値に丸める=import防御) */
+ if(!st.planRemind||typeof st.planRemind!=='object')st.planRemind=JSON.parse(JSON.stringify(DEFAULT_STATE.planRemind));
+ st.planRemind.on=st.planRemind.on?1:0;
+ st.planRemind.day=Math.min(6,Math.max(0,Math.round(Number(st.planRemind.day))||0));
+ st.planRemind.max=Math.min(5,Math.max(1,Math.round(Number(st.planRemind.max))||3));
+ if(st.planRemindMt==null)st.planRemindMt=0;
  if(!Array.isArray(st.bases)||!st.bases.length)st.bases=JSON.parse(JSON.stringify(DEFAULT_BASES));
  if(!st.currentProfile||!st.profiles[st.currentProfile])st.currentProfile=Object.keys(st.profiles)[0];
  if(st.gemini&&(!st.gemini.model||st.gemini.model==='gemini-2.5-flash'))st.gemini.model='gemini-3.5-flash';
@@ -558,7 +566,7 @@ function renderHeader(){const p=P();
 function switchProfile(id){const pr=S.profiles[id];
  if(!pr||id===S.currentProfile)return;
  if(pr.pin){whoPick(id);return;}
- S.currentProfile=id;save();render();}
+ S.currentProfile=id;save();render();maybePlanNudge();}
 /* --- 起動時の「だれがつかう?」ゲート --- */
 function launchGate(){
  if(!Object.values(S.profiles).some(pr=>pr.pin))return; // だれもPINなし→今までどおり
@@ -570,14 +578,14 @@ function showWhoModal(){
   '<span style="font-size:28px">'+pr.em+'</span><span>'+esc(pr.name)+' <span class="muted">'+esc(pr.grade)+'</span>'+(pr.pin?' 🔒':'')+'</span></button>').join('')+
  (S.parentPin?'<button class="btn ghost sm" style="margin-top:12px" onclick="whoParent()">👨 おうちの人(親のPINでひらく)</button>':''),false);}
 function whoPick(id){const pr=S.profiles[id];if(!pr)return;
- if(!pr.pin){S.currentProfile=id;save();closeModal();render();return;}
+ if(!pr.pin){S.currentProfile=id;save();closeModal();render();maybePlanNudge();return;}
  openModal('<h3>'+pr.em+' '+esc(pr.name)+'のPIN</h3>'+
  '<input id="who-pin" type="password" inputmode="numeric" maxlength="4" style="font-size:24px;text-align:center;letter-spacing:10px">'+
  '<button class="btn" style="margin-top:12px" onclick="whoPinOk(\''+id+'\')">ひらく</button>'+
  '<button class="btn ghost sm" style="margin-top:8px" onclick="showWhoModal()">← もどる</button>',false);
  setTimeout(()=>{const el=$('#who-pin');if(el)el.focus();},60);}
 function whoPinOk(id){const pr=S.profiles[id];
- if($('#who-pin').value===pr.pin){S.currentProfile=id;save();closeModal();render();}
+ if($('#who-pin').value===pr.pin){S.currentProfile=id;save();closeModal();render();maybePlanNudge();}
  else alert('ちがうみたい…');}
 function whoParent(){
  openModal('<h3>👨 親のPIN</h3>'+
@@ -600,6 +608,41 @@ function fabBases(){openModal('<h3>🚀 どの きちで しゅつげき?</h3>'+
  S.bases.map(b=>'<button class="btn ghost" style="margin-top:8px;display:flex;align-items:center;gap:12px;text-align:left" onclick="pickBase(\''+b.id+'\',1)">'+
   '<span style="font-size:26px">'+b.em+'</span><span>'+esc(b.name)+'</span></button>').join(''));}
 
+/* ---------- 📅さくせん会議リマインダー(v17) ----------
+   指定曜日から、その週の作戦がたつまで「1日1回・最大N回」だけ声をかける。
+   ・「何回見たか」は端末ローカル(別端末で出た回数を消費しない。同期データも汚さない)
+   ・作戦をたてたら即停止。「あとで」は無言で閉じる(責める文言は出さない)
+   ・モーダル表示中・しゅつげき中・もくひょうタブでは割り込まない */
+const NUDGE_LS_KEY='studykichi_nudge';
+function nudgeLoad(){try{return JSON.parse(localStorage.getItem(NUDGE_LS_KEY)||'{}');}catch(e){return {};}}
+function nudgeSave(o){try{localStorage.setItem(NUDGE_LS_KEY,JSON.stringify(o));}catch(e){}}
+function planNudgeDue(nowTs){const now=nowTs||Date.now();
+ const r=S.planRemind||{};
+ if(!r.on)return null;
+ if(new Date(now).getDay()<(r.day||0))return null;   // 設定した曜日より前
+ const p=P();const key=planTargetKey();
+ if(p.weeks[key]&&p.weeks[key].planTs)return null;   // もう作戦をたてている→即停止
+ const all=nudgeLoad();const k=S.currentProfile+'|'+key;const st=all[k]||{n:0,d:''};
+ if(st.n>=(r.max||3))return null;                    // 回数ぶん出しきった→来週まで待つ
+ if(st.d===dayKey(now))return null;                  // きょうはもう出した
+ return {key,k,all,st,now};}
+function maybePlanNudge(){
+ if($('#modal-root').innerHTML||S.activeSession||S.tab==='goal')return;
+ const d=planNudgeDue();if(!d)return;
+ d.all[d.k]={n:d.st.n+1,d:dayKey(d.now)};nudgeSave(d.all);
+ openModal('<h3>📅 さくせん会議 しようか?</h3>'+
+  '<div class="muted">'+esc(weekRangeLabel(d.key))+' の さくせんが まだだよ。<br>'+
+  'なにを どこまで やるか きめると、🎁ボーナススロットが 1回もらえる!</div>'+
+  '<button class="btn" style="margin-top:14px" onclick="goPlan()">⚔️ さくせんをたてる</button>'+
+  '<button class="btn ghost sm" style="margin-top:8px" onclick="closeModal()">あとで</button>');}
+function goPlan(){closeModal();go('goal');
+ setTimeout(()=>{const el=$('#plan-card');
+  if(el&&el.scrollIntoView)el.scrollIntoView({behavior:'smooth',block:'center'});},80);}
+function setPlanRemind(){const cur=S.planRemind||{};
+ const g=(id,dflt)=>{const el=$(id);return el?Number(el.value):dflt;};
+ const next={on:g('#rm-on',cur.on),day:g('#rm-day',cur.day),max:g('#rm-max',cur.max)};
+ if(next.on===cur.on&&next.day===cur.day&&next.max===cur.max)return;
+ S.planRemind=next;S.planRemindMt=Date.now();save();}
 /* ---------- モーダル ---------- */
 function openModal(html,closable=true){
  $('#modal-root').innerHTML='<div class="overlay" '+(closable?'onclick="if(event.target===this)closeModal()"':'')+'>'+
@@ -1108,7 +1151,7 @@ function weeklyHTML(p){
    '<input type="number" min="1" value="'+it.to+'" oninput="pdSet(\''+sj+'\',\'to\',this.value)">'+
    '<button class="bd-tl" onclick="pgStep(\''+sj+'\',\'to\',1)">＋</button></div>'
   :'')+'</div>';});
- let out='<div class="card" style="border:2px solid #CDE5F7"><h2>📅 '+(isNext?'らいしゅう':'こんしゅう')+'の作戦('+weekRangeLabel(pKey)+')'+
+ let out='<div class="card" id="plan-card" style="border:2px solid #CDE5F7"><h2>📅 '+(isNext?'らいしゅう':'こんしゅう')+'の作戦('+weekRangeLabel(pKey)+')'+
   (wk.planTs?' <span class="badge b-ok">作戦ずみ✓</span>':'')+'</h2>'+
   (isNext?'<div class="muted">きょうは さくせん会議の日!先生やおうちの人と、らいしゅうの作戦をきめよう⚔️</div>':'')+
   '<label>がんばる教科</label><div class="chips">'+
@@ -1627,7 +1670,29 @@ function openParent(focusId){const p=P();const pend=p.sessions.filter(s=>s.statu
    '<button onclick="delBook('+i+')">削除</button></div>').join('')+'</div>'+
   '<div class="row" style="margin-top:8px"><input id="book-new" placeholder="例:予習シリーズ 算数(上)">'+
   '<button class="btn blue sm" style="flex:0 0 70px" onclick="addBook()">追加</button></div>';
- /* ④ メンバーときち */
+ /* ④ さくせん会議リマインダー(v17) */
+ const rm=S.planRemind||{on:1,day:0,max:3};
+ const DOW=['日','月','火','水','木','金','土'];
+ const secRemind=
+  '<div class="muted">その週の作戦がまだのとき、お子さんがアプリを開いたタイミングで「さくせん会議しようか?」と声をかけます。<br>'+
+  '<b>1日1回まで</b>／作戦をたてたら止まります／「あとで」はそのまま閉じます(せかす文言は出しません)。</div>'+
+  '<div class="row" style="margin-top:8px;align-items:center">'+
+  '<span style="flex:0 0 76px;font-size:13px;font-weight:700;color:var(--ink-soft)">声をかける</span>'+
+  '<select id="rm-on" onchange="setPlanRemind()">'+
+   '<option value="1"'+(rm.on?' selected':'')+'>する</option>'+
+   '<option value="0"'+(rm.on?'':' selected')+'>しない</option></select></div>'+
+  '<div class="row" style="margin-top:6px;align-items:center">'+
+  '<span style="flex:0 0 76px;font-size:13px;font-weight:700;color:var(--ink-soft)">いつから</span>'+
+  '<select id="rm-day" onchange="setPlanRemind()">'+
+   DOW.map((d,i)=>'<option value="'+i+'"'+(Number(rm.day)===i?' selected':'')+'>'+d+'曜日から</option>').join('')+
+  '</select></div>'+
+  '<div class="row" style="margin-top:6px;align-items:center">'+
+  '<span style="flex:0 0 76px;font-size:13px;font-weight:700;color:var(--ink-soft)">何回まで</span>'+
+  '<select id="rm-max" onchange="setPlanRemind()">'+
+   [1,2,3,4,5].map(n=>'<option value="'+n+'"'+(Number(rm.max)===n?' selected':'')+'>'+n+'回まで</option>').join('')+
+  '</select></div>'+
+  '<div class="muted" style="margin-top:8px">💡 このアプリの週は「日曜〜土曜」です。土曜だけは<b>らいしゅう</b>の作戦をたてる日になります。</div>';
+ /* ⑤ メンバーときち */
  const secMember=
   '<h2 style="margin-top:2px">👥 メンバーの編集</h2>'+
   '<div class="muted">なまえ・学年をかえても、きろくやポイントはそのまま引きつがれます。削除はもどせません。<br>💡「こどもPIN」(4けた)を設定すると、アプリを開いたときに「だれがつかう?」画面が出て、本人しか入れなくなります(きょうだいのスロット回し防止!)。空欄にするとロックなしです。</div>'+
@@ -1676,6 +1741,7 @@ function openParent(focusId){const p=P();const pend=p.sessions.filter(s=>s.statu
   pdSec('approve','✅ 承認センター',nApprove?('承認まち '+nApprove):'',secApprove,true)+
   pdSec('mission','🎯 特別ミッションを出す','',secMission,false)+
   pdSec('reward','🎁 ごほうび設定','',secReward,false)+
+  pdSec('remind','📅 さくせん会議リマインダー',(S.planRemind&&S.planRemind.on)?'':'OFF',secRemind,false)+
   pdSec('member','👥 メンバーときち','',secMember,false)+
   pdSec('sync','☁️ かぞく同期',syncBadge(),syncSectionHTML(),false)+
   pdSec('sys','🔧 データとシステム','',secSys,false)+
@@ -1913,6 +1979,12 @@ function mergeState(a,b){
   m.parentPin=(m.parentPin==null)?B.parentPin:(B.parentPin==null)?m.parentPin:
    ((m.parentPin>=B.parentPin)?m.parentPin:B.parentPin);
  m.pinMt=Math.max(m.pinMt||0,B.pinMt||0);
+ /* 📅リマインダー設定: planRemindMtが新しい方。同点は既定値のままの側が負け→辞書順(可換) */
+ const _ra=m.planRemindMt||0,_rb=B.planRemindMt||0;
+ if(_rb>_ra)m.planRemind=B.planRemind;
+ else if(_rb===_ra){const D=stableStr(DEFAULT_STATE.planRemind),sa=stableStr(m.planRemind),sb=stableStr(B.planRemind);
+  if(sa!==sb)m.planRemind=(sa===D&&sb!==D)?B.planRemind:(sb===D&&sa!==D)?m.planRemind:(sa>=sb?m.planRemind:B.planRemind);}
+ m.planRemindMt=Math.max(_ra,_rb);
  /* profiles: IDの和集合+墓標。両方に居ればフィールド毎マージ */
  m.profiles=m.profiles||{};
  new Set([...Object.keys(m.profiles),...Object.keys(B.profiles||{})]).forEach(id=>{
@@ -2178,6 +2250,7 @@ showSplash(); /* 🚀ロケットOP → launchGate(だれがつかう?) → ホ�
 render();
 launchGate();
 if(!guideSeen()&&!$('#modal-root').innerHTML)showGuide(0); /* 🎈初回だけガイド(PINゲート表示中は出さない) */
+maybePlanNudge(); /* 📅さくせん会議リマインダー(モーダルが出ているときは割り込まない) */
 /* ☁️かぞく同期: 設定済みかつコード保存済みなら自動接続。オンライン復帰で保留分を再送 */
 syncLoad();
 if(syncConfigured()&&sync.code)syncConnect();
