@@ -35,6 +35,7 @@ function boot(preState, extraLS) {
       if (extraLS) Object.entries(extraLS).forEach(([k, v]) => window.localStorage.setItem(k, v));
     },
   });
+  dom.window.parentAuthed = true; // 既定は入室済み(PINゲートは[20]で個別に検証)
   return { dom, w: dom.window, errors, alerts };
 }
 
@@ -1045,12 +1046,12 @@ console.log('\n[19] 📖コンセプト・保護者ガイド');
   w.showParentGuide();
   const g = w.document.querySelector('#modal-root').innerHTML;
   ok(g.includes('ごほうびのスイッチ'), '①承認しないと報酬が止まることを最初に伝える');
-  ok(g.includes('日曜〜土曜') && g.includes('翌週ぶん'), '②週の区切りと土曜の例外');
+  ok(g.includes('日曜から土曜') && g.includes('翌週ぶん'), '②週の区切りと土曜の例外');
   ok(g.includes('つうちょう') && g.includes('ポイントちょうせい'), '③ポイントは台帳が正・直し方');
   ok(g.includes('含まれません') && g.includes('故障ではありません'), '④写真が同期されないのは仕様だと明記');
   ok(g.includes('親PINは同期されません') && g.includes('こどもPIN'), '⑤同期とPINの注意');
   ok(g.includes('APIキー') && g.includes('この端末の中だけ'), '⑥AIキーの取得と保存場所');
-  ok(g.includes('機種変更する前には必ず保存'), '⑦バックアップを促す');
+  ok(g.includes('機種変更の前には、必ず保存'), '⑦バックアップを促す');
   ok(g.includes('パパ・ママモードの地図'), 'モードの地図がある');
   ['承認センター', '特別ミッション', 'ごほうび設定', 'リマインダー', 'メンバーときち', 'かぞく同期', 'データとシステム']
     .forEach(t => ok(g.includes(t), '地図に載っている: ' + t));
@@ -1061,6 +1062,85 @@ console.log('\n[19] 📖コンセプト・保護者ガイド');
   const app = w.document.querySelector('#app').innerHTML;
   ok(app.includes('はじめての方へ'), 'せっていから説明書を開ける');
   ok(app.includes('大切にしていること'), 'せっていからコンセプトを読み返せる');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+
+/* ---------- 20. 🔐 パパ・ママモードの入室ゲート(v23) ----------
+   実障害: 説明書の「← パパ・ママモードにもどる」から、PINを通さずに入室できた。
+   画面ごとに導線を直すのではなく openParent() 自身に守らせる */
+console.log('\n[20] 🔐入室ゲート');
+{
+  const { w, errors } = boot(undefined, { studykichi_guide: '1' });
+  const mr = () => w.document.querySelector('#modal-root').innerHTML;
+  w.closeModal();
+  w.eval('S').parentPin = '1975';
+  w.parentAuthed = false; // PINをまだ通していない状態
+  // 直接呼んでもゲートに落ちる
+  w.openParent();
+  ok(mr().includes('PIN') && !mr().includes('承認センター'), 'openParent()を直接呼んでもPINゲートに落ちる');
+  w.closeModal();
+  // せってい → 説明書 → もどる の経路(報告された穴)
+  w.eval('S').tab = 'set'; w.render();
+  w.showParentGuide();
+  ok(!mr().includes('パパ・ママモードにもどる'), '未認証では「もどる」ボタン自体を出さない');
+  ok(mr().includes('とじる'), '代わりに「とじる」を出す');
+  w.closeModal();
+  // コンセプト → 説明書 の経路も同じ
+  w.showConcept();
+  ok(!mr().includes('パパ・ママモードへ'), '未認証のコンセプトからは入室ボタンを出さない');
+  w.closeModal();
+  // 間違ったPINでは入れない
+  w.parentGate();
+  w.document.querySelector('#pin-in').value = '0000';
+  w.checkPin();
+  ok(!mr().includes('承認センター'), 'ちがうPINでは入れない');
+  ok(!w.parentAuthed, 'ちがうPINでは入室許可が立たない');
+  // 正しいPINで入れる
+  w.document.querySelector('#pin-in').value = '1975';
+  w.checkPin();
+  ok(w.parentAuthed, '正しいPINで入室許可が立つ');
+  ok(mr().includes('承認センター'), 'パパ・ママモードが開く');
+  // 認証後は説明書から戻れる
+  w.showParentGuide();
+  ok(mr().includes('パパ・ママモードにもどる'), '認証後は「もどる」が出る');
+  w.openParent();
+  ok(mr().includes('承認センター'), '認証後は説明書から戻れる');
+  w.closeModal();
+  // タブを移る/つかう人が変わると入室許可は切れる
+  w.go('home');
+  ok(!w.parentAuthed, 'タブを移ると入室許可が切れる');
+  w.parentAuthed = true;
+  w.switchProfile('fuka');
+  ok(!w.parentAuthed, 'つかう人が変わると入室許可が切れる');
+  // PIN未設定のときも素通りさせない(PINを決める画面へ)
+  w.eval('S').parentPin = null; w.parentAuthed = false;
+  w.closeModal();
+  w.openParent();
+  ok(mr().includes('4けたの暗証番号'), 'PIN未設定なら、まず決めてもらう画面に行く');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  // 読みやすさ: 大きめの本文 + 「くわしく」で深掘り
+  const { w, errors } = boot(undefined, { studykichi_guide: '1' });
+  w.closeModal();
+  w.showParentGuide();
+  const doc = w.document;
+  const g = doc.querySelector('#modal-root');
+  ok(g.querySelector('.pg'), '保護者向けの大きめ本文スタイルが当たっている');
+  eq(g.querySelectorAll('.pg-row').length, 7, '7項目が1つずつのブロックになっている');
+  eq(g.querySelectorAll('.pg-more').length, 7, '各項目に「くわしく」がある');
+  ok([...g.querySelectorAll('.pg-more')].every(d => !d.open), '「くわしく」は既定で閉じている(最初は短く読める)');
+  ok([...g.querySelectorAll('.pg-more summary')].every(s2 => s2.textContent.includes('くわしく')), 'ラベルは「くわしく」');
+  // まとめだけで意味が通る(1項目目)
+  const first = g.querySelector('.pg-row .pg-s').textContent;
+  ok(first.includes('ごほうびのスイッチ') && first.length < 60, '最初のまとめは短く、要点だけ');
+  ok(g.querySelector('.pg-lead').textContent.includes('7つだけ'), '冒頭で「7つだけ」と量を約束する');
+  // コンセプトも同じ読みやすさ
+  w.closeModal(); w.showConcept();
+  ok(doc.querySelector('#modal-root .pg'), 'コンセプトも同じ本文スタイル');
+  eq(doc.querySelectorAll('#modal-root .pg-row').length, 3, 'コンセプトは3本柱');
   eq(errors.length, 0, 'runtime errors: none');
   w.close();
 }
