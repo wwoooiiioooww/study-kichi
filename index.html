@@ -175,6 +175,26 @@ nav button .i{display:block;font-size:20px;margin-bottom:1px;transition:.15s}
 nav button.on{color:var(--blue-d);background:linear-gradient(180deg,#DCEDFA,#FFFFFF)}
 nav button.on::before{content:"";position:absolute;top:0;left:22%;right:22%;height:3px;border-radius:0 0 4px 4px;background:var(--blue)}
 nav button.on .i{transform:scale(1.2)}
+/* ---------- 📖 保護者向けの読みもの(説明書・コンセプト) ----------
+   大人が落ち着いて読む画面なので、子ども向け画面より文字を大きく・行間を広く */
+.pg{font-size:14.5px;line-height:1.95;color:var(--ink)}
+.pg-lead{background:var(--sky-bg);border-radius:14px;padding:12px 14px;margin-bottom:14px}
+.pg-row{display:flex;gap:12px;align-items:flex-start;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pg-em{font-size:26px;flex:0 0 30px;line-height:1.4}
+.pg-txt{flex:1;min-width:0}
+.pg-t{font-family:var(--disp);font-weight:800;font-size:16px;color:var(--ink);line-height:1.6}
+.pg-s{margin-top:3px}
+.pg-more{margin-top:6px}
+.pg-more summary{cursor:pointer;font-size:13.5px;font-weight:700;color:var(--blue-d);list-style:none;
+  display:inline-block;padding:4px 12px;border-radius:999px;background:var(--sky-bg)}
+.pg-more summary::-webkit-details-marker{display:none}
+.pg-more summary::after{content:" ▾"}
+.pg-more[open] summary::after{content:" ▴"}
+.pg-b{margin-top:8px;padding:10px 12px;background:var(--sky-bg);border-radius:12px;font-size:14px;line-height:1.95}
+.pg-map{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px dashed var(--line)}
+.pg-map-t{flex:0 0 132px;font-weight:800;font-size:13.5px}
+.pg-map-b{flex:1;font-size:13px;color:var(--ink-soft);line-height:1.7}
+@media(max-width:360px){.pg-map{display:block}.pg-map-t{display:block;margin-bottom:2px}}
 /* PIN入力: type=password だとパスワードマネージャーが保存候補を出してきて邪魔なので、
    マスク表示できる環境では text + text-security にする(非対応環境は password にフォールバック) */
 .pin-mask{-webkit-text-security:disc;text-security:disc}
@@ -264,7 +284,7 @@ body.has-fab #shell{padding-bottom:124px} /* FABが最後のカードに かぶ�
    データはこの端末の中だけに保存されます（localStorage / IndexedDB）
    ============================================================ */
 /* ---------- マスタ ---------- */
-const APP_VER='v22'; // せってい表示とフィードバックの共通バージョン。sw.js の CACHE と同時に上げること
+const APP_VER='v23'; // せってい表示とフィードバックの共通バージョン。sw.js の CACHE と同時に上げること
 /* 汎用サンプル(配布用)。既存端末の保存済みデータは上書きされない */
 const DEFAULT_BASES=[
  {id:'lib',name:'としょかん',em:'📚'},
@@ -583,6 +603,7 @@ function renderHeader(){const p=P();
   '<span class="em">'+pr.em+'</span><span>'+esc(pr.name)+'<div class="g">'+esc(pr.grade)+'</div></span></div>').join('');}
 function switchProfile(id){const pr=S.profiles[id];
  if(!pr||id===S.currentProfile)return;
+ parentAuthed=false; // つかう人が変わったら入室許可は切れる
  if(pr.pin){whoPick(id);return;}
  S.currentProfile=id;save();render();maybeNudge();}
 /* --- 起動時の「だれがつかう?」ゲート --- */
@@ -613,7 +634,8 @@ function whoParent(){
  setTimeout(()=>{const el=$('#who-ppin');if(el)el.focus();},60);}
 function renderNav(){$('#nav').innerHTML=NAV.map(([id,i,l])=>
  '<button class="'+(S.tab===id?'on':'')+'" onclick="go(\''+id+'\')"><span class="i">'+i+'</span>'+l+'</button>').join('');}
-function go(t){if(recOn)try{recog.stop();}catch(e){} S.tab=t;syncRenderPending=false;save();render();}
+function go(t){if(recOn)try{recog.stop();}catch(e){} parentAuthed=false; // タブを移ったら入室許可は切れる
+ S.tab=t;syncRenderPending=false;save();render();}
 /* 🚀FAB: ホーム以外のタブに出す近道。タイマーはホームでしか描画されないので、
    しゅつげき中に他タブへ行くと見えなくなる問題もこれで埋める(コア動線は変えない) */
 function renderFab(){const el=$('#fab-wrap');if(!el)return;
@@ -1075,9 +1097,9 @@ function showGuide(i){const gi=Math.max(0,Math.min(GUIDE_PAGES.length-1,i||0));
 function conceptSeen(){try{return !!localStorage.getItem(CONCEPT_LS_KEY);}catch(e){return true;}}
 function showConcept(fromParent){
  try{localStorage.setItem(CONCEPT_LS_KEY,'1');}catch(e){}
- const pillar=(n,t,b)=>'<div class="sess" style="align-items:flex-start"><span class="em">'+n+'</span>'+
-  '<div class="info"><b>'+t+'</b><br><span class="muted" style="line-height:1.85">'+b+'</span></div></div>';
- openModal('<h3>📖 スタディきちが大切にしていること</h3>'+
+ const pillar=(n,t,b2)=>'<div class="pg-row"><span class="pg-em">'+n+'</span>'+
+  '<div class="pg-txt"><div class="pg-t">'+t+'</div><div class="pg-s">'+b2+'</div></div></div>';
+ openModal('<h3>💡 スタディきちが大切にしていること</h3><div class="pg">'+
   pillar('1️⃣','「やらせる」ではなく「はじめられた」を祝う',
    '机に向かった時間の長さより、<b>自分から始められた回数</b>を数えます。だから最小単位は5分。'+
    '続けるためのアプリで、追い込むためのアプリではありません。')+
@@ -1087,43 +1109,61 @@ function showConcept(fromParent){
   pillar('3️⃣','がんばりは、家族に届いてはじめて意味を持つ',
    'きろくは家族で共有され、「承認」という形であなたの<b>"見てるよ"</b>が子どもに届きます。'+
    'ごほうびの本体はポイントではなく、<b>あなたが認めてくれたという事実</b>です。')+
-  '<div class="muted" style="margin-top:12px;text-align:center;line-height:1.9">'+
-  '——まずは<b>「承認」</b>だけ覚えて帰ってください。<br>それだけで、このアプリは動きはじめます。</div>'+
+  '<div class="pg-lead" style="margin-top:16px;text-align:center">'+
+  '——まずは<b>「承認」</b>だけ覚えて帰ってください。<br>それだけで、このアプリは動きはじめます。</div></div>'+
   '<button class="btn" style="margin-top:14px" onclick="showParentGuide()">📖 はじめての方へ(つかいかた)</button>'+
   (fromParent?'<button class="btn ghost sm" style="margin-top:8px" onclick="openParent()">パパ・ママモードへ →</button>'
    :'<button class="btn ghost sm" style="margin-top:8px" onclick="closeModal()">とじる</button>'));}
 function showParentGuide(){
- const row=(em,t,b)=>'<div class="sess" style="align-items:flex-start"><span class="em">'+em+'</span>'+
-  '<div class="info"><b>'+t+'</b><br><span class="muted" style="line-height:1.85">'+b+'</span></div></div>';
- const map=(t,b)=>'<div class="ticket-item"><span style="flex:0 0 128px;font-size:13px;font-weight:700">'+t+'</span>'+
-  '<span class="muted" style="flex:1;font-size:12px">'+b+'</span></div>';
- openModal('<h3>📖 はじめての方へ(保護者の方へ)</h3>'+
-  '<div class="muted">ここだけ読めば大丈夫です。それぞれの詳しい説明は、各設定画面にも書いてあります。</div>'+
+ /* 読みつかれないように: 1項目=大きめの見出し+1〜2行のまとめ。詳しい話は「くわしく」に隠す */
+ const row=(em,t,short,more)=>'<div class="pg-row"><span class="pg-em">'+em+'</span>'+
+  '<div class="pg-txt"><div class="pg-t">'+t+'</div><div class="pg-s">'+short+'</div>'+
+  (more?'<details class="pg-more"><summary>くわしく</summary><div class="pg-b">'+more+'</div></details>':'')+
+  '</div></div>';
+ const map=(t,b)=>'<div class="pg-map"><span class="pg-map-t">'+t+'</span><span class="pg-map-b">'+b+'</span></div>';
+ openModal('<h3>📖 はじめての方へ</h3>'+
+  '<div class="pg">'+
+  '<div class="pg-lead">大切なことは、この7つだけです。<br>もっと知りたいところだけ「くわしく」を開いてください。</div>'+
   row('✅','まず「承認」してください',
-   'これが<b>ごほうびのスイッチ</b>です。お子さんの記録を承認すると、次にアプリを開いたときに🎰スロットが回せます。'+
-   '<b>承認しないと報酬が止まり</b>、やる気も止まります。1〜2日以内がおすすめです。')+
+   'これが <b>ごほうびのスイッチ</b> です。承認すると、お子さんは🎰スロットを回せます。',
+   'パパ・ママモードの「✅承認センター」に、お子さんの記録がたまります。'+
+   '<b>承認しないと ごほうびが止まり</b>、やる気も止まってしまいます。'+
+   '1〜2日以内の承認がおすすめです。<br>'+
+   'このアプリでいちばん大事な操作は、これひとつです。')+
   row('📅','週は「日曜〜土曜」です',
-   '土曜にたてる作戦だけは<b>翌週ぶん</b>になります(週の終わりに次を計画するため)。'+
-   '日曜〜金曜は「今週」の作戦です。')+
-  row('⭐','ポイントは「つうちょう(台帳)」が正しい値',
-   '残高は取引の合計です。ズレたら「🔧データとシステム → ポイントちょうせい」で理由つきで直せます。')+
+   '1週間ぶんの作戦を、日曜から土曜のあいだにたてます。',
+   '土曜にたてる作戦だけは <b>翌週ぶん</b> になります(週の終わりに次を計画するため)。'+
+   '日曜〜金曜にたてる作戦は「今週」ぶんです。<br>'+
+   '作戦がまだのときは、アプリを開いたときに声をかけます(曜日と回数は変えられます)。')+
+  row('⭐','ポイントは「つうちょう」が正しい値',
+   '残高は取引の合計です。ズレても、あとから直せます。',
+   'お子さんの画面でポイントをタップすると「つうちょう」が開き、'+
+   'いつ・なぜ増えたかが全部残っています。<br>'+
+   'ズレたときは「🔧データとシステム → ポイントちょうせい」で、理由つきで足し引きできます。')+
   row('📷','写真は撮った端末の中だけにあります',
-   'かぞく同期にもバックアップJSONにも<b>含まれません</b>(容量のため)。'+
-   'ほかの端末では📷マークになりますが、記録そのものは同期されています。故障ではありません。')+
-  row('☁️','かぞく同期と、こどもPIN・親PIN',
-   '「かぞく同期」で家族コードを作り、もう一方の端末で「つながる」に入力すると記録が共有されます。'+
-   'コードは<b>家族だけ</b>に。<b>親PINは同期されません</b>(端末ごとに設定してください)。'+
-   'こどもPINを設定すると、起動時に「だれがつかう?」が出てきょうだいの回し合いを防げます。')+
+   'ほかの端末では📷マークになります。<b>故障ではありません。</b>',
+   '写真と計算メモは容量が大きいため、かぞく同期にもバックアップJSONにも <b>含まれません</b>。'+
+   '記録・ポイント・作戦などは、ちゃんと同期されています。')+
+  row('☁️','かぞく同期と、2種類のPIN',
+   '家族コードを作って、もう一方の端末で入力すれば記録を共有できます。',
+   '「☁️かぞく同期」ではじめると26文字のコードが出ます。'+
+   'もう一方の端末の「つながる」に入力してください。コードは <b>家族だけ</b> に。<br>'+
+   '<b>親PINは同期されません。</b>端末ごとに決めてください(片方を変えても、もう片方は変わりません)。<br>'+
+   '「👥メンバーときち」でこどもPINを決めると、起動時に「だれがつかう?」が出て、'+
+   'きょうだいの回し合いを防げます。空欄ならロックなしです。')+
   row('🔑','AI相棒を使うにはAPIキーが必要です',
-   'Googleの無料キーを「🔧データとシステム」で設定します(クレジットカード不要・約5分。'+
-   '取得ガイドのボタンがあります)。キーは<b>この端末の中だけ</b>に保存されます。')+
+   'Googleの無料キーを1回だけ設定します(カード不要・約5分)。',
+   '「🔧データとシステム」に取得ガイドのボタンがあります。'+
+   'キーは <b>この端末の中だけ</b> に保存され、同期にもバックアップにも含まれません。'+
+   '端末を増やしたら、その端末でも設定してください。')+
   row('💾','こまったらバックアップ',
-   '「🔧データとシステム → バックアップ」でJSONを保存できます。'+
-   '復元(上書き)と、別端末のデータとの合体(マージ)ができます。'+
-   '<b>端末を機種変更する前には必ず保存</b>してください。')+
-  '<h2 style="margin-top:16px">🗺️ パパ・ママモードの地図</h2>'+
-  '<div class="muted">どこに何があるか。細かい設定は、それぞれの画面に説明があります。</div>'+
-  '<div style="margin-top:6px">'+
+   '<b>機種変更の前には、必ず保存してください。</b>',
+   '「🔧データとシステム → バックアップ」でJSONファイルを保存できます。'+
+   'そこから「復元(上書き)」と、別の端末のデータとの「合体(マージ)」ができます。'+
+   '同期がうまくいかないときの安全弁にもなります。')+
+  '<div class="pg-t" style="margin-top:20px">🗺️ パパ・ママモードの地図</div>'+
+  '<div class="pg-s">どこに何があるか。細かい設定は、それぞれの画面にも説明があります。</div>'+
+  '<div style="margin-top:8px">'+
   map('✅ 承認センター','記録・ボーナス・ミッションの承認と却下')+
   map('🎯 特別ミッション','お手伝いなど臨時の課題を出す(承認で加点)')+
   map('🎁 ごほうび設定','ごほうび券と値段／模試の目標／大きなごほうび／テキスト登録')+
@@ -1132,9 +1172,10 @@ function showParentGuide(){
   map('👥 メンバーときち','なまえ・学年・こどもPIN／きちの追加と編集')+
   map('☁️ かぞく同期','家族コードで複数端末をつなぐ')+
   map('🔧 データとシステム','ポイント調整／APIキー／親PIN／バックアップ／初期化')+
-  '</div>'+
-  '<button class="btn ghost sm" style="margin-top:14px" onclick="showConcept()">📖 大切にしていること を読む</button>'+
-  '<button class="btn ghost sm" style="margin-top:8px" onclick="openParent()">← パパ・ママモードにもどる</button>');}
+  '</div></div>'+
+  '<button class="btn ghost sm" style="margin-top:16px" onclick="showConcept()">💡 大切にしていること を読む</button>'+
+  (parentAuthed?'<button class="btn ghost sm" style="margin-top:8px" onclick="openParent()">← パパ・ママモードにもどる</button>'
+   :'<button class="btn ghost sm" style="margin-top:8px" onclick="closeModal()">とじる</button>'));}
 /* ---------- 🚀ロケットOP(起動時1回だけのスプラッシュ) ---------- */
 function showSplash(){
  if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches)return;
@@ -1735,8 +1776,9 @@ function parentGate(){
  '<button class="btn" style="margin-top:12px" onclick="checkPin()">ひらく</button>');}
 function setPin(){const v=$('#pin-new').value;
  if(!/^\d{4}$/.test(v)){alert('4けたの数字で!');return;}
- S.parentPin=v;S.pinMt=Date.now();save();closeModal();openParent();}
-function checkPin(){if($('#pin-in').value===S.parentPin){closeModal();openParent();}else alert('ちがうみたい…');}
+ S.parentPin=v;S.pinMt=Date.now();save();parentAuthed=true;closeModal();openParent();}
+function checkPin(){if($('#pin-in').value===S.parentPin){parentAuthed=true;closeModal();openParent();}
+ else alert('ちがうみたい…');}
 /* 折りたたみセクション(パパ・ママモード整理用) */
 function pdSec(id,title,badge,body,open2){
  return '<details class="pd" id="pd-'+id+'"'+(open2?' open':'')+'><summary>'+title+
@@ -1754,7 +1796,11 @@ function pdRestore(snap,focusId){
  const mo=document.querySelector('#modal-root .modal');
  if(mo&&snap&&snap.scroll)mo.scrollTop=snap.scroll;
  if(focusId){const el=$('#'+focusId);if(el)el.focus();}}
+/* パパ・ママモードの入室許可(この画面を開いているあいだだけ有効。保存しない)。
+   openParent()を直接呼ぶ導線がPINを素通りしないよう、画面側ではなくここで守る */
+var parentAuthed=false;
 function openParent(focusId){
+ if(!parentAuthed){parentGate();return;} // ← PINを通っていなければ必ずゲートへ
  if(!conceptSeen()){showConcept(true);return;} // 初回だけ: 何をする道具かを先に伝える
  const p=P();const pend=p.sessions.filter(s=>s.status==='pending');
  const _snap=pdSnapshot();
