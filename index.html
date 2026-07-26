@@ -264,7 +264,7 @@ body.has-fab #shell{padding-bottom:124px} /* FABが最後のカードに かぶ�
    データはこの端末の中だけに保存されます（localStorage / IndexedDB）
    ============================================================ */
 /* ---------- マスタ ---------- */
-const APP_VER='v21'; // せってい表示とフィードバックの共通バージョン。sw.js の CACHE と同時に上げること
+const APP_VER='v22'; // せってい表示とフィードバックの共通バージョン。sw.js の CACHE と同時に上げること
 /* 汎用サンプル(配布用)。既存端末の保存済みデータは上書きされない */
 const DEFAULT_BASES=[
  {id:'lib',name:'としょかん',em:'📚'},
@@ -1046,7 +1046,12 @@ function spinNext(){const p=P();const item=slotQueue[0];
  },1600);}
 /* ---------- 🎈はじめてガイド(初回だけ。せっていから再表示可) ---------- */
 const GUIDE_LS_KEY='studykichi_guide'; // 端末ローカル(同期・バックアップに混ぜない)
+const CONCEPT_LS_KEY='studykichi_concept'; // 保護者向けコンセプトを見せたか(端末ローカル)
 const GUIDE_PAGES=[
+ /* 0ページ目は世界観の宣言。子にも大人にも読める短さにする(案B) */
+ {em:'☁️',t:'ようこそ、スタディきちへ',b:'ここは べんきょうを「やらされる」ばしょじゃないよ。<br>'+
+  'きょう <b>5分だけ</b> でも、じぶんで はじめられたら、それが いちばん すごいこと。<br>'+
+  'その5分を きろくして、ほめて、つづけていこう。'},
  {em:'🚀',t:'きちに しゅつげき!',b:'ホームで きょうの「きち(勉強ばしょ)」をタップして、タイマーで べんきょうスタート!<br>まずは<b>「5分だけ」</b>でOK。はじめるのが いちばんえらい!'},
  {em:'🎰',t:'がんばりが スロットに!',b:'きろくを パパ・ママが「がんばったね」って承認すると、🎰スロットがまわせるよ。<br>⭐ポイントをためて「こうかんじょ」で ごほうび券や🎨きせかえと こうかんしよう!'},
  {em:'⚔️',t:'週の さくせん と ボスバトル',b:'土曜は📅<b>さくせん会議</b>で らいしゅうの作戦をたてて、週まつは⚔️<b>ボスバトル</b>にちょうせん!<br>わからない問題は 🤖AI相棒に しつもんできるよ。'},
@@ -1064,6 +1069,72 @@ function showGuide(i){const gi=Math.max(0,Math.min(GUIDE_PAGES.length-1,i||0));
  '<button class="btn" style="margin-top:8px" onclick="'+(last?'closeModal()':'showGuide('+(gi+1)+')')+'">'+(last?'はじめる! 🚀':'つぎへ →')+'</button>'+
  (last?'':'<button class="btn ghost sm" style="margin-top:8px" onclick="closeModal()">スキップ</button>')+
  '</div>');}
+/* ---------- 📖 保護者向け: コンセプト と はじめての方へ(v22) ----------
+   コンセプトはパパ・ママモードを初めて開いたときに1回だけ(=100%保護者が見ている瞬間)。
+   説明書は「知らないと損する・壊れること」だけに絞り、細かい設定は各画面の説明に任せる */
+function conceptSeen(){try{return !!localStorage.getItem(CONCEPT_LS_KEY);}catch(e){return true;}}
+function showConcept(fromParent){
+ try{localStorage.setItem(CONCEPT_LS_KEY,'1');}catch(e){}
+ const pillar=(n,t,b)=>'<div class="sess" style="align-items:flex-start"><span class="em">'+n+'</span>'+
+  '<div class="info"><b>'+t+'</b><br><span class="muted" style="line-height:1.85">'+b+'</span></div></div>';
+ openModal('<h3>📖 スタディきちが大切にしていること</h3>'+
+  pillar('1️⃣','「やらせる」ではなく「はじめられた」を祝う',
+   '机に向かった時間の長さより、<b>自分から始められた回数</b>を数えます。だから最小単位は5分。'+
+   '続けるためのアプリで、追い込むためのアプリではありません。')+
+  pillar('2️⃣','AIを「ずるい道具」ではなく「となりの相棒」に',
+   '答えをすぐには教えません。ヒントと問いかけで、<b>考える力を残したまま</b>伴走します。'+
+   'これからの子どもたちが、AIと自然に付き合えるようになるための練習の場でもあります。')+
+  pillar('3️⃣','がんばりは、家族に届いてはじめて意味を持つ',
+   'きろくは家族で共有され、「承認」という形であなたの<b>"見てるよ"</b>が子どもに届きます。'+
+   'ごほうびの本体はポイントではなく、<b>あなたが認めてくれたという事実</b>です。')+
+  '<div class="muted" style="margin-top:12px;text-align:center;line-height:1.9">'+
+  '——まずは<b>「承認」</b>だけ覚えて帰ってください。<br>それだけで、このアプリは動きはじめます。</div>'+
+  '<button class="btn" style="margin-top:14px" onclick="showParentGuide()">📖 はじめての方へ(つかいかた)</button>'+
+  (fromParent?'<button class="btn ghost sm" style="margin-top:8px" onclick="openParent()">パパ・ママモードへ →</button>'
+   :'<button class="btn ghost sm" style="margin-top:8px" onclick="closeModal()">とじる</button>'));}
+function showParentGuide(){
+ const row=(em,t,b)=>'<div class="sess" style="align-items:flex-start"><span class="em">'+em+'</span>'+
+  '<div class="info"><b>'+t+'</b><br><span class="muted" style="line-height:1.85">'+b+'</span></div></div>';
+ const map=(t,b)=>'<div class="ticket-item"><span style="flex:0 0 128px;font-size:13px;font-weight:700">'+t+'</span>'+
+  '<span class="muted" style="flex:1;font-size:12px">'+b+'</span></div>';
+ openModal('<h3>📖 はじめての方へ(保護者の方へ)</h3>'+
+  '<div class="muted">ここだけ読めば大丈夫です。それぞれの詳しい説明は、各設定画面にも書いてあります。</div>'+
+  row('✅','まず「承認」してください',
+   'これが<b>ごほうびのスイッチ</b>です。お子さんの記録を承認すると、次にアプリを開いたときに🎰スロットが回せます。'+
+   '<b>承認しないと報酬が止まり</b>、やる気も止まります。1〜2日以内がおすすめです。')+
+  row('📅','週は「日曜〜土曜」です',
+   '土曜にたてる作戦だけは<b>翌週ぶん</b>になります(週の終わりに次を計画するため)。'+
+   '日曜〜金曜は「今週」の作戦です。')+
+  row('⭐','ポイントは「つうちょう(台帳)」が正しい値',
+   '残高は取引の合計です。ズレたら「🔧データとシステム → ポイントちょうせい」で理由つきで直せます。')+
+  row('📷','写真は撮った端末の中だけにあります',
+   'かぞく同期にもバックアップJSONにも<b>含まれません</b>(容量のため)。'+
+   'ほかの端末では📷マークになりますが、記録そのものは同期されています。故障ではありません。')+
+  row('☁️','かぞく同期と、こどもPIN・親PIN',
+   '「かぞく同期」で家族コードを作り、もう一方の端末で「つながる」に入力すると記録が共有されます。'+
+   'コードは<b>家族だけ</b>に。<b>親PINは同期されません</b>(端末ごとに設定してください)。'+
+   'こどもPINを設定すると、起動時に「だれがつかう?」が出てきょうだいの回し合いを防げます。')+
+  row('🔑','AI相棒を使うにはAPIキーが必要です',
+   'Googleの無料キーを「🔧データとシステム」で設定します(クレジットカード不要・約5分。'+
+   '取得ガイドのボタンがあります)。キーは<b>この端末の中だけ</b>に保存されます。')+
+  row('💾','こまったらバックアップ',
+   '「🔧データとシステム → バックアップ」でJSONを保存できます。'+
+   '復元(上書き)と、別端末のデータとの合体(マージ)ができます。'+
+   '<b>端末を機種変更する前には必ず保存</b>してください。')+
+  '<h2 style="margin-top:16px">🗺️ パパ・ママモードの地図</h2>'+
+  '<div class="muted">どこに何があるか。細かい設定は、それぞれの画面に説明があります。</div>'+
+  '<div style="margin-top:6px">'+
+  map('✅ 承認センター','記録・ボーナス・ミッションの承認と却下')+
+  map('🎯 特別ミッション','お手伝いなど臨時の課題を出す(承認で加点)')+
+  map('🎁 ごほうび設定','ごほうび券と値段／模試の目標／大きなごほうび／テキスト登録')+
+  map('📅 リマインダー','作戦がまだのときの声かけ(曜日・回数)')+
+  map('🤖 AI相棒に…','お子さんのことをAIに伝える(会話とレポートに反映)')+
+  map('👥 メンバーときち','なまえ・学年・こどもPIN／きちの追加と編集')+
+  map('☁️ かぞく同期','家族コードで複数端末をつなぐ')+
+  map('🔧 データとシステム','ポイント調整／APIキー／親PIN／バックアップ／初期化')+
+  '</div>'+
+  '<button class="btn ghost sm" style="margin-top:14px" onclick="showConcept()">📖 大切にしていること を読む</button>'+
+  '<button class="btn ghost sm" style="margin-top:8px" onclick="openParent()">← パパ・ママモードにもどる</button>');}
 /* ---------- 🚀ロケットOP(起動時1回だけのスプラッシュ) ---------- */
 function showSplash(){
  if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches)return;
@@ -1612,7 +1683,9 @@ function setHTML(){const p=P();
  '<button class="btn sm" style="margin-top:10px" onclick="parentGate()">🔐 ひらく</button></div>'+
  '<div class="card"><h2>📖 つかいかた</h2>'+
  '<div class="muted">はじめてガイドを もういちど見られるよ。</div>'+
- '<button class="btn ghost sm" style="margin-top:8px" onclick="showGuide(0)">🎈 つかいかたガイドを見る</button></div>'+
+ '<button class="btn ghost sm" style="margin-top:8px" onclick="showGuide(0)">🎈 つかいかたガイドを見る</button>'+
+ '<button class="btn ghost sm" style="margin-top:8px" onclick="showParentGuide()">📖 はじめての方へ(保護者の方へ)</button>'+
+ '<button class="btn ghost sm" style="margin-top:8px" onclick="showConcept()">💡 大切にしていること</button></div>'+
  '<details class="pd"><summary>📱 アプリとしてつかう</summary><div class="pd-body">'+
  '<div class="muted">ホーム画面についかすると、アプリみたいに全画面でつかえるよ。<br>'+
  '・Android(Chrome):右上の⋮メニュー →「ホーム画面に追加」<br>'+
@@ -1681,7 +1754,9 @@ function pdRestore(snap,focusId){
  const mo=document.querySelector('#modal-root .modal');
  if(mo&&snap&&snap.scroll)mo.scrollTop=snap.scroll;
  if(focusId){const el=$('#'+focusId);if(el)el.focus();}}
-function openParent(focusId){const p=P();const pend=p.sessions.filter(s=>s.status==='pending');
+function openParent(focusId){
+ if(!conceptSeen()){showConcept(true);return;} // 初回だけ: 何をする道具かを先に伝える
+ const p=P();const pend=p.sessions.filter(s=>s.status==='pending');
  const _snap=pdSnapshot();
  const nApprove=pend.length+pendingBonus(p).length+claimedMissions(p).length;
  /* ① 承認センター */
@@ -1825,6 +1900,7 @@ function openParent(focusId){const p=P();const pend=p.sessions.filter(s=>s.statu
   '<button class="btn ghost sm" style="margin-top:6px;color:#B04040" onclick="factoryReset()">初期設定にもどす</button>'+
   feedbackSectionHTML();
  openModal('<h3>👨 パパ・ママモード('+esc(p.name)+')</h3>'+
+  '<button class="btn ghost sm" style="margin-bottom:10px" onclick="showParentGuide()">📖 はじめての方へ(つかいかた・こまったとき)</button>'+
   pdSec('approve','✅ 承認センター',nApprove?('承認まち '+nApprove):'',secApprove,true)+
   pdSec('mission','🎯 特別ミッションを出す','',secMission,false)+
   pdSec('reward','🎁 ごほうび設定','',secReward,false)+
