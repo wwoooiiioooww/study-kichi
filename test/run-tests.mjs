@@ -928,7 +928,7 @@ console.log('\n[18] 🤖Personal Context');
   ok(doc.querySelector('#pd-ctx').innerHTML.includes('個人が特定できる情報'), '個人情報を書かない注意がある');
   const before = p.metaMt;
   doc.querySelector('#ctx-about').value = '負けずぎらい。算数のひらめき問題が好き';
-  doc.querySelector('#ctx-now').value = 'アルプス子供会のキャンプに参加中';
+  doc.querySelector('#ctx-now').value = 'しゅうがく旅行に行っている';
   doc.querySelector('#ctx-until').value = '2026-07-24';
   w.saveParent();
   eq(w.P().context.about, '負けずぎらい。算数のひらめき問題が好き', '長期の情報が保存される');
@@ -959,10 +959,10 @@ console.log('\n[18] 🤖Personal Context');
   w.closeModal(); w.nudgeSave({});
   const p = w.P();
   const until = new Date(Date.now() - 864e5); // きのう終わった
-  p.context = { about: '', now: 'アルプス子供会のキャンプ', nowUntil:
+  p.context = { about: '', now: 'しゅうがく旅行', nowUntil:
     until.getFullYear() + '-' + String(until.getMonth() + 1).padStart(2, '0') + '-' + String(until.getDate()).padStart(2, '0') };
   ok(w.maybeBackNudge(), 'できごとが終わった翌日に「おかえり」を出す');
-  ok(mr().includes('おかえり') && mr().includes('アルプス子供会のキャンプ'), 'できごとの名前を入れて声をかける');
+  ok(mr().includes('おかえり') && mr().includes('しゅうがく旅行'), 'できごとの名前を入れて声をかける');
   ok(mr().includes('5分だけ'), '小さく再開する提案をする');
   ok(mr().includes('しゅつげき'), 'そのまま しゅつげきできる');
   w.closeModal();
