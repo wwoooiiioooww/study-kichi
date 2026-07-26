@@ -264,7 +264,7 @@ body.has-fab #shell{padding-bottom:124px} /* FABが最後のカードに かぶ�
    データはこの端末の中だけに保存されます（localStorage / IndexedDB）
    ============================================================ */
 /* ---------- マスタ ---------- */
-const APP_VER='v20'; // せってい表示とフィードバックの共通バージョン。sw.js の CACHE と同時に上げること
+const APP_VER='v21'; // せってい表示とフィードバックの共通バージョン。sw.js の CACHE と同時に上げること
 /* 汎用サンプル(配布用)。既存端末の保存済みデータは上書きされない */
 const DEFAULT_BASES=[
  {id:'lib',name:'としょかん',em:'📚'},
@@ -1771,7 +1771,7 @@ function openParent(focusId){const p=P();const pend=p.sessions.filter(s=>s.statu
   '<label>この子について(ずっと使う情報)</label>'+
   '<textarea id="ctx-about" rows="3" placeholder="例:負けずぎらい。算数のひらめき問題が好き。国語の記述に苦手意識がある。ほめられるとぐんと伸びる">'+esc(cx.about||'')+'</textarea>'+
   '<label style="margin-top:10px">いまのできごと(しばらくのあいだ)</label>'+
-  '<textarea id="ctx-now" rows="2" placeholder="例:アルプス子供会のキャンプ(子どもだけの合宿)に参加中">'+esc(cx.now||'')+'</textarea>'+
+  '<textarea id="ctx-now" rows="2" placeholder="例:しゅうがく旅行に行っている">'+esc(cx.now||'')+'</textarea>'+
   '<div class="row" style="margin-top:6px;align-items:center">'+
   '<span style="flex:0 0 62px;font-size:13px;font-weight:700;color:var(--ink-soft)">いつまで</span>'+
   '<input type="date" id="ctx-until" value="'+esc(cx.nowUntil||'')+'"></div>'+
