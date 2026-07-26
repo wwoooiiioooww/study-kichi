@@ -1,8 +1,10 @@
 /* スタディきち Service Worker
+   Copyright (c) 2026 そら ＆ ふう ＆ パパ / https://github.com/wwoooiiioooww/study-kichi
+   利用条件は同梱の LICENSE をご覧ください。
    ・アプリ本体(index.html)はネット優先→オフライン時はキャッシュ(更新がすぐ届く)
    ・アイコンやフォントはキャッシュ優先(サクサク起動)
    ・Gemini APIへの通信には一切さわらない */
-const CACHE = 'studykichi-v23';
+const CACHE = 'studykichi-v24';
 const ASSETS = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './icon-maskable-512.png'];
 
 self.addEventListener('install', e => {
