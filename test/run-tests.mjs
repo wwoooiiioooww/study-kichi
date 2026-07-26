@@ -463,12 +463,12 @@ console.log('\n[10] 👨親モードUI');
   p.sessions.unshift({ id: 'sp1', base: 'home', plannedMin: 25, startTs: 1, endTs: 2, minutes: 25, subjects: [], memo: '', photoId: null, boards: [], focus: null, status: 'pending', spin: null, mt: 1 });
   w.openParent();
   const mr = () => w.document.querySelector('#modal-root');
-  eq(mr().querySelectorAll('details.pd').length, 7, '7つの折りたたみセクションがある');
+  eq(mr().querySelectorAll('details.pd').length, 8, '8つの折りたたみセクションがある');
   const ap = mr().querySelector('#pd-approve');
   ok(ap && ap.open, '承認センターは初期展開');
   ok(ap.innerHTML.includes('承認まちはありません') === false && ap.innerHTML.includes('セッション(1)'), '承認センターに件数が出る');
   ok(mr().innerHTML.includes('承認まち 1'), 'サマリに承認まちバッジ');
-  for (const id of ['pd-mission', 'pd-reward', 'pd-remind', 'pd-member', 'pd-sync', 'pd-sys']) {
+  for (const id of ['pd-mission', 'pd-reward', 'pd-remind', 'pd-ctx', 'pd-member', 'pd-sync', 'pd-sys']) {
     const d = mr().querySelector('#' + id);
     ok(d && !d.open, id + ' は初期折りたたみ');
   }
@@ -907,6 +907,106 @@ console.log('\n[17] 🔁切替の合図・文言・PIN入力');
   // 子どものPIN・PIN変更欄にも同じ生成関数を使っている
   ok(w.showWhoModal.toString().length > 0 && w.whoPick.toString().indexOf('pinInput') >= 0, 'こどもPINにも同じ入力を使う(コード照合)');
   ok(w.openParent.toString().indexOf("pinInput('pin-chg'") >= 0, 'PIN変更欄にも同じ入力を使う(コード照合)');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+
+/* ---------- 18. 🤖Personal Context(v20) ---------- */
+console.log('\n[18] 🤖Personal Context');
+{
+  const { w, errors } = boot(undefined, { studykichi_guide: '1' });
+  const doc = w.document;
+  w.closeModal();
+  const p = w.P();
+  // 既定は空 → 今までどおりのプロンプト(余計なものを足さない)
+  eq(p.context.about, '', '既定は空');
+  eq(w.ctxPrompt(p), '', '空なら何も足さない(従来どおりの動作)');
+  // 保護者モードで入力 → まとめて保存
+  w.openParent();
+  ok(doc.querySelector('#pd-ctx'), 'パパ・ママモードにPersonal Contextのセクションがある');
+  ok(doc.querySelector('#pd-ctx').innerHTML.includes('Google'), '送信先とクラウド保存の注意が書いてある');
+  ok(doc.querySelector('#pd-ctx').innerHTML.includes('個人が特定できる情報'), '個人情報を書かない注意がある');
+  const before = p.metaMt;
+  doc.querySelector('#ctx-about').value = '負けずぎらい。算数のひらめき問題が好き';
+  doc.querySelector('#ctx-now').value = 'アルプス子供会のキャンプに参加中';
+  doc.querySelector('#ctx-until').value = '2026-07-24';
+  w.saveParent();
+  eq(w.P().context.about, '負けずぎらい。算数のひらめき問題が好き', '長期の情報が保存される');
+  eq(w.P().context.nowUntil, '2026-07-24', '期限が保存される');
+  ok(w.P().metaMt > before, '編集したのでmetaMtが進む(同期のLWW用)');
+  eq(w.eval('S').profiles.fuka.metaMt, 0, '編集していないメンバーのmetaMtは進まない');
+  // 期限の内/外
+  const inTerm = new Date(2026, 6, 23).getTime(), afterTerm = new Date(2026, 6, 26).getTime();
+  ok(w.ctxNowActive(w.P(), inTerm), '期限内は「いまのできごと」が有効');
+  ok(!w.ctxNowActive(w.P(), afterTerm), '期限をすぎたら会話に使わない');
+  ok(w.ctxNowJustEnded(w.P(), afterTerm), '終わった直後は「おかえり」の対象');
+  ok(!w.ctxNowJustEnded(w.P(), new Date(2026, 7, 10).getTime()), '1週間すぎたら「おかえり」は言わない(今さら感を出さない)');
+  ok(!w.ctxNowJustEnded(w.P(), inTerm), '期限内は「おかえり」にならない');
+  // プロンプトへの注入
+  const sp = w.sysPrompt(w.P());
+  ok(sp.includes('負けずぎらい'), 'チャットのプロンプトに長期の情報が入る');
+  ok(sp.includes('責めたりしない'), '責めない指示が入る');
+  ok(sp.includes('パパ・ママから聞いた') , '出どころを本人に言わない指示が入る');
+  ok(w.makeReport.toString().includes('この時期のできごと'), '週次レポートにもできごとを渡す(コード照合)');
+  ok(w.makeReport.toString().includes('この子について'), '週次レポートに長期の情報も渡す(コード照合)');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  // 👋カムバックナッジ: 終わった翌日に1回だけ
+  const { w, errors } = boot(undefined, { studykichi_guide: '1' });
+  const mr = () => w.document.querySelector('#modal-root').innerHTML;
+  w.closeModal(); w.nudgeSave({});
+  const p = w.P();
+  const until = new Date(Date.now() - 864e5); // きのう終わった
+  p.context = { about: '', now: 'アルプス子供会のキャンプ', nowUntil:
+    until.getFullYear() + '-' + String(until.getMonth() + 1).padStart(2, '0') + '-' + String(until.getDate()).padStart(2, '0') };
+  ok(w.maybeBackNudge(), 'できごとが終わった翌日に「おかえり」を出す');
+  ok(mr().includes('おかえり') && mr().includes('アルプス子供会のキャンプ'), 'できごとの名前を入れて声をかける');
+  ok(mr().includes('5分だけ'), '小さく再開する提案をする');
+  ok(mr().includes('しゅつげき'), 'そのまま しゅつげきできる');
+  w.closeModal();
+  ok(!w.maybeBackNudge(), '2回目は出さない(追撃しない)');
+  eq(mr(), '', 'モーダルは出ていない');
+  // 「おかえり」を優先し、同時に2つ出さない
+  w.nudgeSave({});
+  w.eval('S').planRemind.day = new Date().getDay();
+  w.maybeNudge();
+  ok(mr().includes('おかえり'), 'さくせん会議より「おかえり」を優先する');
+  w.closeModal();
+  w.maybeNudge();
+  ok(mr().includes('さくせん会議'), '「おかえり」が済んだらさくせん会議の声かけに戻る');
+  w.closeModal();
+  // 割り込まない条件
+  w.nudgeSave({});
+  w.eval('S').activeSession = { base: 'home', plannedMin: 25, startTs: Date.now(), boards: [] };
+  ok(!w.maybeBackNudge(), 'しゅつげき中は割り込まない');
+  w.eval('S').activeSession = null;
+  // 記録は端末ローカル(同期データを汚さない)
+  w.maybeBackNudge();
+  ok(Object.keys(w.nudgeLoad()).some(k => k.startsWith('back|')), '表示済みの記録は端末ローカルに残る');
+  ok(!JSON.stringify(w.eval('S')).includes('back|'), '同期データ・バックアップJSONには入らない');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  // migrate: 旧データ・壊れた値の防御 + マージ(metaMt LWW)
+  const { w, errors } = boot(undefined, { studykichi_guide: '1' });
+  w.closeModal();
+  const st = { profiles: { x: { pool: [], weeks: {}, exams: [], context: { about: 'a'.repeat(900), now: 'b', nowUntil: 'へんな日付' } } } };
+  w.migrate(st);
+  eq(st.profiles.x.context.about.length, 600, '長すぎる文章は切り詰める(プロンプト暴発の防止)');
+  eq(st.profiles.x.context.nowUntil, '', '日付の形になっていない値は捨てる(import防御)');
+  const st2 = { profiles: { y: { pool: [], weeks: {}, exams: [] } } };
+  w.migrate(st2);
+  eq(st2.profiles.y.context.about, '', '旧データには空のcontextが付与される');
+  // マージ: metaMtが新しい方のcontextが採用される
+  const clone = o => JSON.parse(JSON.stringify(o));
+  const base = JSON.parse(w.eval('JSON.stringify(S)'));
+  const a = clone(base); a.profiles.sora.context = { about: 'ふるい', now: '', nowUntil: '' }; a.profiles.sora.metaMt = 100;
+  const b2 = clone(base); b2.profiles.sora.context = { about: 'あたらしい', now: '', nowUntil: '' }; b2.profiles.sora.metaMt = 200;
+  eq(w.mergeState(a, b2).profiles.sora.context.about, 'あたらしい', 'contextはmetaMtが新しい方が勝つ');
+  eq(w.mergeState(b2, a).profiles.sora.context.about, 'あたらしい', '引数順によらない(可換)');
   eq(errors.length, 0, 'runtime errors: none');
   w.close();
 }

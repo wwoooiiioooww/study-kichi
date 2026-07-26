@@ -264,7 +264,7 @@ body.has-fab #shell{padding-bottom:124px} /* FABが最後のカードに かぶ�
    データはこの端末の中だけに保存されます（localStorage / IndexedDB）
    ============================================================ */
 /* ---------- マスタ ---------- */
-const APP_VER='v19'; // せってい表示とフィードバックの共通バージョン。sw.js の CACHE と同時に上げること
+const APP_VER='v20'; // せってい表示とフィードバックの共通バージョン。sw.js の CACHE と同時に上げること
 /* 汎用サンプル(配布用)。既存端末の保存済みデータは上書きされない */
 const DEFAULT_BASES=[
  {id:'lib',name:'としょかん',em:'📚'},
@@ -313,6 +313,7 @@ function mkProfile(name,em,grade){return{
  ownedThemes:['sky','sakura'],
  missions:[],
  ledger:[],   /* ポイント取引台帳。p.points は台帳合計のキャッシュ */
+ context:{about:'',now:'',nowUntil:''}, /* v20: AI相棒に渡すPersonal Context(長期/短期+期限) */
  deleted:{},  /* 墓標 {id:削除ts}。マージでの蘇り防止 */
  metaMt:0,    /* スカラー群(name/pool/books/theme等)の更新時刻。マージはLWW */
 };}
@@ -358,6 +359,9 @@ function migrate(st){
   if(!Array.isArray(pr.ledger)){pr.ledger=[]; // 既存残高は繰越取引に(決定的ID=2端末で同時migrateしても収束)
    const bal=Math.round(Number(pr.points)||0);
    if(bal!==0)pr.ledger.push({id:'tx-init-'+pid,ts:Date.now(),delta:bal,reason:'carryover',ref:null});}
+  if(!pr.context||typeof pr.context!=='object')pr.context={about:'',now:'',nowUntil:''};
+  ['about','now'].forEach(k=>{pr.context[k]=String(pr.context[k]||'').slice(0,600);});
+  pr.context.nowUntil=/^\d{4}-\d{2}-\d{2}$/.test(pr.context.nowUntil||'')?pr.context.nowUntil:'';
   if(!pr.deleted||typeof pr.deleted!=='object')pr.deleted={};
   if(pr.metaMt==null)pr.metaMt=0;
   /* ID採番(内容由来の決定的IDにし、同じ旧データを別端末でmigrateしても収束させる) */
@@ -580,7 +584,7 @@ function renderHeader(){const p=P();
 function switchProfile(id){const pr=S.profiles[id];
  if(!pr||id===S.currentProfile)return;
  if(pr.pin){whoPick(id);return;}
- S.currentProfile=id;save();render();maybePlanNudge();}
+ S.currentProfile=id;save();render();maybeNudge();}
 /* --- 起動時の「だれがつかう?」ゲート --- */
 function launchGate(){
  if(!Object.values(S.profiles).some(pr=>pr.pin))return; // だれもPINなし→今までどおり
@@ -592,14 +596,14 @@ function showWhoModal(){
   '<span style="font-size:28px">'+pr.em+'</span><span>'+esc(pr.name)+' <span class="muted">'+esc(pr.grade)+'</span>'+(pr.pin?' 🔒':'')+'</span></button>').join('')+
  (S.parentPin?'<button class="btn ghost sm" style="margin-top:12px" onclick="whoParent()">👨 おうちの人(親のPINでひらく)</button>':''),false);}
 function whoPick(id){const pr=S.profiles[id];if(!pr)return;
- if(!pr.pin){S.currentProfile=id;save();closeModal();render();maybePlanNudge();return;}
+ if(!pr.pin){S.currentProfile=id;save();closeModal();render();maybeNudge();return;}
  openModal('<h3>'+pr.em+' '+esc(pr.name)+'のPIN</h3>'+
  pinInput('who-pin','font-size:24px;text-align:center;letter-spacing:10px')+
  '<button class="btn" style="margin-top:12px" onclick="whoPinOk(\''+id+'\')">ひらく</button>'+
  '<button class="btn ghost sm" style="margin-top:8px" onclick="showWhoModal()">← もどる</button>',false);
  setTimeout(()=>{const el=$('#who-pin');if(el)el.focus();},60);}
 function whoPinOk(id){const pr=S.profiles[id];
- if($('#who-pin').value===pr.pin){S.currentProfile=id;save();closeModal();render();maybePlanNudge();}
+ if($('#who-pin').value===pr.pin){S.currentProfile=id;save();closeModal();render();maybeNudge();}
  else alert('ちがうみたい…');}
 function whoParent(){
  openModal('<h3>👨 親のPIN</h3>'+
@@ -640,6 +644,36 @@ function planNudgeDue(nowTs){const now=nowTs||Date.now();
  if(st.n>=(r.max||3))return null;                    // 回数ぶん出しきった→来週まで待つ
  if(st.d===dayKey(now))return null;                  // きょうはもう出した
  return {key,k,all,st,now};}
+/* ---------- 🤖Personal Context(v20) ----------
+   親が書いた「この子について(長期)」と「いまのできごと(短期+期限)」を、
+   AI相棒の会話・週次レポート・カムバックナッジに効かせる */
+function dstr(s){const a=String(s||'').split('-').map(Number);
+ return (a.length===3&&a.every(n=>!isNaN(n)))?new Date(a[0],a[1]-1,a[2]).getTime():null;}
+function midnight(ts){const d=new Date(ts||Date.now());d.setHours(0,0,0,0);return d.getTime();}
+function ctxNowActive(p,nowTs){const c=p.context||{};if(!c.now)return null;
+ const u=dstr(c.nowUntil);
+ if(u==null)return {text:c.now,until:''};              // 期限なし=ずっと有効
+ return midnight(nowTs)<=u?{text:c.now,until:c.nowUntil}:null;}
+function ctxNowJustEnded(p,nowTs){const c=p.context||{};if(!c.now)return null;
+ const u=dstr(c.nowUntil);if(u==null)return null;
+ const d=Math.round((midnight(nowTs)-u)/864e5);
+ return (d>=1&&d<=7)?{text:c.now,until:c.nowUntil}:null;} // 終わった翌日〜1週間だけ「おかえり」
+/* 👋カムバックナッジ: できごとが終わった翌日に1回だけ。追撃しない */
+function maybeBackNudge(){
+ if($('#modal-root').innerHTML||S.activeSession)return false;
+ const p=P();const ev=ctxNowJustEnded(p);if(!ev)return false;
+ const all=nudgeLoad();const k='back|'+S.currentProfile+'|'+ev.until;
+ if(all[k])return false;
+ all[k]=1;nudgeSave(all);
+ openModal('<h3>👋 おかえり!</h3>'+
+  '<div class="muted">「'+esc(ev.text)+'」どうだった?<br>'+
+  'そろそろ べんきょうモードに もどろうか。<b>まずは5分だけ</b>でも いいよ ☺️</div>'+
+  '<button class="btn" style="margin-top:14px" onclick="closeModal();fabBases()">🚀 しゅつげき する</button>'+
+  (S.gemini.key?'<button class="btn ghost sm" style="margin-top:8px" onclick="closeModal();go(\'ai\')">🤖 AI相棒に はなす</button>':'')+
+  '<button class="btn ghost sm" style="margin-top:8px" onclick="closeModal()">あとで</button>');
+ return true;}
+/* 起動・プロフィール切替のたたき台。おかえりを優先し、同時に2つは出さない */
+function maybeNudge(){if(maybeBackNudge())return;maybePlanNudge();}
 function maybePlanNudge(){
  if($('#modal-root').innerHTML||S.activeSession)return;
  const d=planNudgeDue();if(!d)return;
@@ -1323,6 +1357,9 @@ async function makeReport(){const p=P();
   週末ボスバトル:wk.test?(wk.test.correct+'/'+wk.test.total+'問正解'+(wk.test.correct===wk.test.total?'(満点)':'')+(wk.test.items?' 内訳:'+wk.test.items.map(x=>x.subj+x.correct+'/'+x.total).join(','):'')):'未実施',
   リベンジ:(wk.reviews||[]).length?(wk.reviews.filter(r=>r.done).length+'/'+wk.reviews.length+'教科クリア'):'対象なし',
   パーフェクトウィーク連続週数:weekLoopStreak(p,key)};
+ const _c=p.context||{};const _ev=ctxNowActive(p)||ctxNowJustEnded(p); // 期間中/終わったばかりのできごと
+ if(_c.about)info['この子について']=_c.about;
+ if(_ev)info['この時期のできごと']=_ev.text+(_ev.until?'('+_ev.until+'まで)':'');
  const btn=$('#rep-btn');if(btn){btn.disabled=true;btn.textContent='🤖 かんがえ中…';}
  try{
   const prompt='あなたは小学生の勉強コーチ「'+p.aiName+'」です。'+p.name+'さん('+p.grade+')の1週間レポートを日本語で書いてください。\n'+
@@ -1332,6 +1369,7 @@ async function makeReport(){const p=P();
    '🔍つぎのチャレンジ … 作戦と実際のギャップをやさしく1つだけ。責めない(2文)\n'+
    '💡らいしゅうのヒント … 具体的なコツを2つ(各1〜2文)\n'+
    '👨‍👩‍👧パパ・ママにじまんしよう! … 親に見せる用。数字を使って客観的に、どれだけ頑張ったかを堂々と書く(3〜4文)\n'+
+   (_ev?'「この時期のできごと」があるので、それにふれて はげます。できごとで勉強できなかった日があっても責めない。\n':'')+
    '小学生にわかる言葉で明るく、ぜんぶで400字ほど。#や*などの記号は使わない。';
   const res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+
    encodeURIComponent(S.gemini.model)+':generateContent?key='+encodeURIComponent(S.gemini.key),{
@@ -1511,7 +1549,16 @@ function sysPrompt(p){return 'あなたは小学生の勉強パートナー「'+
  '5. 本人が2回以上しっかり考えたやりとりの後なら、答えと解説を教えてよい。\n'+
  '6. 勉強と関係ない雑談は少しなら付き合ってよいが、危険・不適切な話題はやさしく勉強にもどす。\n'+
  '7. 写真がおくられたら、それは問題やノートの画像です。まず何の問題かを短く確かめてから、上のルールにそってヒントや解説をする。\n'+
- '8. 絵文字はときどき少しだけ使う。';}
+ '8. 絵文字はときどき少しだけ使う。'+ctxPrompt(p);}
+/* Personal Context をシステムプロンプトに足す(空なら何も足さない=従来どおりの動作) */
+function ctxPrompt(p){const c=p.context||{};const ev=ctxNowActive(p);
+ if(!c.about&&!ev)return '';
+ return '\n\nこの子について(保護者からの情報。本人には「パパ・ママから聞いた」とは言わない):\n'+
+  (c.about?'・'+c.about+'\n':'')+
+  (ev?'・いまのできごと: '+ev.text+(ev.until?'('+ev.until+'まで)':'')+'\n':'')+
+  '9. この情報は会話を温かくするために使う。会話のはじめの一言でふれるのは自然だが、'+
+  '毎回むし返さない。本人が問題の話をしたいときは すぐ勉強にもどる。'+
+  'できごとを勉強しない言い訳あつかいしたり、責めたりしない。';}
 async function sendChat(forceText){const p=P();const ta=$('#chat-in');
  if(recOn)try{recog.stop();}catch(e){}
  const t=(forceText!=null?forceText:(ta?ta.value.trim():''));
@@ -1712,7 +1759,27 @@ function openParent(focusId){const p=P();const pend=p.sessions.filter(s=>s.statu
    [1,2,3,4,5].map(n=>'<option value="'+n+'"'+(Number(rm.max)===n?' selected':'')+'>'+n+'回まで</option>').join('')+
   '</select></div>'+
   '<div class="muted" style="margin-top:8px">💡 このアプリの週は「日曜〜土曜」です。土曜だけは<b>らいしゅう</b>の作戦をたてる日になります。</div>';
- /* ⑤ メンバーときち */
+ /* ⑤ AI相棒に おしえておくこと(Personal Context / v20) */
+ const cx=p.context||{about:'',now:'',nowUntil:''};
+ const cxEv=ctxNowActive(p);
+ const secCtx=
+  '<div class="muted">AI相棒「'+esc(p.aiName)+'」が'+esc(p.name)+'さんのことを知ったうえで会話し、1週間レポートも書きます。'+
+  '空欄なら今までどおりの動きです。</div>'+
+  '<div class="muted" style="background:#FFF3D1;padding:9px;border-radius:12px;margin-top:8px">'+
+  '⚠️ ここに書いた内容は<b>Google(Gemini)に送られ</b>、かぞく同期でクラウドにも保存されます。'+
+  '住所・学校名・電話番号など、個人が特定できる情報は書かないでください。</div>'+
+  '<label>この子について(ずっと使う情報)</label>'+
+  '<textarea id="ctx-about" rows="3" placeholder="例:負けずぎらい。算数のひらめき問題が好き。国語の記述に苦手意識がある。ほめられるとぐんと伸びる">'+esc(cx.about||'')+'</textarea>'+
+  '<label style="margin-top:10px">いまのできごと(しばらくのあいだ)</label>'+
+  '<textarea id="ctx-now" rows="2" placeholder="例:アルプス子供会のキャンプ(子どもだけの合宿)に参加中">'+esc(cx.now||'')+'</textarea>'+
+  '<div class="row" style="margin-top:6px;align-items:center">'+
+  '<span style="flex:0 0 62px;font-size:13px;font-weight:700;color:var(--ink-soft)">いつまで</span>'+
+  '<input type="date" id="ctx-until" value="'+esc(cx.nowUntil||'')+'"></div>'+
+  '<div class="muted" style="margin-top:6px">💡「いつまで」を入れておくと、<b>終わった次の日</b>に「おかえり!どうだった?」と1回だけ声をかけて、勉強モードへの切りかえをうながします。'+
+  (cxEv?'<br>🟢 いま有効です'+(cxEv.until?'('+esc(cxEv.until)+'まで)':'(期限なし)'):
+   (cx.now?'<br>⚪ 期限をすぎたので、会話には使われていません':''))+'</div>'+
+  '<div class="muted" style="margin-top:6px">※変更は下の「まとめて保存」でほぞんされます。</div>';
+ /* ⑥ メンバーときち */
  const secMember=
   '<h2 style="margin-top:2px">👥 メンバーの編集</h2>'+
   '<div class="muted">なまえ・学年をかえても、きろくやポイントはそのまま引きつがれます。削除はもどせません。<br>💡「こどもPIN」(4けた)を設定すると、アプリを開いたときに「だれがつかう?」画面が出て、本人しか入れなくなります(きょうだいのスロット回し防止!)。空欄にするとロックなしです。</div>'+
@@ -1762,6 +1829,7 @@ function openParent(focusId){const p=P();const pend=p.sessions.filter(s=>s.statu
   pdSec('mission','🎯 特別ミッションを出す','',secMission,false)+
   pdSec('reward','🎁 ごほうび設定','',secReward,false)+
   pdSec('remind','📅 さくせん会議リマインダー',(S.planRemind&&S.planRemind.on)?'':'OFF',secRemind,false)+
+  pdSec('ctx','🤖 AI相棒に おしえておくこと',(p.context&&(p.context.about||p.context.now))?'設定ずみ':'',secCtx,false)+
   pdSec('member','👥 メンバーときち','',secMember,false)+
   pdSec('sync','☁️ かぞく同期',syncBadge(),syncSectionHTML(),false)+
   pdSec('sys','🔧 データとシステム','',secSys,false)+
@@ -1859,7 +1927,7 @@ function keyGuide(){openModal('<h3>🔑 AI相棒のカギ(APIキー)のもらい
    未編集プロフィールのmetaMtを進めると、家族同期で未編集側(デフォルト値のまま等)が本物のデータにLWWで勝ち
    名前・きち・ごほうび・目標・テキストを上書きする事故になる(v15で実際に発生) */
 function metaSnap(pr){return stableStr({name:pr.name,em:pr.em,grade:pr.grade,pin:pr.pin,aiName:pr.aiName,
- examTarget:pr.examTarget,bigGoals:pr.bigGoals,pool:pr.pool,books:pr.books,theme:pr.theme});}
+ examTarget:pr.examTarget,bigGoals:pr.bigGoals,pool:pr.pool,books:pr.books,theme:pr.theme,context:pr.context});}
 function saveParent(){
  const p=P();
  // 保存前スナップショット(実際に変わったプロフィール・きちだけmetaMt/basesMtを打つため)
@@ -1892,6 +1960,11 @@ function saveParent(){
  document.querySelectorAll('[data-bs-em]').forEach(i=>{const b=S.bases[Number(i.dataset.bsEm)];if(b&&i.value.trim())b.em=i.value.trim();});
  document.querySelectorAll('[data-bs-nm]').forEach(i=>{const b=S.bases[Number(i.dataset.bsNm)];if(b&&i.value.trim())b.name=i.value.trim();});
  
+ if($('#ctx-about')){p.context=p.context||{};p.context.about=$('#ctx-about').value.trim().slice(0,600);}
+ if($('#ctx-now')){p.context=p.context||{};p.context.now=$('#ctx-now').value.trim().slice(0,300);}
+ if($('#ctx-until')){p.context=p.context||{};
+  const _u=$('#ctx-until').value;p.context.nowUntil=/^\d{4}-\d{2}-\d{2}$/.test(_u)?_u:'';}
+
  if($('#gm-key')) S.gemini.key=$('#gm-key').value.trim();
  if($('#gm-model')) S.gemini.model=$('#gm-model').value.trim()||'gemini-3.5-flash';
 
@@ -2270,7 +2343,7 @@ showSplash(); /* 🚀ロケットOP → launchGate(だれがつかう?) → ホ�
 render();
 launchGate();
 if(!guideSeen()&&!$('#modal-root').innerHTML)showGuide(0); /* 🎈初回だけガイド(PINゲート表示中は出さない) */
-maybePlanNudge(); /* 📅さくせん会議リマインダー(モーダルが出ているときは割り込まない) */
+maybeNudge(); /* 📅さくせん会議リマインダー・👋カムバックナッジ(モーダルが出ているときは割り込まない) */
 /* ☁️かぞく同期: 設定済みかつコード保存済みなら自動接続。オンライン復帰で保留分を再送 */
 syncLoad();
 if(syncConfigured()&&sync.code)syncConnect();
