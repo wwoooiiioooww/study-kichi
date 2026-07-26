@@ -30,6 +30,7 @@ function boot(preState, extraLS) {
       window.confirm = () => true;
       window.alert = m => alerts.push(String(m));
       window.addEventListener('error', e => errors.push(e.message));
+      window.localStorage.setItem('studykichi_concept', '1'); // 既定は表示済み(初回挙動は個別テストで検証)
       if (preState) window.localStorage.setItem('studykichi_v1', JSON.stringify(preState));
       if (extraLS) Object.entries(extraLS).forEach(([k, v]) => window.localStorage.setItem(k, v));
     },
@@ -486,9 +487,11 @@ console.log('\n[10] 👨親モードUI');
 console.log('\n[11] 🎈v15');
 {
   const { w, errors } = boot();
-  ok(w.document.querySelector('#modal-root').innerHTML.includes('しゅつげき'), '初回はガイドが自動表示される');
+  ok(w.document.querySelector('#modal-root').innerHTML.includes('ようこそ、スタディきちへ'), '初回はガイドが自動表示され、1枚目は世界観の宣言');
+  w.showGuide(1);
+  ok(w.document.querySelector('#modal-root').innerHTML.includes('しゅつげき'), '2枚目からは今までどおりの操作ガイド');
   eq(w.localStorage.getItem('studykichi_guide'), '1', '表示済みフラグが端末ローカルに立つ');
-  w.showGuide(3);
+  w.showGuide(4);
   ok(w.document.querySelector('#modal-root').innerHTML.includes('保護者の方へ'), '最終ページに保護者向け案内');
   w.closeModal();
   const St = w.eval('S');
@@ -1007,6 +1010,57 @@ console.log('\n[18] 🤖Personal Context');
   const b2 = clone(base); b2.profiles.sora.context = { about: 'あたらしい', now: '', nowUntil: '' }; b2.profiles.sora.metaMt = 200;
   eq(w.mergeState(a, b2).profiles.sora.context.about, 'あたらしい', 'contextはmetaMtが新しい方が勝つ');
   eq(w.mergeState(b2, a).profiles.sora.context.about, 'あたらしい', '引数順によらない(可換)');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+
+/* ---------- 19. 📖 コンセプト と はじめての方へ(v22) ---------- */
+console.log('\n[19] 📖コンセプト・保護者ガイド');
+{
+  // 初回のパパ・ママモード入室でだけコンセプトが出る(=確実に保護者が見ている瞬間)
+  const { w, errors } = boot(undefined, { studykichi_guide: '1' });
+  const mr = () => w.document.querySelector('#modal-root').innerHTML;
+  w.closeModal();
+  w.localStorage.removeItem('studykichi_concept');
+  ok(!w.conceptSeen(), '初期状態では未表示');
+  w.openParent();
+  ok(mr().includes('大切にしていること'), '初回のパパ・ママモードでコンセプトが出る');
+  ok(mr().includes('はじめられた'), '柱1: やらせるのではなく はじめられたを祝う');
+  ok(mr().includes('となりの相棒'), '柱2: AIは考える力を残して伴走する');
+  ok(mr().includes('あなたが認めてくれたという事実'), '柱3: 承認こそがごほうびの本体');
+  ok(mr().includes('「承認」</b>だけ覚えて'), '理念から実務(承認)へつなぐ一文がある');
+  ok(w.conceptSeen(), '表示したらフラグが立つ(端末ローカル)');
+  ok(!JSON.stringify(w.eval('S')).includes('studykichi_concept'), 'フラグは同期データに入らない');
+  // そのままパパ・ママモードへ進める
+  w.openParent();
+  ok(mr().includes('パパ・ママモード') && mr().includes('承認センター'), '2回目からは通常どおりパパ・ママモードが開く');
+  ok(mr().includes('はじめての方へ'), 'パパ・ママモードの先頭に説明書への導線がある');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  // 説明書の中身: 知らないと損する7項目 + モードの地図
+  const { w, errors } = boot(undefined, { studykichi_guide: '1' });
+  w.closeModal();
+  w.showParentGuide();
+  const g = w.document.querySelector('#modal-root').innerHTML;
+  ok(g.includes('ごほうびのスイッチ'), '①承認しないと報酬が止まることを最初に伝える');
+  ok(g.includes('日曜〜土曜') && g.includes('翌週ぶん'), '②週の区切りと土曜の例外');
+  ok(g.includes('つうちょう') && g.includes('ポイントちょうせい'), '③ポイントは台帳が正・直し方');
+  ok(g.includes('含まれません') && g.includes('故障ではありません'), '④写真が同期されないのは仕様だと明記');
+  ok(g.includes('親PINは同期されません') && g.includes('こどもPIN'), '⑤同期とPINの注意');
+  ok(g.includes('APIキー') && g.includes('この端末の中だけ'), '⑥AIキーの取得と保存場所');
+  ok(g.includes('機種変更する前には必ず保存'), '⑦バックアップを促す');
+  ok(g.includes('パパ・ママモードの地図'), 'モードの地図がある');
+  ['承認センター', '特別ミッション', 'ごほうび設定', 'リマインダー', 'メンバーときち', 'かぞく同期', 'データとシステム']
+    .forEach(t => ok(g.includes(t), '地図に載っている: ' + t));
+  ok(g.includes('もどる'), 'パパ・ママモードへ戻る導線がある');
+  // せっていからいつでも読める
+  w.closeModal();
+  w.eval('S').tab = 'set'; w.render();
+  const app = w.document.querySelector('#app').innerHTML;
+  ok(app.includes('はじめての方へ'), 'せっていから説明書を開ける');
+  ok(app.includes('大切にしていること'), 'せっていからコンセプトを読み返せる');
   eq(errors.length, 0, 'runtime errors: none');
   w.close();
 }
