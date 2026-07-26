@@ -1,4 +1,14 @@
 <!DOCTYPE html>
+<!--
+  スタディきち (Study-kichi)
+  子どもの「はじめられた」を家族で応援する、家庭用の学習トラッキングPWA。
+  Copyright (c) 2026 そら ＆ ふう ＆ パパ
+  https://github.com/wwoooiiioooww/study-kichi
+
+  個人・家庭内での利用と改変は自由です。
+  再配布・公開する場合は、この著作権表示と LICENSE を残してください。
+  商用利用は事前にご相談ください。詳細は LICENSE をご覧ください。
+-->
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
@@ -284,7 +294,7 @@ body.has-fab #shell{padding-bottom:124px} /* FABが最後のカードに かぶ�
    データはこの端末の中だけに保存されます（localStorage / IndexedDB）
    ============================================================ */
 /* ---------- マスタ ---------- */
-const APP_VER='v23'; // せってい表示とフィードバックの共通バージョン。sw.js の CACHE と同時に上げること
+const APP_VER='v24'; // せってい表示とフィードバックの共通バージョン。sw.js の CACHE と同時に上げること
 /* 汎用サンプル(配布用)。既存端末の保存済みデータは上書きされない */
 const DEFAULT_BASES=[
  {id:'lib',name:'としょかん',em:'📚'},
@@ -1735,7 +1745,8 @@ function setHTML(){const p=P();
  '<div class="card" style="margin-top:14px"><h2>💾 データ</h2>'+
  '<div class="muted">データはこの端末の中にだけ保存されます。ときどきバックアップしてね(写真・メモボードはふくまれません)。</div>'+
  '<button class="btn ghost sm" style="margin-top:10px" onclick="exportData()">バックアップを保存(JSON)</button>'+
- '<div class="muted" style="margin-top:8px;text-align:right">スタディきち '+APP_VER+'<br>made by そら ＆ ふう ＆ パパ 🚀</div></div>';}
+ '<div class="muted" style="margin-top:8px;text-align:right;line-height:1.8">スタディきち '+APP_VER+'<br>made by そら ＆ ふう ＆ パパ 🚀'+
+ '<br><span style="font-size:11px">© 2026 そら ＆ ふう ＆ パパ</span></div></div>';}
 function saveAiName(){P().aiName=$('#ai-name').value.trim()||'そらとも';P().metaMt=Date.now();save();render();}
 /* --- メンバー編集(パパ・ママモード内) --- */
 function addProfile(){const id='p'+Date.now();

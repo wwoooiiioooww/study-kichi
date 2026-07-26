@@ -1155,6 +1155,20 @@ console.log('\n[6] リリース規約');
   for (const f of ['index.html', 'manifest.json', 'sw.js', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png']) {
     ok(fs.existsSync(path.join(__dirname, '..', f)), `リリースファイル存在: ${f}`);
   }
+  /* 著作権表示: 配布されるファイルと、リポジトリを見た人の両方に必ず届くようにする */
+  const lic = path.join(__dirname, '..', 'LICENSE');
+  ok(fs.existsSync(lic), 'LICENSE がある(表記がないと自由に使えると誤解される)');
+  const lt = fs.readFileSync(lic, 'utf8');
+  ok(lt.includes('Copyright (c) 2026 そら ＆ ふう ＆ パパ'), 'LICENSE に著作権者');
+  ok(lt.includes('github.com/wwoooiiioooww'), 'LICENSE に権利者を特定できる連絡先');
+  ok(lt.includes('個人・家庭内での利用は自由'), 'LICENSE に許可の範囲');
+  ok(lt.includes('商用利用'), 'LICENSE に要相談の範囲');
+  ok(lt.includes('無保証') && lt.includes('NO WARRANTY'), 'LICENSE に無保証条項(日英)');
+  ok(html.slice(0, 700).includes('Copyright (c) 2026'), 'index.html の先頭に著作権表示(コピーされても残る)');
+  ok(html.includes('© 2026 そら ＆ ふう ＆ パパ'), 'アプリ内にも著作権表示');
+  ok(fs.readFileSync(path.join(__dirname, '..', 'sw.js'), 'utf8').includes('Copyright (c) 2026'), 'sw.js にも著作権表示');
+  const rm = fs.readFileSync(path.join(__dirname, '..', 'README.md'), 'utf8');
+  ok(rm.includes('ライセンス') && rm.includes('LICENSE'), 'README からライセンスに導線がある');
 }
 
 console.log(`\n==== 結果: ${passed} passed / ${failed} failed ====`);
