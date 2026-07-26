@@ -175,6 +175,12 @@ nav button .i{display:block;font-size:20px;margin-bottom:1px;transition:.15s}
 nav button.on{color:var(--blue-d);background:linear-gradient(180deg,#DCEDFA,#FFFFFF)}
 nav button.on::before{content:"";position:absolute;top:0;left:22%;right:22%;height:3px;border-radius:0 0 4px 4px;background:var(--blue)}
 nav button.on .i{transform:scale(1.2)}
+/* PIN入力: type=password だとパスワードマネージャーが保存候補を出してきて邪魔なので、
+   マスク表示できる環境では text + text-security にする(非対応環境は password にフォールバック) */
+.pin-mask{-webkit-text-security:disc;text-security:disc}
+/* 「ここだよ」の合図。作戦カードへ飛んだときに数回ふわっと光らせる */
+@keyframes flash{0%,100%{outline-color:rgba(62,143,216,0)}50%{outline-color:rgba(62,143,216,.9)}}
+.card.flash{outline:3px solid rgba(62,143,216,0);outline-offset:3px;animation:flash .62s ease-in-out 3}
 /* ---------- FAB(ホーム以外のタブから しゅつげき / タイマーにもどる) ---------- */
 #fab-wrap{position:fixed;left:50%;transform:translateX(-50%);width:100%;max-width:480px;bottom:0;z-index:40;
   display:flex;justify-content:flex-end;padding:0 14px 62px;pointer-events:none;
@@ -258,7 +264,7 @@ body.has-fab #shell{padding-bottom:124px} /* FABが最後のカードに かぶ�
    データはこの端末の中だけに保存されます（localStorage / IndexedDB）
    ============================================================ */
 /* ---------- マスタ ---------- */
-const APP_VER='v18'; // せってい表示とフィードバックの共通バージョン。sw.js の CACHE と同時に上げること
+const APP_VER='v19'; // せってい表示とフィードバックの共通バージョン。sw.js の CACHE と同時に上げること
 /* 汎用サンプル(配布用)。既存端末の保存済みデータは上書きされない */
 const DEFAULT_BASES=[
  {id:'lib',name:'としょかん',em:'📚'},
@@ -430,6 +436,14 @@ async function getPhoto(id){const d=await idb();return new Promise(res=>{
 
 /* ---------- ユーティリティ ---------- */
 const $=s=>document.querySelector(s);
+/* 4けたPIN入力の共通生成。パスワードマネージャーの自動入力候補を出さないため
+   type=password を避ける(マスクはCSSの text-security。非対応環境だけ password) */
+const PIN_MASK=(()=>{try{return !!(window.CSS&&CSS.supports&&CSS.supports('-webkit-text-security','disc'));}catch(e){return false;}})();
+function pinInput(id,style,ph){
+ return '<input id="'+id+'" '+(PIN_MASK?'type="text" class="pin-mask"':'type="password"')+
+  ' inputmode="numeric" maxlength="4" autocomplete="off" autocorrect="off" autocapitalize="off"'+
+  ' spellcheck="false" data-lpignore="true" data-1p-ignore'+
+  (ph?' placeholder="'+esc(ph)+'"':'')+(style?' style="'+style+'"':'')+'>';}
 function esc(t){return String(t==null?'':t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function fmtDate(ts){const d=new Date(ts);return (d.getMonth()+1)+'/'+d.getDate();}
 function dayKey(ts){const d=new Date(ts);return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();}
@@ -580,7 +594,7 @@ function showWhoModal(){
 function whoPick(id){const pr=S.profiles[id];if(!pr)return;
  if(!pr.pin){S.currentProfile=id;save();closeModal();render();maybePlanNudge();return;}
  openModal('<h3>'+pr.em+' '+esc(pr.name)+'のPIN</h3>'+
- '<input id="who-pin" type="password" inputmode="numeric" maxlength="4" style="font-size:24px;text-align:center;letter-spacing:10px">'+
+ pinInput('who-pin','font-size:24px;text-align:center;letter-spacing:10px')+
  '<button class="btn" style="margin-top:12px" onclick="whoPinOk(\''+id+'\')">ひらく</button>'+
  '<button class="btn ghost sm" style="margin-top:8px" onclick="showWhoModal()">← もどる</button>',false);
  setTimeout(()=>{const el=$('#who-pin');if(el)el.focus();},60);}
@@ -589,7 +603,7 @@ function whoPinOk(id){const pr=S.profiles[id];
  else alert('ちがうみたい…');}
 function whoParent(){
  openModal('<h3>👨 親のPIN</h3>'+
- '<input id="who-ppin" type="password" inputmode="numeric" maxlength="4" style="font-size:24px;text-align:center;letter-spacing:10px">'+
+ pinInput('who-ppin','font-size:24px;text-align:center;letter-spacing:10px')+
  '<button class="btn" style="margin-top:12px" onclick="if(document.getElementById(\'who-ppin\').value===S.parentPin){closeModal();render();}else alert(\'ちがうみたい…\')">ひらく</button>'+
  '<button class="btn ghost sm" style="margin-top:8px" onclick="showWhoModal()">← もどる</button>',false);
  setTimeout(()=>{const el=$('#who-ppin');if(el)el.focus();},60);}
@@ -627,17 +641,23 @@ function planNudgeDue(nowTs){const now=nowTs||Date.now();
  if(st.d===dayKey(now))return null;                  // きょうはもう出した
  return {key,k,all,st,now};}
 function maybePlanNudge(){
- if($('#modal-root').innerHTML||S.activeSession||S.tab==='goal')return;
+ if($('#modal-root').innerHTML||S.activeSession)return;
  const d=planNudgeDue();if(!d)return;
  d.all[d.k]={n:d.st.n+1,d:dayKey(d.now)};nudgeSave(d.all);
- openModal('<h3>📅 さくせん会議 しようか?</h3>'+
-  '<div class="muted">'+esc(weekRangeLabel(d.key))+' の さくせんが まだだよ。<br>'+
-  'なにを どこまで やるか きめると、🎁ボーナススロットが 1回もらえる!</div>'+
+ /* 作戦カードが見えている画面では「そこへ行こう」と言っても仕方ないので、
+    モーダルの代わりにカードを光らせて場所を教える(プロフィール切替でも合図が出る) */
+ if(S.tab==='goal'){flashPlanCard();return;}
+ openModal('<h3>⚔️ さくせん会議の じかんだ!</h3>'+
+  '<div class="muted">'+esc(weekRangeLabel(d.key))+' の さくせんを きめて、パパ・ママに みせよう!<br>'+
+  'きめたら 🎁ボーナススロットが 1回もらえる ✨</div>'+
   '<button class="btn" style="margin-top:14px" onclick="goPlan()">⚔️ さくせんをたてる</button>'+
   '<button class="btn ghost sm" style="margin-top:8px" onclick="closeModal()">あとで</button>');}
-function goPlan(){closeModal();go('goal');
- setTimeout(()=>{const el=$('#plan-card');
-  if(el&&el.scrollIntoView)el.scrollIntoView({behavior:'smooth',block:'center'});},80);}
+function flashPlanCard(){const el=$('#plan-card');if(!el)return;
+ if(el.scrollIntoView)el.scrollIntoView({behavior:'smooth',block:'center'});
+ el.classList.remove('flash');void el.offsetWidth; // 連続で呼ばれてもアニメーションを再生し直す
+ el.classList.add('flash');
+ setTimeout(()=>{const e2=$('#plan-card');if(e2)e2.classList.remove('flash');},2200);}
+function goPlan(){closeModal();go('goal');setTimeout(flashPlanCard,80);}
 function setPlanRemind(){const cur=S.planRemind||{};
  const g=(id,dflt)=>{const el=$(id);return el?Number(el.value):dflt;};
  const next={on:g('#rm-on',cur.on),day:g('#rm-day',cur.day),max:g('#rm-max',cur.max)};
@@ -1588,10 +1608,10 @@ function factoryReset(){
 function parentGate(){
  if(!S.parentPin){openModal('<h3>はじめまして、保護者さま</h3>'+
   '<div class="muted">4けたの暗証番号(PIN)を決めてください。承認やごほうび管理に使います。※簡易ロックです。</div>'+
-  '<label>PIN(4けたの数字)</label><input id="pin-new" type="password" inputmode="numeric" maxlength="4">'+
+  '<label>PIN(4けたの数字)</label>'+pinInput('pin-new')+
   '<button class="btn" style="margin-top:12px" onclick="setPin()">決定</button>');return;}
  openModal('<h3>🔐 パパ・ママモード</h3><label>PIN</label>'+
- '<input id="pin-in" type="password" inputmode="numeric" maxlength="4">'+
+ pinInput('pin-in')+
  '<button class="btn" style="margin-top:12px" onclick="checkPin()">ひらく</button>');}
 function setPin(){const v=$('#pin-new').value;
  if(!/^\d{4}$/.test(v)){alert('4けたの数字で!');return;}
@@ -1725,7 +1745,7 @@ function openParent(focusId){const p=P();const pend=p.sessions.filter(s=>s.statu
   '<input id="gm-key" type="password" placeholder="AIza..." value="'+esc(S.gemini.key)+'" style="margin-top:6px">'+
   '<label>モデル</label><input id="gm-model" value="'+esc(S.gemini.model)+'">'+
   '<h2 style="margin-top:14px">🔐 暗証番号(PIN)の変更</h2>'+
-  '<div class="row"><input id="pin-chg" type="password" inputmode="numeric" maxlength="4" placeholder="新しい4けたの数字">'+
+  '<div class="row">'+pinInput('pin-chg',null,'新しい4けたの数字')+
   '<button class="btn blue sm" style="flex:0 0 90px" onclick="changePin()">変更</button></div>'+
   '<h2 style="margin-top:14px">💾 バックアップから復元(上書き)</h2>'+
   '<div class="muted">今のデータを消して、ファイルの内容に置き換えます。</div>'+

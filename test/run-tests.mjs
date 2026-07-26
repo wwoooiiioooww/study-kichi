@@ -784,15 +784,19 @@ console.log('\n[16] 📅さくせん会議リマインダー');
   w.maybePlanNudge();
   eq(mr(), '', 'しゅつげき中は割り込まない');
   w.eval('S').activeSession = null;
-  w.eval('S').tab = 'goal';
+  // もくひょうタブ: 作戦カードが見えているのでモーダルではなく カードを光らせて場所を教える
+  w.eval('S').tab = 'goal'; w.render();
+  w.nudgeSave({ [nk()]: { n: 0, d: '' } });
   w.maybePlanNudge();
-  eq(mr(), '', 'もくひょうタブ(作戦カードが見えている)では出さない');
+  eq(mr(), '', 'もくひょうタブではモーダルを出さない');
+  ok(w.document.querySelector('#plan-card').classList.contains('flash'), '代わりに作戦カードが光って場所を教える');
   w.eval('S').tab = 'home';
   w.openModal('<h3>べつのモーダル</h3>');
   w.maybePlanNudge();
   ok(mr().includes('べつのモーダル'), '他のモーダル表示中は割り込まない');
   w.closeModal();
   // 「さくせんをたてる」でもくひょうタブへ
+  w.nudgeSave({ [nk()]: { n: 0, d: '' } });
   w.maybePlanNudge();
   ok(mr().includes('さくせんをたてる'), 'さくせんをたてるボタンがある');
   w.goPlan();
@@ -842,6 +846,67 @@ console.log('\n[16] 📅さくせん会議リマインダー');
   eq(w.mergeState(clone(real), clone(fresh)).planRemind.day, 4, 'mt同点マージも可換');
   const newer = clone(base); newer.planRemind = { on: 1, day: 5, max: 5 }; newer.planRemindMt = 9999;
   eq(w.mergeState(clone(real), clone(newer)).planRemind.day, 5, 'mtが新しい方が勝つ');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+
+/* ---------- 17. v19: プロフィール切替の合図 / 文言 / PIN入力の自動入力抑止 ---------- */
+console.log('\n[17] 🔁切替の合図・文言・PIN入力');
+{
+  // 実報告: そら→ふう に切り替えたときに出ないことがあった(もくひょうタブにいると抑止されていた)
+  const { w, errors } = boot(undefined, { studykichi_guide: '1' });
+  const mr = () => w.document.querySelector('#modal-root').innerHTML;
+  w.closeModal();
+  const today = new Date().getDay();
+  w.eval('S').planRemind.day = today;
+  // ホームタブでの切替 → 新しいプロフィール宛てに出る
+  w.eval('S').tab = 'home'; w.render();
+  w.switchProfile('fuka');
+  eq(w.eval('S').currentProfile, 'fuka', 'ふうに切り替わる');
+  ok(mr().includes('さくせん会議'), 'プロフィール切替でも(そのメンバーの作戦がまだなら)声をかける');
+  w.closeModal();
+  // 切替先ごとに回数を数える(そらで出したぶんが ふうの回数を消費しない)
+  const all = w.nudgeLoad();
+  ok(Object.keys(all).some(k => k.startsWith('fuka|')), 'ふうの回数が別に記録される');
+  // もくひょうタブでの切替 → モーダルではなくカードが光る
+  w.eval('S').tab = 'goal'; w.render();
+  w.nudgeSave({});
+  w.switchProfile('sora');
+  eq(mr(), '', 'もくひょうタブではモーダルを出さない');
+  ok(w.document.querySelector('#plan-card').classList.contains('flash'), 'もくひょうタブでは作戦カードが光る(切替でも合図が出る)');
+  // 文言: せかす・責める表現を使わない
+  w.eval('S').tab = 'home'; w.render();
+  w.nudgeSave({});
+  w.maybePlanNudge();
+  ok(mr().includes('パパ・ママに みせよう'), 'つくる動機になる文言になっている');
+  ok(!mr().includes('まだだよ'), 'できていないことを指摘する文言を使わない');
+  w.closeModal();
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  // PIN入力: パスワードマネージャーの保存候補・自動入力を出させない
+  const { w, errors } = boot(undefined, { studykichi_guide: '1' });
+  w.closeModal();
+  w.eval('S').parentPin = '1975';
+  w.parentGate();
+  const el = w.document.querySelector('#pin-in');
+  ok(el, '親PINの入力欄がある');
+  ok(el.type !== 'password' || !w.PIN_MASK, 'マスク表示できる環境では type=password を使わない');
+  eq(el.getAttribute('autocomplete'), 'off', '自動入力を切っている');
+  eq(el.getAttribute('inputmode'), 'numeric', '数字キーボードが出る');
+  eq(el.getAttribute('maxlength'), '4', '4けた制限は維持');
+  ok(!el.getAttribute('name'), 'パスワード欄と誤認されるname属性を付けない');
+  if (w.PIN_MASK) ok(el.classList.contains('pin-mask'), 'CSSでマスク表示する');
+  ok(w.pinInput('x').indexOf('data-lpignore') >= 0, '他のパスワード管理ツールにも無視させる');
+  // PINそのものは今までどおり機能する
+  el.value = '1975';
+  w.checkPin();
+  ok(w.document.querySelector('#modal-root').innerHTML.includes('パパ・ママモード'), '正しいPINでひらける');
+  w.closeModal();
+  // 子どものPIN・PIN変更欄にも同じ生成関数を使っている
+  ok(w.showWhoModal.toString().length > 0 && w.whoPick.toString().indexOf('pinInput') >= 0, 'こどもPINにも同じ入力を使う(コード照合)');
+  ok(w.openParent.toString().indexOf("pinInput('pin-chg'") >= 0, 'PIN変更欄にも同じ入力を使う(コード照合)');
   eq(errors.length, 0, 'runtime errors: none');
   w.close();
 }
