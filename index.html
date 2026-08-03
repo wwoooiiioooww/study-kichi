@@ -236,6 +236,9 @@ body.has-fab #shell{padding-bottom:124px} /* FABが最後のカードに かぶ�
 .pd summary{cursor:pointer;padding:11px 12px;font-family:var(--disp);font-weight:800;font-size:14px;
   list-style:none;display:flex;align-items:center;gap:6px;-webkit-user-select:none;user-select:none}
 .pd summary::-webkit-details-marker{display:none}
+.pd-hd{flex:1;min-width:0}
+.pd-hint{display:block;font-family:var(--body);font-weight:500;font-size:11.5px;
+  color:var(--ink-soft);margin-top:3px;line-height:1.55}
 .pd summary::after{content:"▾";margin-left:auto;color:var(--ink-soft);transition:.15s}
 .pd[open] summary::after{transform:rotate(180deg)}
 .pd[open] summary{border-bottom:1px dashed var(--line)}
@@ -294,7 +297,7 @@ body.has-fab #shell{padding-bottom:124px} /* FABが最後のカードに かぶ�
    データはこの端末の中だけに保存されます（localStorage / IndexedDB）
    ============================================================ */
 /* ---------- マスタ ---------- */
-const APP_VER='v24'; // せってい表示とフィードバックの共通バージョン。sw.js の CACHE と同時に上げること
+const APP_VER='v25'; // せってい表示とフィードバックの共通バージョン。sw.js の CACHE と同時に上げること
 /* 汎用サンプル(配布用)。既存端末の保存済みデータは上書きされない */
 const DEFAULT_BASES=[
  {id:'lib',name:'としょかん',em:'📚'},
@@ -1149,7 +1152,7 @@ function showParentGuide(){
    '残高は取引の合計です。ズレても、あとから直せます。',
    'お子さんの画面でポイントをタップすると「つうちょう」が開き、'+
    'いつ・なぜ増えたかが全部残っています。<br>'+
-   'ズレたときは「🔧データとシステム → ポイントちょうせい」で、理由つきで足し引きできます。')+
+   'ズレたときは「🎁ごほうび設定 → ポイントちょうせい」で、理由つきで足し引きできます。')+
   row('📷','写真は撮った端末の中だけにあります',
    'ほかの端末では📷マークになります。<b>故障ではありません。</b>',
    '写真と計算メモは容量が大きいため、かぞく同期にもバックアップJSONにも <b>含まれません</b>。'+
@@ -1176,12 +1179,12 @@ function showParentGuide(){
   '<div style="margin-top:8px">'+
   map('✅ 承認センター','記録・ボーナス・ミッションの承認と却下')+
   map('🎯 特別ミッション','お手伝いなど臨時の課題を出す(承認で加点)')+
-  map('🎁 ごほうび設定','ごほうび券と値段／模試の目標／大きなごほうび／テキスト登録')+
-  map('📅 リマインダー','作戦がまだのときの声かけ(曜日・回数)')+
+  map('📚 がくしゅうの設定','<b>テキストの登録</b>／模試の目標／さくせん会議リマインダー')+
+  map('🎁 ごほうび設定','ごほうび券と値段／大きなごほうび／ポイントちょうせい')+
   map('🤖 AI相棒に…','お子さんのことをAIに伝える(会話とレポートに反映)')+
   map('👥 メンバーときち','なまえ・学年・こどもPIN／きちの追加と編集')+
   map('☁️ かぞく同期','家族コードで複数端末をつなぐ')+
-  map('🔧 データとシステム','ポイント調整／APIキー／親PIN／バックアップ／初期化')+
+  map('🔧 データとシステム','APIキー／親PIN／バックアップ／初期化')+
   '</div></div>'+
   '<button class="btn ghost sm" style="margin-top:16px" onclick="showConcept()">💡 大切にしていること を読む</button>'+
   (parentAuthed?'<button class="btn ghost sm" style="margin-top:8px" onclick="openParent()">← パパ・ママモードにもどる</button>'
@@ -1791,9 +1794,10 @@ function setPin(){const v=$('#pin-new').value;
 function checkPin(){if($('#pin-in').value===S.parentPin){parentAuthed=true;closeModal();openParent();}
  else alert('ちがうみたい…');}
 /* 折りたたみセクション(パパ・ママモード整理用) */
-function pdSec(id,title,badge,body,open2){
- return '<details class="pd" id="pd-'+id+'"'+(open2?' open':'')+'><summary>'+title+
-  (badge?' <span class="badge b-pend">'+badge+'</span>':'')+'</summary>'+
+function pdSec(id,title,badge,body,open2,hint){
+ return '<details class="pd" id="pd-'+id+'"'+(open2?' open':'')+'><summary><span class="pd-hd">'+title+
+  (badge?' <span class="badge b-pend">'+badge+'</span>':'')+
+  (hint?'<span class="pd-hint">'+hint+'</span>':'')+'</span></summary>'+
   '<div class="pd-body">'+body+'</div></details>';}
 /* 追加・削除のたびにopenParent()でモーダルを作り直すため、そのままだと開いていた
    セクションが閉じ、スクロールも先頭に戻る(テキストや券の連続入力がつらい)。
@@ -1857,19 +1861,29 @@ function openParent(focusId){
   '<div class="row" style="margin-top:8px"><input id="pool-new" placeholder="例:回転ずし券 🍣">'+
   '<input id="pool-price" type="number" placeholder="pt" style="flex:0 0 74px">'+
   '<button class="btn blue sm" style="flex:0 0 70px" onclick="addPool()">追加</button></div>'+
-  '<h2 style="margin-top:14px">🎯 模試の目標</h2>'+
-  '<div class="row"><input id="tgt-label" placeholder="例:○○模試 偏差値" value="'+esc(p.examTarget.label)+'">'+
-  '<input id="tgt-value" type="number" placeholder="60" value="'+esc(p.examTarget.value)+'" style="flex:0 0 90px"></div>'+
   '<h2 style="margin-top:14px">🏆 大きなごほうび</h2>'+
-  p.bigGoals.map((g,i)=>'<div class="row" style="margin-bottom:6px">'+
+  '<div class="muted">「もくひょう」タブのいちばん上に出る、大きな約束です。</div>'+
+  p.bigGoals.map((g,i)=>'<div class="row" style="margin-bottom:6px;margin-top:6px">'+
    '<input data-bg-t="'+i+'" value="'+esc(g.title)+'"><input data-bg-r="'+i+'" value="'+esc(g.reward)+'"></div>').join('')+
-  '<h2 style="margin-top:14px">📚 テキストの登録('+esc(p.name)+')</h2>'+
-  '<div class="muted">さくせん会議で「やるところ」に使うテキストの一覧です。</div>'+
-  '<div>'+p.books.map((b,i)=>'<div class="ticket-item"><span style="flex:1">'+esc(b)+'</span>'+
+  '<h2 style="margin-top:14px">⭐ ポイントちょうせい('+esc(p.name)+')</h2>'+
+  '<div class="muted">マージ後のズレなどを直す安全弁です。±どちらも可。お子さんの通帳に理由つきで記録されます。</div>'+
+  '<div class="row" style="margin-top:6px"><input id="adj-delta" type="number" inputmode="numeric" placeholder="例: 50 / -30" style="flex:0 0 110px">'+
+  '<input id="adj-memo" placeholder="理由(例:二重購入の補正)"></div>'+
+  '<button class="btn blue sm" style="margin-top:8px" onclick="adjustPoints()">反映</button>';
+ /* ④ がくしゅうの設定(v25で新設: テキスト・模試の目標・さくせん会議まわりを1か所に) */
+ const secStudy=
+  '<h2 style="margin-top:2px">📚 テキストの登録('+esc(p.name)+')</h2>'+
+  '<div class="muted">さくせん会議で「やるところ」を決めるときに、えらべるようになります。</div>'+
+  '<div style="margin-top:6px">'+p.books.map((b,i)=>'<div class="ticket-item"><span style="flex:1">'+esc(b)+'</span>'+
    '<button onclick="delBook('+i+')">削除</button></div>').join('')+'</div>'+
   '<div class="row" style="margin-top:8px"><input id="book-new" placeholder="例:予習シリーズ 算数(上)">'+
-  '<button class="btn blue sm" style="flex:0 0 70px" onclick="addBook()">追加</button></div>';
- /* ④ さくせん会議リマインダー(v17) */
+  '<button class="btn blue sm" style="flex:0 0 70px" onclick="addBook()">追加</button></div>'+
+  '<h2 style="margin-top:14px">🎯 模試の目標('+esc(p.name)+')</h2>'+
+  '<div class="muted">「もくひょう」タブの成績グラフに、目標の線が引かれます。</div>'+
+  '<div class="row" style="margin-top:6px"><input id="tgt-label" placeholder="例:○○模試 偏差値" value="'+esc(p.examTarget.label)+'">'+
+  '<input id="tgt-value" type="number" placeholder="60" value="'+esc(p.examTarget.value)+'" style="flex:0 0 90px"></div>'+
+  '<h2 style="margin-top:14px">📅 さくせん会議リマインダー</h2>';
+ /* ④-2 さくせん会議リマインダー(v17。がくしゅうの設定の中に置く) */
  const rm=S.planRemind||{on:1,day:0,max:3};
  const DOW=['日','月','火','水','木','金','土'];
  const secRemind=
@@ -1933,12 +1947,7 @@ function openParent(focusId){
   '<button class="btn ghost sm" style="margin-top:8px" onclick="addBase()">＋ きちついか</button>';
  /* ⑤ かぞく同期(v13-b) / ⑥ データとシステム */
  const secSys=
-  '<h2 style="margin-top:2px">⭐ ポイントちょうせい('+esc(p.name)+')</h2>'+
-  '<div class="muted">マージ後のズレなどを直す安全弁です。±どちらも可。お子さんの通帳に理由つきで記録されます。</div>'+
-  '<div class="row" style="margin-top:6px"><input id="adj-delta" type="number" inputmode="numeric" placeholder="例: 50 / -30" style="flex:0 0 110px">'+
-  '<input id="adj-memo" placeholder="理由(例:二重購入の補正)"></div>'+
-  '<button class="btn blue sm" style="margin-top:8px" onclick="adjustPoints()">反映</button>'+
-  '<h2 style="margin-top:14px">🔑 Gemini APIキー</h2>'+
+  '<h2 style="margin-top:2px">🔑 Gemini APIキー</h2>'+
   '<div class="muted">キーはこの端末のブラウザ内にだけ保存され、Googleとの通信にのみ使われます。コードには書かれず、同期・バックアップにも含まれません。</div>'+
   '<button class="btn ghost sm" style="margin-top:6px" onclick="keyGuide()">📖 キーのかんたん取得ガイド(無料・約5分)</button>'+
   '<input id="gm-key" type="password" placeholder="AIza..." value="'+esc(S.gemini.key)+'" style="margin-top:6px">'+
@@ -1956,16 +1965,25 @@ function openParent(focusId){
   '<div class="muted">全メンバーのきろく・ポイント・券・会話・写真・PIN・APIキーをすべて消して、はじめての状態にもどします。</div>'+
   '<button class="btn ghost sm" style="margin-top:6px;color:#B04040" onclick="factoryReset()">初期設定にもどす</button>'+
   feedbackSectionHTML();
+ const secStudyAll=secStudy+secRemind;
  openModal('<h3>👨 パパ・ママモード('+esc(p.name)+')</h3>'+
   '<button class="btn ghost sm" style="margin-bottom:10px" onclick="showParentGuide()">📖 はじめての方へ(つかいかた・こまったとき)</button>'+
-  pdSec('approve','✅ 承認センター',nApprove?('承認まち '+nApprove):'',secApprove,true)+
-  pdSec('mission','🎯 特別ミッションを出す','',secMission,false)+
-  pdSec('reward','🎁 ごほうび設定','',secReward,false)+
-  pdSec('remind','📅 さくせん会議リマインダー',(S.planRemind&&S.planRemind.on)?'':'OFF',secRemind,false)+
-  pdSec('ctx','🤖 AI相棒に おしえておくこと',(p.context&&(p.context.about||p.context.now))?'設定ずみ':'',secCtx,false)+
-  pdSec('member','👥 メンバーときち','',secMember,false)+
-  pdSec('sync','☁️ かぞく同期',syncBadge(),syncSectionHTML(),false)+
-  pdSec('sys','🔧 データとシステム','',secSys,false)+
+  pdSec('approve','✅ 承認センター',nApprove?('承認まち '+nApprove):'',secApprove,true,
+   'きろく・ボーナス・ミッションの承認と却下')+
+  pdSec('mission','🎯 特別ミッションを出す','',secMission,false,
+   'お手伝いなど臨時の課題を出す(承認で加点)')+
+  pdSec('study','📚 がくしゅうの設定',(S.planRemind&&S.planRemind.on)?'':'リマインダーOFF',secStudyAll,false,
+   'テキストの登録・模試の目標・さくせん会議リマインダー')+
+  pdSec('reward','🎁 ごほうび設定','',secReward,false,
+   'ごほうび券と価格・大きなごほうび・ポイントちょうせい')+
+  pdSec('ctx','🤖 AI相棒に おしえておくこと',(p.context&&(p.context.about||p.context.now))?'設定ずみ':'',secCtx,false,
+   'お子さんのことをAIに伝える(会話とレポートに反映)')+
+  pdSec('member','👥 メンバーときち','',secMember,false,
+   'なまえ・学年・こどもPIN／きちの追加と編集')+
+  pdSec('sync','☁️ かぞく同期',syncBadge(),syncSectionHTML(),false,
+   '家族コードで複数の端末をつなぐ')+
+  pdSec('sys','🔧 データとシステム','',secSys,false,
+   'APIキー・親PIN・バックアップ・初期化')+
   '<button class="btn" style="margin-top:16px" onclick="saveParent()">まとめて保存</button>');
  pdRestore(_snap,focusId);
  loadThumbs();}

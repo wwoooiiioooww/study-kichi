@@ -470,7 +470,7 @@ console.log('\n[10] 👨親モードUI');
   ok(ap && ap.open, '承認センターは初期展開');
   ok(ap.innerHTML.includes('承認まちはありません') === false && ap.innerHTML.includes('セッション(1)'), '承認センターに件数が出る');
   ok(mr().innerHTML.includes('承認まち 1'), 'サマリに承認まちバッジ');
-  for (const id of ['pd-mission', 'pd-reward', 'pd-remind', 'pd-ctx', 'pd-member', 'pd-sync', 'pd-sys']) {
+  for (const id of ['pd-mission', 'pd-study', 'pd-reward', 'pd-ctx', 'pd-member', 'pd-sync', 'pd-sys']) {
     const d = mr().querySelector('#' + id);
     ok(d && !d.open, id + ' は初期折りたたみ');
   }
@@ -662,21 +662,22 @@ console.log('\n[14] 👨親モード 連続入力');
   w.openParent();
   ok(mr().querySelector('#pd-approve').open && !mr().querySelector('#pd-reward').open, '初回オープンは既定の開閉状態');
   // 📚テキストを続けて登録
-  mr().querySelector('#pd-reward').open = true;
+  mr().querySelector('#pd-study').open = true;
   doc.querySelector('#book-new').value = '予習シリーズ 算数(上)';
   w.addBook();
-  ok(mr().querySelector('#pd-reward').open, 'テキスト追加後もセクションが開いたまま');
+  ok(mr().querySelector('#pd-study').open, 'テキスト追加後もセクションが開いたまま');
   ok(!mr().querySelector('#pd-member').open, '閉じていたセクションは閉じたまま');
   eq(doc.activeElement.id, 'book-new', '追加後は入力欄にカーソルが戻る(続けて打てる)');
   eq(doc.querySelector('#book-new').value, '', '入力欄は空になっている');
   doc.querySelector('#book-new').value = '基本トレーニング計算';
   w.addBook();
   eq(w.P().books.length, 2, '2つめも続けて登録できる');
-  ok(mr().querySelector('#pd-reward').open, '2回目もセクションが開いたまま');
+  ok(mr().querySelector('#pd-study').open, '2回目もセクションが開いたまま');
   w.delBook(0);
-  ok(mr().querySelector('#pd-reward').open, '削除でもセクションが開いたまま');
+  ok(mr().querySelector('#pd-study').open, '削除でもセクションが開いたまま');
   eq(w.P().books.length, 1, '削除が反映される');
   // 🎟️ごほうび券でも同じ
+  mr().querySelector('#pd-reward').open = true;
   doc.querySelector('#pool-new').value = '回転ずし券 🍣';
   doc.querySelector('#pool-price').value = '600';
   w.addPool();
@@ -687,7 +688,7 @@ console.log('\n[14] 👨親モード 連続入力');
   doc.querySelector('#ms-title').value = 'おてつだい';
   doc.querySelector('#ms-pts').value = '20';
   w.addMission();
-  ok(mr().querySelector('#pd-mission').open && mr().querySelector('#pd-reward').open, 'ミッション追加でも開閉状態が保たれる');
+  ok(mr().querySelector('#pd-mission').open && mr().querySelector('#pd-study').open, 'ミッション追加でも開閉状態が保たれる');
   eq(doc.activeElement.id, 'ms-title', 'ミッション追加後も入力欄にカーソルが戻る');
   // 🗺️きち・メンバーの追加でも維持
   mr().querySelector('#pd-member').open = true;
@@ -819,7 +820,7 @@ console.log('\n[16] 📅さくせん会議リマインダー');
   w.closeModal();
   w.openParent();
   const doc = w.document;
-  ok(doc.querySelector('#pd-remind'), 'パパ・ママモードにリマインダーのセクションがある');
+  ok(doc.querySelector('#pd-study'), 'パパ・ママモードにがくしゅうの設定がある');
   ok(doc.querySelector('#rm-on') && doc.querySelector('#rm-day') && doc.querySelector('#rm-max'), 'ON/曜日/回数の3つを設定できる');
   doc.querySelector('#rm-day').value = '3';
   w.setPlanRemind();
@@ -1141,6 +1142,53 @@ console.log('\n[20] 🔐入室ゲート');
   w.closeModal(); w.showConcept();
   ok(doc.querySelector('#modal-root .pg'), 'コンセプトも同じ本文スタイル');
   eq(doc.querySelectorAll('#modal-root .pg-row').length, 3, 'コンセプトは3本柱');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+
+/* ---------- 21. 🗂️ パパ・ママモードの分類(v25) ----------
+   実報告: 保護者モードを開いても、テキストをどこで登録するのか分からなかった
+   (テキスト登録が「ごほうび設定」の中に埋もれていた) */
+console.log('\n[21] 🗂️パパ・ママモードの分類');
+{
+  const { w, errors } = boot(undefined, { studykichi_guide: '1' });
+  const doc = w.document;
+  w.closeModal();
+  w.openParent();
+  const sec = id => doc.querySelector('#pd-' + id);
+  const body = id => sec(id).querySelector('.pd-body').innerHTML;
+  // たたんだままでも「中に何があるか」が見える
+  const hints = [...doc.querySelectorAll('#modal-root .pd-hint')];
+  eq(hints.length, 8, '8つすべての見出しに中身の案内がある');
+  ok(sec('study').querySelector('.pd-hint').textContent.includes('テキストの登録'),
+    'たたんだ状態でも「テキストの登録」がどこにあるか読める(報告への直接の答え)');
+  ok(!doc.querySelector('#modal-root .pd-hint').textContent.includes('undefined'), '案内文が壊れていない');
+  // 学習まわりは「がくしゅうの設定」に集約
+  ok(body('study').includes('テキストの登録'), 'テキストの登録が がくしゅうの設定にある');
+  ok(body('study').includes('模試の目標'), '模試の目標が がくしゅうの設定にある(ごほうびではない)');
+  ok(body('study').includes('さくせん会議リマインダー'), 'リマインダーも がくしゅうの設定にある');
+  ok(doc.querySelector('#book-new') && doc.querySelector('#tgt-label') && doc.querySelector('#rm-day'),
+    '移動しても入力欄はすべて生きている');
+  // ごほうびまわりは「ごほうび設定」に集約
+  ok(body('reward').includes('ごほうび券'), 'ごほうび券は ごほうび設定');
+  ok(body('reward').includes('大きなごほうび'), '大きなごほうびは ごほうび設定');
+  ok(body('reward').includes('ポイントちょうせい'), 'ポイントちょうせいも ごほうび設定に集約(ごほうび経済が1か所)');
+  ok(doc.querySelector('#pool-new') && doc.querySelector('#adj-delta'), 'ごほうび側の入力欄も生きている');
+  // 移動したものが元の場所に残っていない(二重表示していない)
+  ok(!body('reward').includes('テキストの登録'), 'テキストは ごほうび設定から消えている');
+  ok(!body('reward').includes('模試の目標'), '模試の目標は ごほうび設定から消えている');
+  ok(!body('sys').includes('ポイントちょうせい'), 'ポイントちょうせいは データとシステムから消えている');
+  ok(!doc.querySelector('#pd-remind'), 'リマインダー単独のセクションはなくなった');
+  eq(doc.querySelectorAll('#modal-root details.pd').length, 8, 'セクション数は8のまま(増やさずに整理した)');
+  // 説明書の地図も新しい分類に追いついている
+  w.closeModal(); w.showParentGuide();
+  const g = doc.querySelector('#modal-root').innerHTML;
+  ok(g.includes('がくしゅうの設定') && g.includes('テキストの登録'), '地図にがくしゅうの設定とテキスト登録がある');
+  ok(g.includes('🎁ごほうび設定 → ポイントちょうせい'), '説明書のポイントの直し方が新しい場所を指している');
+  const rewardRow = [...doc.querySelectorAll('#modal-root .pg-map')]
+    .find(r => r.querySelector('.pg-map-t').textContent.includes('ごほうび設定'));
+  ok(rewardRow && !rewardRow.querySelector('.pg-map-b').textContent.includes('テキスト'),
+    '地図の ごほうび設定 の説明にテキストが残っていない');
   eq(errors.length, 0, 'runtime errors: none');
   w.close();
 }
