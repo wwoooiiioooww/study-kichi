@@ -300,7 +300,7 @@ body.has-fab #shell{padding-bottom:124px} /* FABが最後のカードに かぶ�
    データはこの端末の中だけに保存されます（localStorage / IndexedDB）
    ============================================================ */
 /* ---------- マスタ ---------- */
-const APP_VER='v27'; // せってい表示とフィードバックの共通バージョン。sw.js の CACHE と同時に上げること
+const APP_VER='v28'; // せってい表示とフィードバックの共通バージョン。sw.js の CACHE と同時に上げること
 /* 汎用サンプル(配布用)。既存端末の保存済みデータは上書きされない */
 const DEFAULT_BASES=[
  {id:'lib',name:'としょかん',em:'📚'},
@@ -2279,7 +2279,8 @@ function mergeState(a,b){
 /* 同期対象の抽出(端末ローカル項目を除いた複製) */
 function syncable(st){const c=JSON.parse(JSON.stringify(st));
  delete c.gemini;delete c.tab;delete c.currentProfile;delete c.activeSession;
- Object.values(c.profiles||{}).forEach(stripInlineImages); // 画像の実体は載せない(idだけ運ぶ)
+ Object.values(c.profiles||{}).forEach(pr=>{stripInlineImages(pr); // 画像の実体は載せない(idだけ運ぶ)
+  delete pr.chatArchive;}); // まえの会話は端末ごと。読み返しは各端末にあれば足りる
  delete c.parentPin;delete c.pinMt; // 🔐親PINは端末ローカル(かぞく同期に載せない)。バックアップJSONには従来どおり含まれる
  return c;}
 
@@ -2297,6 +2298,7 @@ const FIREBASE_CONFIG={
  appId:"1:254325574772:web:5be57f34e4a420744f1521",
  measurementId:"G-J8NXPJNJX8"
 };
+var SYNC_DEBOUNCE_MS=8000; // 書き込み回数=転送量。まとめて送るほど無料枠がもつ(テストでは短縮する)
 const SYNC_MAX_LEN=900000; // database.rules.json の state 上限(1,000,000字)より手前で止めて警告する
 const SYNC_LS_KEY='studykichi_sync'; // 家族コードはSと別キー保存=バックアップJSONに含めない(コード漏洩防止)
 let sync={code:null,lastTs:0};
@@ -2347,7 +2349,7 @@ function syncSchedulePush(){ // save()から毎回呼ばれる。受信適用中
  if(!syncConfigured()||!sync.code||syncApplying)return;
  syncDirty=true;
  if(syncTimer)clearTimeout(syncTimer);
- syncTimer=setTimeout(syncPushNow,2000);} // 2秒デバウンス
+ syncTimer=setTimeout(syncPushNow,SYNC_DEBOUNCE_MS);}
 function syncPushNow(){if(syncTimer){clearTimeout(syncTimer);syncTimer=null;}
  if(!syncConfigured()||!sync.code||!syncTransport||!syncDirty)return;
  if(stableStr(syncable(S)).length>SYNC_MAX_LEN){ // 上限超過。黙って失敗し続けないよう状態で知らせる
@@ -2385,7 +2387,7 @@ function syncOnRemote(node){ // Pull: onValue受信
  if(mergedStr!==stableStr(syncable(inc))){ // こちらだけが持つものがある→送り返す(収束したら止まる)
   syncDirty=true;
   if(syncTimer)clearTimeout(syncTimer);
-  syncTimer=setTimeout(syncPushNow,2000);}
+  syncTimer=setTimeout(syncPushNow,SYNC_DEBOUNCE_MS);}
  syncStatusRefresh();}
 function syncSafeRender(){ // 描画ポリシー: 入力を壊さない(モーダル/タイマー/作戦・バトル編集中はSだけ更新)
  if($('#modal-root').innerHTML||S.activeSession||S.tab==='goal'){syncRenderPending=true;return;}
