@@ -1,23 +1,4 @@
 {
-  "_comment": [
-    "スタディきち Realtime Database セキュリティルール",
-    "https://github.com/wwoooiiioooww/study-kichi",
-    "",
-    "■ 守りの考え方",
-    "  認証は匿名(signInAnonymously)なので auth != null は誰でも満たせる。",
-    "  実質の鍵は26文字の家族コード($fid)であり、families 自体には .read を置かない。",
-    "  したがって『コードを知る者だけが、そのコードのノードを読み書きできる』が成立する。",
-    "",
-    "■ このファイルの適用手順(人間が実施)",
-    "  Firebase Console → Realtime Database → ルール に貼り付けて公開する。",
-    "  _comment はコンソール側では不要なので、貼るときは削ってよい(JSONとしては無害)。",
-    "",
-    "■ 限界(正直に)",
-    "  匿名ユーザーが正しい形式のコードを自分で作って書き込むことは、ルールだけでは防げない。",
-    "  1回あたりのサイズを絞ることで領域埋めのコストを上げているだけ。",
-    "  Sparkプランなら上限で自動停止するため金銭被害は出ず、最悪でも同期が止まるだけで、",
-    "  各端末のデータは残る。実害が出たら App Check の有効化か、プロジェクトの作り直しで対応する。"
-  ],
   "rules": {
     ".read": false,
     ".write": false,
@@ -44,7 +25,7 @@
       ".read": false,
       "$id": {
         ".write": "auth != null && !data.exists()",
-        ".validate": "newData.hasChildren(['text','ts']) && newData.child('text').isString() && newData.child('text').val().length <= 2000",
+        ".validate": "newData.hasChildren(['text','ts'])",
         "text": { ".validate": "newData.isString() && newData.val().length <= 2000" },
         "ts":   { ".validate": "newData.isNumber()" },
         "ver":  { ".validate": "newData.isString() && newData.val().length <= 20" },

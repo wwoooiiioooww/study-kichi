@@ -36,6 +36,7 @@ function boot(preState, extraLS) {
     },
   });
   dom.window.parentAuthed = true; // 既定は入室済み(PINゲートは[20]で個別に検証)
+  dom.window.SYNC_DEBOUNCE_MS = 200; // テストは短縮(本番値は[25]でソース照合)
   return { dom, w: dom.window, errors, alerts };
 }
 
@@ -418,7 +419,7 @@ console.log('\n[9] ☁️かぞく同期');
   w.save(); w.save(); w.save();
   eq(mock.pushes, 1, 'デバウンス中はまだpushされない');
   await sleep(2300);
-  eq(mock.pushes, 2, '2秒デバウンスで1回だけpush');
+  eq(mock.pushes, 2, 'デバウンスでまとめて1回だけpush');
   ok(mock.node.state.includes('msA') && mock.node.meta.rev === 2, '変更がクラウドに反映されrevが進む');
   // Pull: クラウド由来の新データを取り込み(ローカル項目は維持)。エコーではpushしない
   w.eval('S').gemini.key = 'LOCAL-KEY';
@@ -1259,7 +1260,14 @@ console.log('\n[23] 🔒RTDBルール');
   const rp = path.join(__dirname, '..', 'database.rules.json');
   ok(fs.existsSync(rp), 'ルールがリポジトリのルートにある(構成管理下・差分レビュー可能)');
   ok(!fs.existsSync(path.join(__dirname, '..', 'plan', 'firebase-rules.json')), '旧い置き場所に残っていない(二重管理しない)');
-  const R = JSON.parse(fs.readFileSync(rp, 'utf8')).rules;
+  const RAW = JSON.parse(fs.readFileSync(rp, 'utf8'));
+  // 実障害: 説明用に "_comment" を足したらFirebaseが公開を拒否した。
+  // このファイルは「そのまま貼るためだけのもの」に固定する
+  eq(Object.keys(RAW).length, 1, 'トップレベルのキーは rules ひとつだけ(Firebaseは他のキーを拒否する)');
+  eq(Object.keys(RAW)[0], 'rules', 'トップレベルのキーは rules');
+  ok(!fs.readFileSync(rp, 'utf8').includes('//'), '行コメントも入れない(貼り付け専用のファイル)');
+  ok(fs.existsSync(path.join(__dirname, '..', 'plan', 'firebase-rules-notes.md')), '説明は別ファイルに置く');
+  const R = RAW.rules;
   // 列挙を許さない
   eq(R['.read'], false, 'ルートは読み取り不可(全データ列挙を許さない)');
   eq(R['.write'], false, 'ルートは書き込み不可');
@@ -1356,6 +1364,34 @@ console.log('\n[24] 🙂ニックネーム推奨・行き先の明示');
   ok(!rm.includes('ご自身の Firebase プロジェクトの設定が必要'), 'READMEの誤った記述(BYO前提)が消えている');
   ok(rm.includes('追加の設定なしで使えます'), 'READMEが実装どおりになっている');
   ok(rm.includes('database.rules.json'), 'READMEからルールの構成管理に導線がある');
+}
+
+/* ---------- 25. 📉 同期の転送量を減らす(v28 / 規模展開Step3) ---------- */
+console.log('\n[25] 📉同期の転送量');
+{
+  // 本番のデバウンス値(テストでは短縮しているのでソースで照合する)
+  const ms = Number((html.match(/SYNC_DEBOUNCE_MS=(\d+)/) || [])[1]);
+  ok(ms >= 5000, `本番のデバウンスが十分長い(${ms}ms) = 書き込み回数が減る`);
+  ok(!/setTimeout\(syncPushNow,\s*\d/.test(html), 'デバウンス値がベタ書きされていない(1か所に集約)');
+  const { w, errors } = boot(undefined, { studykichi_guide: '1', studykichi_concept: '1' });
+  w.closeModal();
+  const p = w.P();
+  // まえの会話は同期に載せない(端末ごとに持てばよい・増える一方の要素を減らす)
+  p.chatArchive.push({ id: 'caS', ts: 1, mt: 1, msgs: [{ id: 'm1', r: 'user', t: 'ふるい会話のながい本文', ts: 1 }] });
+  const sync = w.syncable(w.eval('S'));
+  eq(sync.profiles.sora.chatArchive, undefined, 'まえの会話は同期ペイロードに含まれない');
+  ok(!JSON.stringify(sync).includes('ふるい会話のながい本文'), '中身も載らない');
+  eq(w.P().chatArchive.length, 1, '端末の中には残っている(読み返せる)');
+  // 受信しても消えない(相手が送ってこないだけで、こちらの分は保持される)
+  const clone = o => JSON.parse(JSON.stringify(o));
+  const inc = clone(w.eval('S')); delete inc.profiles.sora.chatArchive;
+  const merged = w.mergeState(clone(w.eval('S')), inc);
+  eq(merged.profiles.sora.chatArchive.length, 1, 'まえの会話がマージで消えない');
+  // いまの会話は同期される(家族で見えることに意味があるため)
+  p.chat.push({ id: 'cmS', r: 'user', t: 'いまの質問', ts: Date.now() });
+  ok(JSON.stringify(w.syncable(w.eval('S'))).includes('いまの質問'), 'いまの会話は同期される');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
 }
 
 /* ---------- 6. リリース規約(6ファイル構成 + バージョン同時更新) ---------- */
