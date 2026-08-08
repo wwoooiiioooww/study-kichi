@@ -300,7 +300,7 @@ body.has-fab #shell{padding-bottom:124px} /* FABが最後のカードに かぶ�
    データはこの端末の中だけに保存されます（localStorage / IndexedDB）
    ============================================================ */
 /* ---------- マスタ ---------- */
-const APP_VER='v29'; // せってい表示とフィードバックの共通バージョン。sw.js の CACHE と同時に上げること
+const APP_VER='v30'; // せってい表示とフィードバックの共通バージョン。sw.js の CACHE と同時に上げること
 /* 汎用サンプル(配布用)。既存端末の保存済みデータは上書きされない */
 const DEFAULT_BASES=[
  {id:'lib',name:'としょかん',em:'📚'},
@@ -685,6 +685,8 @@ function fabBases(){openModal('<h3>🚀 どの きちで しゅつげき?</h3>'+
    ・「何回見たか」は端末ローカル(別端末で出た回数を消費しない。同期データも汚さない)
    ・作戦をたてたら即停止。「あとで」は無言で閉じる(責める文言は出さない)
    ・モーダル表示中・しゅつげき中・もくひょうタブでは割り込まない */
+const BK_LS_KEY='studykichi_bk'; // 最後にバックアップした日時(端末ローカル)
+const BK_EVERY=30*864e5;         // このくらい経ったら、そっと1行だけ出す
 const NUDGE_LS_KEY='studykichi_nudge';
 function nudgeLoad(){try{return JSON.parse(localStorage.getItem(NUDGE_LS_KEY)||'{}');}catch(e){return {};}}
 function nudgeSave(o){try{localStorage.setItem(NUDGE_LS_KEY,JSON.stringify(o));}catch(e){}}
@@ -1126,6 +1128,22 @@ function showGuide(i){const gi=Math.max(0,Math.min(GUIDE_PAGES.length-1,i||0));
 /* ---------- 📖 保護者向け: コンセプト と はじめての方へ(v22) ----------
    コンセプトはパパ・ママモードを初めて開いたときに1回だけ(=100%保護者が見ている瞬間)。
    説明書は「知らないと損する・壊れること」だけに絞り、細かい設定は各画面の説明に任せる */
+/* 💾バックアップの催促。ポップアップは出さない。
+   親は承認のためにパパ・ママモードを必ず開くので、そこに1行だけ置く。
+   保存したら消える。責める文言は使わない */
+function bkLast(){try{return Number(localStorage.getItem(BK_LS_KEY))||0;}catch(e){return 0;}}
+function bkDue(){
+ const has=Object.values(S.profiles||{}).some(pr=>(pr.sessions||[]).length>0);
+ if(!has)return null;                       // まだ守るものが無い
+ const last=bkLast();
+ if(last&&Date.now()-last<BK_EVERY)return null;
+ return {last};}
+function bkNoticeHTML(){const d=bkDue();if(!d)return '';
+ const days=d.last?Math.floor((Date.now()-d.last)/864e5):0;
+ return '<div class="pg-lead" style="margin-bottom:10px">💾 <b>きろくのバックアップはいかがですか?</b><br>'+
+  '<span class="muted">'+(d.last?('前回の保存から '+days+'日たちました。'):'まだ一度も保存していません。')+
+  'ブラウザのデータを消すと記録も消えてしまうので、ときどきファイルに残しておくと安心です。</span><br>'+
+  '<button class="btn blue sm" style="margin-top:8px" onclick="exportData()">いま保存する(JSON)</button></div>';}
 function conceptSeen(){try{return !!localStorage.getItem(CONCEPT_LS_KEY);}catch(e){return true;}}
 function showConcept(fromParent){
  try{localStorage.setItem(CONCEPT_LS_KEY,'1');}catch(e){}
@@ -1190,7 +1208,9 @@ function showParentGuide(){
    'もう一方の端末の「つながる」に入力してください。コードは <b>家族だけ</b> に。<br>'+
    '<b>親PINは同期されません。</b>端末ごとに決めてください(片方を変えても、もう片方は変わりません)。<br>'+
    '「👥メンバーときち」でこどもPINを決めると、起動時に「だれがつかう?」が出て、'+
-   'きょうだいの回し合いを防げます。空欄ならロックなしです。')+
+   'きょうだいの回し合いを防げます。空欄ならロックなしです。<br>'+
+   'コードを知られてしまったときは「🔁かぞくコードを作り直す」で古いコードを無効にできます'+
+   '(記録はそのまま新しいコードへ移ります)。')+
   row('🔑','AI相棒を使うにはAPIキーが必要です',
    'Googleの無料キーを1回だけ設定します(カード不要・約5分)。',
    '「🔧データとシステム」に取得ガイドのボタンがあります。'+
@@ -2006,6 +2026,7 @@ function openParent(focusId){
  const secStudyAll=secStudy+secRemind;
  openModal('<h3>👨 パパ・ママモード('+esc(p.name)+')</h3>'+
   '<button class="btn ghost sm" style="margin-bottom:10px" onclick="showParentGuide()">📖 はじめての方へ(つかいかた・こまったとき)</button>'+
+  bkNoticeHTML()+
   pdSec('approve','✅ 承認センター',nApprove?('承認まち '+nApprove):'',secApprove,true,
    'きろく・ボーナス・ミッションの承認と却下')+
   pdSec('mission','🎯 特別ミッションを出す','',secMission,false,
@@ -2351,7 +2372,10 @@ function firebaseTransport(){
   },
   stop(){if(ref&&cb)ref.off('value',cb);ref=null;cb=null;},
   push(fn){if(!ref)return Promise.reject(new Error('not connected'));
-   return ref.transaction(fn).then(()=>{});} // トランザクション=同時書込の取りこぼしなし
+   return ref.transaction(fn).then(()=>{});}, // トランザクション=同時書込の取りこぼしなし
+  remove(code){ // コードの作り直し・完全にやめるとき、クラウドのノードごと消す
+   try{if(!window.firebase||!firebase.apps.length)return Promise.resolve();
+    return firebase.database().ref('families/'+code).remove();}catch(e){return Promise.resolve();}}
  };}
 /* --- 同期エンジン(B-3) --- */
 function syncSchedulePush(){ // save()から毎回呼ばれる。受信適用中はスケジュールしない(ループ防止)
@@ -2437,7 +2461,9 @@ function syncSectionHTML(){
   syncWhatGoesHTML(); // ONにする前に、行き先を読めるようにしておく
  return '<div id="sync-status" class="muted">'+syncStatusLine()+'</div>'+
   '<button class="btn ghost sm" style="margin-top:8px" onclick="syncShowCode()">🔑 かぞくコードを見る(端末追加用)</button>'+
-  '<button class="btn ghost sm" style="margin-top:8px;color:#B04040" onclick="syncDisconnect()">切断する(この端末のデータは残ります)</button>'+
+  '<button class="btn ghost sm" style="margin-top:8px" onclick="syncRotate()">🔁 かぞくコードを作り直す(知られてしまったとき)</button>'+
+  '<button class="btn ghost sm" style="margin-top:8px;color:#B04040" onclick="syncDisconnect()">この端末だけ切断する(データは残ります)</button>'+
+  '<button class="btn ghost sm" style="margin-top:8px;color:#B04040" onclick="syncDeleteAll()">同期をやめて、クラウドのデータも消す</button>'+
   syncWhatGoesHTML();}
 /* 同期をONにすると何がどこへ行くか。ONの前後どちらの画面にも同じものを出す */
 function syncWhatGoesHTML(){return '<div class="muted" style="margin-top:10px;line-height:1.8">'+
@@ -2471,6 +2497,33 @@ function syncCopyCode(){if(!sync.code)return;
  else prompt('ながおしでコピーしてください',sync.code);}
 function syncShareCode(){if(navigator.share&&sync.code)
  navigator.share({text:'スタディきちの かぞくコード:\n'+sync.code}).catch(()=>{});}
+/* 🔁かぞくコードの作り直し。コードが漏れたとき、古いコードを無効にする唯一の手段。
+   新しいノードへ移し替え、古いノードは消す(=古いコードを知っていても何も読めなくなる) */
+async function syncRotate(){
+ if(!sync.code)return;
+ if(!confirm('かぞくコードを作り直しますか?\n\n'+
+  '・いまのコードは使えなくなります(だれかに知られてしまったときの対処です)\n'+
+  '・記録は消えません。この端末のデータをそのまま新しいコードへ移します\n'+
+  '・ほかの端末では、新しいコードを入れ直してください'))return;
+ const old=sync.code;
+ try{if(syncTransport&&syncTransport.stop)syncTransport.stop();}catch(e){}
+ try{if(syncTransport&&syncTransport.remove)await syncTransport.remove(old);}catch(e){}
+ sync.code=genFamilyCode();sync.lastTs=0;syncSave();
+ await syncConnect(); // 新しいノードへローカルを書き出す
+ syncShowCode();}     // そのまま新しいコードを表示して、他の端末へ渡してもらう
+/* クラウドのデータごとやめる。端末のデータは残る */
+async function syncDeleteAll(){
+ if(!sync.code)return;
+ if(!confirm('かぞく同期をやめて、クラウドにあるデータも消しますか?\n\n'+
+  '・この端末の記録は消えません(消えるのはクラウドにある共有用のコピーだけです)\n'+
+  '・ほかの端末とはもう同期されなくなります\n'+
+  '・もう一度つかうときは、はじめからやり直しになります'))return;
+ const old=sync.code;
+ try{if(syncTransport&&syncTransport.stop)syncTransport.stop();}catch(e){}
+ try{if(syncTransport&&syncTransport.remove)await syncTransport.remove(old);}catch(e){}
+ sync.code=null;syncStatus='off';syncSave();
+ alert('クラウドのデータを消しました。この端末の記録はそのまま残っています。');
+ openParent();const pd=$('#pd-sync');if(pd)pd.open=true;}
 function syncDisconnect(){
  if(!confirm('同期を切断しますか?(この端末のデータは残ります。もう一度つなぐにはかぞくコードが必要です)'))return;
  if(syncTransport)try{syncTransport.stop();}catch(e){}
@@ -2508,7 +2561,9 @@ async function sendFeedback(){
 /* ---------- バックアップ ---------- */
 function exportData(){const blob=new Blob([JSON.stringify(S,null,1)],{type:'application/json'});
  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
- a.download='studykichi-backup.json';a.click();}
+ a.download='studykichi-backup.json';a.click();
+ try{localStorage.setItem(BK_LS_KEY,String(Date.now()));}catch(e){}
+ if($('#modal-root').innerHTML)openParent();} // 催促を消して、保存できたことが分かるようにする
 function importData(inp){const f=inp.files&&inp.files[0];if(!f)return;
  const r=new FileReader();
  r.onload=()=>{try{const s=JSON.parse(r.result);if(!s.profiles)throw 0;

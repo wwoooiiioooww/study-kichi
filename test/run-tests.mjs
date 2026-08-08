@@ -28,6 +28,9 @@ function boot(preState, extraLS) {
     pretendToBeVisual: true,
     beforeParse(window) {
       window.confirm = () => true;
+      window.URL.createObjectURL = () => 'blob:test'; // jsdom未実装。バックアップ保存の検証用
+      window.URL.revokeObjectURL = () => {};
+      window.HTMLAnchorElement.prototype.click = function () {};
       window.alert = m => alerts.push(String(m));
       window.addEventListener('error', e => errors.push(e.message));
       window.localStorage.setItem('studykichi_concept', '1'); // 既定は表示済み(初回挙動は個別テストで検証)
@@ -1457,6 +1460,87 @@ console.log('\n[26] 🔮前方互換');
   mock.onRemote({ state: w.stableStr(same), meta: { rev: 10, updatedAt: Date.now() } });
   await sleep(150);
   ok(w.P().sessions.some(s => s.id === 's-ok'), '同じ版のデータは今までどおり取り込む');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+
+/* ---------- 27. 🔁コードの作り直し / 💾バックアップの催促(v30 / Step C・D) ---------- */
+console.log('\n[27] 🔁コード作り直し・💾バックアップ催促');
+{
+  const { w, errors } = boot(undefined, { studykichi_guide: '1', studykichi_concept: '1' });
+  w.closeModal();
+  w.FB_CONFIG_TEST = { apiKey: 'test', databaseURL: 'https://test' };
+  const removed = [];
+  const mock = { pushes: 0, node: null, started: null,
+    start(c, cb) { this.started = c; this.onRemote = cb; return Promise.resolve(); },
+    stop() { this.started = null; },
+    push(fn) { this.pushes++; this.node = fn(this.node); return Promise.resolve(); },
+    remove(code) { removed.push(code); this.node = null; return Promise.resolve(); } };
+  w.setSyncTransport(mock);
+  w.syncStart();
+  await sleep(150);
+  w.closeModal();
+  const first = w.eval('sync.code');
+  ok(/^[a-z2-7]{26}$/.test(first), '1つ目のコードができる');
+  const sec = w.syncSectionHTML();
+  ok(sec.includes('かぞくコードを作り直す'), 'コードを作り直す導線がある(漏れたときの対処)');
+  ok(sec.includes('クラウドのデータも消す'), 'クラウドごとやめる導線がある');
+  ok(sec.includes('この端末だけ切断'), '端末だけ切る導線と区別できる');
+  // 記録を1件入れてから作り直す
+  w.P().sessions.unshift({ id: 'sR', base: 'home', plannedMin: 25, startTs: 1, endTs: 2, minutes: 25,
+    subjects: [], memo: '', photoId: null, boards: [], focus: null, status: 'approved', spin: null, mt: 1 });
+  w.save();
+  await w.syncRotate();
+  await sleep(200);
+  const second = w.eval('sync.code');
+  ok(/^[a-z2-7]{26}$/.test(second), '新しいコードができる');
+  ok(second !== first, 'コードが変わる');
+  eq(removed[0], first, '古いノードをクラウドから消す(古いコードでは何も読めなくなる)');
+  eq(mock.started, second, '新しいコードで接続し直す');
+  ok(JSON.stringify(mock.node).includes('sR'), '記録は新しいノードへ引き継がれる(消えない)');
+  ok(w.P().sessions.some(s => s.id === 'sR'), '端末の記録もそのまま');
+  ok(w.document.querySelector('#modal-root').innerHTML.includes(second), '新しいコードを表示して他の端末へ渡せる');
+  w.closeModal();
+  // クラウドごとやめる
+  await w.syncDeleteAll();
+  await sleep(150);
+  eq(removed[1], second, 'クラウドのノードを消す');
+  eq(w.eval('sync.code'), null, 'コードを手放す');
+  ok(w.P().sessions.some(s => s.id === 'sR'), 'この端末の記録は残る');
+  w.closeModal();
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  // 💾催促: ポップアップにしない。親が必ず開くパパ・ママモードに1行だけ
+  const { w, errors } = boot(undefined, { studykichi_guide: '1', studykichi_concept: '1' });
+  w.closeModal();
+  const mr = () => w.document.querySelector('#modal-root').innerHTML;
+  w.openParent();
+  ok(!mr().includes('バックアップはいかがですか'), 'まだ記録が無いうちは出さない(守るものが無い)');
+  w.closeModal();
+  w.P().sessions.unshift({ id: 'sB', base: 'home', plannedMin: 25, startTs: 1, endTs: 2, minutes: 25,
+    subjects: [], memo: '', photoId: null, boards: [], focus: null, status: 'approved', spin: null, mt: 1 });
+  w.openParent();
+  ok(mr().includes('バックアップはいかがですか'), '記録ができたら案内が出る');
+  ok(mr().includes('まだ一度も保存していません'), '一度も保存していないことが分かる');
+  ok(!mr().includes('しなければ') && !mr().includes('危険'), '責める・脅す文言を使わない');
+  ok(w.document.querySelector('#modal-root').innerHTML.includes('いま保存する'), 'その場で保存できる');
+  // 保存したら消える
+  w.exportData();
+  ok(Number(w.localStorage.getItem('studykichi_bk')) > 0, '保存した日時が記録される');
+  ok(!mr().includes('バックアップはいかがですか'), '保存したら案内が消える(追撃しない)');
+  // 30日たつとまた出る / 直後は出ない
+  w.localStorage.setItem('studykichi_bk', String(Date.now() - 20 * 864e5));
+  w.closeModal(); w.openParent();
+  ok(!mr().includes('バックアップはいかがですか'), '20日ではまだ出さない');
+  w.localStorage.setItem('studykichi_bk', String(Date.now() - 40 * 864e5));
+  w.closeModal(); w.openParent();
+  ok(mr().includes('バックアップはいかがですか'), '30日をすぎたらまた案内する');
+  ok(mr().includes('40日たちました'), '前回からの日数が分かる');
+  // 端末ローカル(同期データを汚さない)
+  ok(!JSON.stringify(w.eval('S')).includes('studykichi_bk'), '記録はSに入らない');
+  w.closeModal();
   eq(errors.length, 0, 'runtime errors: none');
   w.close();
 }
