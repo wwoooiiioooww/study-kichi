@@ -1130,14 +1130,14 @@ console.log('\n[20] 🔐入室ゲート');
   const doc = w.document;
   const g = doc.querySelector('#modal-root');
   ok(g.querySelector('.pg'), '保護者向けの大きめ本文スタイルが当たっている');
-  eq(g.querySelectorAll('.pg-row').length, 7, '7項目が1つずつのブロックになっている');
-  eq(g.querySelectorAll('.pg-more').length, 7, '各項目に「くわしく」がある');
+  eq(g.querySelectorAll('.pg-row').length, 8, '8項目が1つずつのブロックになっている');
+  eq(g.querySelectorAll('.pg-more').length, 8, '各項目に「くわしく」がある');
   ok([...g.querySelectorAll('.pg-more')].every(d => !d.open), '「くわしく」は既定で閉じている(最初は短く読める)');
   ok([...g.querySelectorAll('.pg-more summary')].every(s2 => s2.textContent.includes('くわしく')), 'ラベルは「くわしく」');
   // まとめだけで意味が通る(1項目目)
   const first = g.querySelector('.pg-row .pg-s').textContent;
   ok(first.includes('ごほうびのスイッチ') && first.length < 60, '最初のまとめは短く、要点だけ');
-  ok(g.querySelector('.pg-lead').textContent.includes('7つだけ'), '冒頭で「7つだけ」と量を約束する');
+  ok(g.querySelector('.pg-lead').textContent.includes('8つだけ'), '冒頭で量を約束する');
   // コンセプトも同じ読みやすさ
   w.closeModal(); w.showConcept();
   ok(doc.querySelector('#modal-root .pg'), 'コンセプトも同じ本文スタイル');
@@ -1251,6 +1251,111 @@ console.log('\n[22] 📷チャット写真の外出し');
   w.closeModal();
   eq(errors.length, 0, 'runtime errors: none');
   w.close();
+}
+
+/* ---------- 23. 🔒 RTDBセキュリティルール(v27 / 規模展開Step2) ---------- */
+console.log('\n[23] 🔒RTDBルール');
+{
+  const rp = path.join(__dirname, '..', 'database.rules.json');
+  ok(fs.existsSync(rp), 'ルールがリポジトリのルートにある(構成管理下・差分レビュー可能)');
+  ok(!fs.existsSync(path.join(__dirname, '..', 'plan', 'firebase-rules.json')), '旧い置き場所に残っていない(二重管理しない)');
+  const R = JSON.parse(fs.readFileSync(rp, 'utf8')).rules;
+  // 列挙を許さない
+  eq(R['.read'], false, 'ルートは読み取り不可(全データ列挙を許さない)');
+  eq(R['.write'], false, 'ルートは書き込み不可');
+  eq(R.families['.read'], undefined, 'families 自体に .read が無い(家族コードの一覧を取れない)');
+  eq(R.feedback['.read'], false, 'フィードバックは読み取り不可(作者がコンソールで見る)');
+  // 家族コードの形式チェック
+  const fid = R.families.$fid;
+  ok(/\[a-z2-7\]\{26\}/.test(fid['.read']), '読み取りに26文字base32の形式チェックがある');
+  ok(/\[a-z2-7\]\{26\}/.test(fid['.write']), '書き込みにも形式チェックがある(でたらめなノードを作れない)');
+  // 書き込みサイズの上限
+  ok(/length\s*<=\s*\d+/.test(fid.state['.validate']), 'state に文字数の上限がある(領域埋めのコストを上げる)');
+  const cap = Number((fid.state['.validate'].match(/length\s*<=\s*(\d+)/) || [])[1]);
+  ok(cap > 0 && cap <= 1000000, `上限が現実的な値(${cap}字)`);
+  eq(fid.$other['.validate'], false, '想定外のキーを弾く');
+  eq(fid.meta.$other['.validate'], false, 'meta の想定外キーも弾く');
+  ok(fid['.validate'].includes('state') && fid['.validate'].includes('meta'), 'state と meta の両方を要求する');
+  // ルールとコード生成の整合(片方だけ変わると同期が全く通らなくなる)
+  const { w, errors } = boot(undefined, { studykichi_guide: '1', studykichi_concept: '1' });
+  w.closeModal();
+  const code = w.genFamilyCode();
+  ok(new RegExp('^[a-z2-7]{26}$').test(code), 'genFamilyCode()の出力がルールの形式に一致する(ドリフト防止)');
+  const cMax = Number((html.match(/SYNC_MAX_LEN=(\d+)/) || [])[1]);
+  ok(cMax > 0 && cMax < cap, `クライアント側の上限(${cMax})がルールの上限(${cap})より手前にある`);
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  // 上限を超えたら、黙って失敗し続けずに状態で知らせる
+  const { w, errors } = boot(undefined, { studykichi_guide: '1', studykichi_concept: '1' });
+  w.closeModal();
+  w.FB_CONFIG_TEST = { apiKey: 'test', databaseURL: 'https://test' };
+  const mock = { pushes: 0, node: null, start(c, cb) { this.onRemote = cb; return Promise.resolve(); }, stop() {},
+    push(fn) { this.pushes++; this.node = fn(this.node); return Promise.resolve(); } };
+  w.setSyncTransport(mock);
+  w.syncStart();
+  await sleep(120);
+  w.closeModal();
+  const base = mock.pushes;
+  ok(base >= 1, '通常時は同期される');
+  // 上限を超える大きさにする
+  const cMax = Number((html.match(/SYNC_MAX_LEN=(\d+)/) || [])[1]);
+  w.P().books = [ 'あ'.repeat(cMax) ];
+  w.save();
+  await sleep(2300);
+  eq(mock.pushes, base, '上限を超えたら送信しない(ルールに弾かれ続けるのを避ける)');
+  ok(w.syncStatusLine().includes('大きくなりすぎ'), '止めている理由が画面に出る');
+  ok(w.syncStatusLine().includes('端末に残っています'), '記録が失われていないことを伝える');
+  eq(w.syncBadge(), '停止中', 'セクションのバッジでも気づける');
+  // 元に戻せば再開する
+  w.P().books = [];
+  w.save();
+  await sleep(2300);
+  ok(mock.pushes > base, '小さくなれば同期が再開する');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+
+/* ---------- 24. 🙂 ニックネーム推奨と、同期の行き先の明示(v27) ----------
+   免責より前に「そもそも本名を預からない」設計にする(データ最小化)。
+   伝え方は「脆弱だから」ではなく「個人開発だから」 */
+console.log('\n[24] 🙂ニックネーム推奨・行き先の明示');
+{
+  const { w, errors } = boot(undefined, { studykichi_guide: '1', studykichi_concept: '1' });
+  w.closeModal();
+  // 説明書
+  w.showParentGuide();
+  const g = w.document.querySelector('#modal-root').innerHTML;
+  ok(g.includes('ニックネームでどうぞ'), '説明書にニックネームの項目がある');
+  ok(g.includes('セキュリティは実装しています'), '対策していることを先に言う(不安を煽らない)');
+  ok(g.includes('個人がつくったもの'), '理由は「個人開発だから」と説明する');
+  ok(g.includes('まったく同じように動きます'), 'ニックネームでも機能が変わらないと伝える');
+  ok(!g.includes('危険') && !g.includes('流出'), '不安を煽る言葉を使わない');
+  w.closeModal();
+  // 同期セクションでの行き先の明示
+  w.FB_CONFIG_TEST = { apiKey: 'test', databaseURL: 'https://test' };
+  const sec = w.syncSectionHTML();
+  ok(sec.includes('クラウドへ行くもの'), '同期で送られるものが列挙されている');
+  ok(sec.includes('端末の中だけに残るもの'), '送られないものも列挙されている');
+  ok(sec.includes('PIN') && sec.includes('APIキー') && sec.includes('写真'), '端末に残る3つが明記されている');
+  ok(sec.includes('ニックネーム'), '同期の画面でもニックネームを案内する');
+  // 開始時の確認にも入っている
+  ok(w.syncStart.toString().includes('ニックネーム'), '同期をはじめる確認にも書いてある(コード照合)');
+  ok(w.syncStart.toString().includes('端末の外に出ません'), '出ないものも確認に書いてある');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  // LICENSE / README の記述が実装と一致しているか
+  const lic = fs.readFileSync(path.join(__dirname, '..', 'LICENSE'), 'utf8');
+  ok(lic.includes('ニックネームでのご利用をおすすめ'), 'LICENSEにニックネームのお願いがある');
+  ok(lic.includes('作者のFirebase'), 'LICENSEが送信先を正しく書いている');
+  ok(lic.includes('同期をOFFのままお使いいただく場合は、データは端末の外に一切出ません'), 'OFFなら完全ローカルと明記');
+  const rm = fs.readFileSync(path.join(__dirname, '..', 'README.md'), 'utf8');
+  ok(!rm.includes('ご自身の Firebase プロジェクトの設定が必要'), 'READMEの誤った記述(BYO前提)が消えている');
+  ok(rm.includes('追加の設定なしで使えます'), 'READMEが実装どおりになっている');
+  ok(rm.includes('database.rules.json'), 'READMEからルールの構成管理に導線がある');
 }
 
 /* ---------- 6. リリース規約(6ファイル構成 + バージョン同時更新) ---------- */
