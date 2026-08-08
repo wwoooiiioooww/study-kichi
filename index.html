@@ -300,7 +300,7 @@ body.has-fab #shell{padding-bottom:124px} /* FABが最後のカードに かぶ�
    データはこの端末の中だけに保存されます（localStorage / IndexedDB）
    ============================================================ */
 /* ---------- マスタ ---------- */
-const APP_VER='v26'; // せってい表示とフィードバックの共通バージョン。sw.js の CACHE と同時に上げること
+const APP_VER='v27'; // せってい表示とフィードバックの共通バージョン。sw.js の CACHE と同時に上げること
 /* 汎用サンプル(配布用)。既存端末の保存済みデータは上書きされない */
 const DEFAULT_BASES=[
  {id:'lib',name:'としょかん',em:'📚'},
@@ -1154,7 +1154,7 @@ function showParentGuide(){
  const map=(t,b)=>'<div class="pg-map"><span class="pg-map-t">'+t+'</span><span class="pg-map-b">'+b+'</span></div>';
  openModal('<h3>📖 はじめての方へ</h3>'+
   '<div class="pg">'+
-  '<div class="pg-lead">大切なことは、この7つだけです。<br>もっと知りたいところだけ「くわしく」を開いてください。</div>'+
+  '<div class="pg-lead">大切なことは、この8つだけです。<br>もっと知りたいところだけ「くわしく」を開いてください。</div>'+
   row('✅','まず「承認」してください',
    'これが <b>ごほうびのスイッチ</b> です。承認すると、お子さんは🎰スロットを回せます。',
    'パパ・ママモードの「✅承認センター」に、お子さんの記録がたまります。'+
@@ -1176,6 +1176,13 @@ function showParentGuide(){
    'しゅつげきの写真・計算メモ・AI相棒に送った写真は、容量が大きいため'+
    'かぞく同期にもバックアップJSONにも <b>含まれません</b>。'+
    '記録・ポイント・作戦などは、ちゃんと同期されています。')+
+  row('🙂','なまえは ニックネームでどうぞ',
+   'このアプリは個人が作った小さな道具です。<b>お子さんの名前はニックネームで</b>お使いください。',
+   'できる範囲のセキュリティは実装しています(コードを知らない人はデータに触れられません／'+
+   '親のPINとAIのカギは端末の外に出しません／写真も端末の中だけです)。'+
+   'そのうえで、これは会社の製品ではなく<b>個人がつくったもの</b>です。<br>'+
+   'なので「もしも」に備えて、はじめから<b>本名でない呼び名</b>にしておくのが安心です。'+
+   'ニックネームでも、きろくもポイントもごほうびも、まったく同じように動きます。')+
   row('☁️','かぞく同期と、2種類のPIN',
    '家族コードを作って、もう一方の端末で入力すれば記録を共有できます。',
    '「☁️かぞく同期」ではじめると26文字のコードが出ます。'+
@@ -2290,6 +2297,7 @@ const FIREBASE_CONFIG={
  appId:"1:254325574772:web:5be57f34e4a420744f1521",
  measurementId:"G-J8NXPJNJX8"
 };
+const SYNC_MAX_LEN=900000; // database.rules.json の state 上限(1,000,000字)より手前で止めて警告する
 const SYNC_LS_KEY='studykichi_sync'; // 家族コードはSと別キー保存=バックアップJSONに含めない(コード漏洩防止)
 let sync={code:null,lastTs:0};
 let syncTransport=null,syncDirty=false,syncTimer=null,syncApplying=false,syncRenderPending=false,syncStatus='off';
@@ -2342,6 +2350,8 @@ function syncSchedulePush(){ // save()から毎回呼ばれる。受信適用中
  syncTimer=setTimeout(syncPushNow,2000);} // 2秒デバウンス
 function syncPushNow(){if(syncTimer){clearTimeout(syncTimer);syncTimer=null;}
  if(!syncConfigured()||!sync.code||!syncTransport||!syncDirty)return;
+ if(stableStr(syncable(S)).length>SYNC_MAX_LEN){ // 上限超過。黙って失敗し続けないよう状態で知らせる
+  syncDirty=false;syncStatus='toobig';syncStatusRefresh();return;}
  syncDirty=false;
  Promise.resolve(syncTransport.push(node=>({
   state:syncMergeRemoteStr(node&&node.state),
@@ -2390,9 +2400,11 @@ async function syncConnect(){
  syncStatusRefresh();}
 /* --- ☁️UI(パパ・ママモード内) --- */
 function syncBadge(){if(!syncConfigured()||!sync.code)return'';
- return syncStatus==='on'?'接続中':syncStatus==='connecting'?'接続中…':syncStatus==='error'?'エラー':'未接続';}
+ return syncStatus==='on'?'接続中':syncStatus==='connecting'?'接続中…':
+  syncStatus==='toobig'?'停止中':syncStatus==='error'?'エラー':'未接続';}
 function syncStatusLine(){
  const st=syncStatus==='on'?'🟢 接続中':syncStatus==='connecting'?'🟡 接続中…':
+  syncStatus==='toobig'?'🟠 データが大きくなりすぎて同期を止めています(記録は端末に残っています。開発者にご連絡ください)':
   syncStatus==='error'?'🔴 エラー(電波とFirebase設定を確認して、開き直してください)':'⚪ 未接続';
  if(!sync.lastTs)return st;
  const d=new Date(sync.lastTs);
@@ -2401,17 +2413,27 @@ function syncStatusRefresh(){const el=$('#sync-status');if(el)el.innerHTML=syncS
 function syncSectionHTML(){
  if(!syncConfigured())return '<div class="muted">☁️ じゅんび中です(アプリにFirebase設定がまだ入っていません)。それまでは「🔧データとシステム」のバックアップ保存と合体(マージ)で複数端末を運用できます。</div>';
  if(!sync.code)return ''+
-  '<div class="muted">家族みんなの記録・ポイント・承認を、数秒でおたがいの端末にそろえます。写真・計算メモの画像とAPIキーは各端末の中だけに残ります。</div>'+
+  '<div class="muted">家族みんなの記録・ポイント・承認を、数秒でおたがいの端末にそろえます。</div>'+
   '<button class="btn blue sm" style="margin-top:8px" onclick="syncStart()">☁️ 同期をはじめる(この端末が1台目)</button>'+
   '<div class="muted" style="margin-top:10px">2台目からは、1台目の「かぞくコード」を入れてつながります:</div>'+
   '<div class="row" style="margin-top:6px"><input id="sync-code-in" placeholder="かぞくコードを入力" autocapitalize="none" autocomplete="off">'+
-  '<button class="btn blue sm" style="flex:0 0 90px" onclick="syncJoin()">つながる</button></div>';
+  '<button class="btn blue sm" style="flex:0 0 90px" onclick="syncJoin()">つながる</button></div>'+
+  syncWhatGoesHTML(); // ONにする前に、行き先を読めるようにしておく
  return '<div id="sync-status" class="muted">'+syncStatusLine()+'</div>'+
   '<button class="btn ghost sm" style="margin-top:8px" onclick="syncShowCode()">🔑 かぞくコードを見る(端末追加用)</button>'+
   '<button class="btn ghost sm" style="margin-top:8px;color:#B04040" onclick="syncDisconnect()">切断する(この端末のデータは残ります)</button>'+
-  '<div class="muted" style="margin-top:8px">※写真・計算メモの画像は撮った端末の中だけにあるため、他の端末では📷マークになります(記録じたいは同期されます)。<br>🔐 パパ・ママモードのPINは同期されません。端末ごとに設定してください(お子さんのPINは同期されます)。</div>';}
+  syncWhatGoesHTML();}
+/* 同期をONにすると何がどこへ行くか。ONの前後どちらの画面にも同じものを出す */
+function syncWhatGoesHTML(){return '<div class="muted" style="margin-top:10px;line-height:1.8">'+
+ '<b>クラウドへ行くもの</b>:なまえ・学年・きろく・ポイント・作戦・模試のせいせき・AI相棒との会話の文章・AI相棒に伝えた情報。<br>'+
+ '<b>端末の中だけに残るもの</b>:すべての写真と計算メモ／パパ・ママモードのPIN／AIのカギ(APIキー)。<br>'+
+ '写真は撮った端末の中だけなので、他の端末では📷マークになります(きろくじたいは同期されます)。お子さんのPINは同期されます。<br>'+
+ '🙂 <b>お子さんの名前はニックネームでのご利用をおすすめしています</b>(くわしくは「📖 はじめての方へ」)。</div>';}
 function syncStart(){
- if(!confirm('この端末のデータをクラウドに置いて、かぞく同期をはじめますか?'))return;
+ if(!confirm('この端末のデータをクラウドに置いて、かぞく同期をはじめますか?\n\n'+
+  '・なまえ・きろく・ポイント・作戦・AI相棒との会話が、開発者のFirebaseを経由して家族の端末で共有されます\n'+
+  '・写真とPINとAPIキーは端末の外に出ません\n'+
+  '・個人がつくったアプリです。お子さんの名前はニックネームでのご利用をおすすめします'))return;
  sync.code=genFamilyCode();syncSave();syncConnect();openParent();
  const pd=$('#pd-sync');if(pd)pd.open=true;}
 function syncJoin(){const v=($('#sync-code-in')?$('#sync-code-in').value.trim().toLowerCase():'');
