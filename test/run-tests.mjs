@@ -1193,6 +1193,66 @@ console.log('\n[21] 🗂️パパ・ママモードの分類');
   w.close();
 }
 
+/* ---------- 22. 📷 チャット写真を同期・バックアップから外す(v26) ----------
+   実測: チャット写真1枚(78KB)が同期ペイロード89KBの88%を占めていた。
+   写真は端末のIndexedDBへ逃がし、Sにはidだけ残す */
+console.log('\n[22] 📷チャット写真の外出し');
+{
+  // 旧データ(base64がSに入っている状態)からの移行
+  const b64 = 'data:image/jpeg;base64,' + 'A'.repeat(2000);
+  const old = {
+    v: 5, currentProfile: 'sora',
+    profiles: {
+      sora: {
+        name: '空花', em: '🌸', grade: '小5', points: 0, sessions: [], exams: [], pool: [], tickets: [],
+        weeks: {}, bonusSpins: [], books: [],
+        chat: [{ id: 'cm1', r: 'user', t: 'この問題おしえて', img: b64, ts: 1000 }],
+        chatArchive: [{ id: 'ca1', ts: 900, msgs: [{ id: 'cm0', r: 'user', t: 'まえの質問', img: b64, ts: 900 }] }],
+      },
+    },
+  };
+  const { w, errors } = boot(old, { studykichi_guide: '1', studykichi_concept: '1' });
+  w.closeModal();
+  const p = w.P();
+  eq(p.chat[0].img, null, '起動時に旧データのbase64が S から外れる');
+  ok(p.chat[0].imgId, '代わりに画像のidが入る');
+  eq(p.chat[0].imgId, 'ci-cm1', 'idはメッセージid由来で決定的(2端末で同じ結果に収束)');
+  eq(p.chatArchive[0].msgs[0].img, null, 'アーカイブの写真も外れる');
+  eq(p.chatArchive[0].msgs[0].imgId, 'ci-cm0', 'アーカイブにもidが入る');
+  // 同期ペイロードとバックアップに base64 が含まれない
+  const sync = JSON.stringify(w.syncable(w.eval('S')));
+  ok(!sync.includes('data:image'), '同期ペイロードに base64 が含まれない');
+  ok(sync.includes('ci-cm1'), '画像のidは同期される(他端末では📷になる)');
+  ok(!JSON.stringify(w.eval('S')).includes('data:image'), 'バックアップJSON(S)にも含まれない');
+  // 実測どおり軽くなっているか
+  ok(sync.length < 3000, `同期ペイロードが十分小さい(${sync.length}文字)`);
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  // 表示: 画像が無い端末では📷プレースホルダ(こわれた画像を出さない)
+  const { w, errors } = boot(undefined, { studykichi_guide: '1', studykichi_concept: '1' });
+  w.closeModal();
+  const p = w.P();
+  p.chat.push({ id: 'cmX', r: 'user', t: 'これ見て', imgId: 'ci-not-here', ts: Date.now() });
+  p.chat.push({ id: 'cmY', r: 'model', t: 'いい質問だね', ts: Date.now() });
+  w.eval('S').tab = 'ai'; w.render();
+  await sleep(150);
+  const miss = w.document.querySelectorAll('.chat-photo-miss');
+  eq(miss.length, 1, '写真が無いメッセージはプレースホルダになる');
+  ok(miss[0].textContent.includes('しゃしん'), '写真が撮られたことは分かる表示');
+  ok(!w.document.querySelector('img[data-photo]'), 'src無しの壊れたimgが残らない');
+  ok(w.document.querySelector('#chat-log').innerHTML.includes('これ見て'), '本文は今までどおり読める');
+  // まえの会話(アーカイブ)でも同じ
+  p.chatArchive.push({ id: 'caX', ts: Date.now(), msgs: [{ id: 'cmZ', r: 'user', t: 'ふるい質問', imgId: 'ci-gone', ts: 1 }], mt: 1 });
+  w.openArchive(); w.viewArchive(0);
+  await sleep(150);
+  ok(w.document.querySelector('#modal-root .chat-photo-miss'), 'まえの会話でもプレースホルダになる');
+  w.closeModal();
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+
 /* ---------- 6. リリース規約(6ファイル構成 + バージョン同時更新) ---------- */
 console.log('\n[6] リリース規約');
 {
