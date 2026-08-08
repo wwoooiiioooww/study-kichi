@@ -1394,6 +1394,73 @@ console.log('\n[25] 📉同期の転送量');
   w.close();
 }
 
+/* ---------- 26. 🔮 前方互換(v29 / 規模展開Step5) ----------
+   配布すると更新しない端末が必ず残る。旧版が新しいデータを壊さないこと */
+console.log('\n[26] 🔮前方互換');
+{
+  const { w, errors } = boot(undefined, { studykichi_guide: '1', studykichi_concept: '1' });
+  w.closeModal();
+  const clone = o => JSON.parse(JSON.stringify(o));
+  const sortk = v => Array.isArray(v) ? v.map(sortk)
+    : (v && typeof v === 'object') ? Object.keys(v).sort().reduce((o, k) => (o[k] = sortk(v[k]), o), {}) : v;
+  const canon = o => JSON.stringify(sortk(o));
+  const base = JSON.parse(w.eval('JSON.stringify(S)'));
+  // 直下の未知フィールド(新版だけが持つ設定など)が、旧版のマージで消えない
+  const oldSide = clone(base);
+  const newSide = clone(base); newSide.futureSetting = { on: 1 }; newSide.futureMt = 123;
+  const M1 = w.mergeState(clone(oldSide), clone(newSide));
+  ok(M1.futureSetting && M1.futureSetting.on === 1, '新版だけが持つ直下フィールドが引き継がれる');
+  eq(M1.futureMt, 123, '複数あっても引き継がれる');
+  const M2 = w.mergeState(clone(newSide), clone(oldSide));
+  eq(canon(w.syncable(M1)), canon(w.syncable(M2)), '引数順に依らない(可換)');
+  // プロフィールの未知フィールドも消えない(metaMtで負けた側が持っていても)
+  const a2 = clone(base); a2.profiles.sora.metaMt = 999; // 旧版が勝つ状況
+  const b2 = clone(base); b2.profiles.sora.metaMt = 1; b2.profiles.sora.futureField = 'のこす';
+  const M3 = w.mergeState(clone(a2), clone(b2));
+  eq(M3.profiles.sora.futureField, 'のこす', 'metaMtで負けた側の未知フィールドも引き継がれる');
+  eq(M3.profiles.sora.metaMt, 999, 'metaMt自体は新しい方のまま');
+  const M4 = w.mergeState(clone(b2), clone(a2));
+  eq(canon(w.syncable(M3)), canon(w.syncable(M4)), 'プロフィールの引き継ぎも可換');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  // クラウドが自分より新しいスキーマなら、取り込みも押し戻しもしない
+  const { w, errors } = boot(undefined, { studykichi_guide: '1', studykichi_concept: '1' });
+  w.closeModal();
+  w.FB_CONFIG_TEST = { apiKey: 'test', databaseURL: 'https://test' };
+  const mock = { pushes: 0, node: null, start(c, cb) { this.onRemote = cb; return Promise.resolve(); }, stop() {},
+    push(fn) { this.pushes++; this.node = fn(this.node); return Promise.resolve(); } };
+  w.setSyncTransport(mock);
+  w.syncStart();
+  await sleep(150);
+  w.closeModal();
+  const before = mock.pushes;
+  const nameBefore = w.P().name;
+  // 未来の版から届いたデータ
+  const future = JSON.parse(mock.node.state);
+  future.v = 99; future.profiles.sora.name = 'みらいの名前';
+  mock.onRemote({ state: w.stableStr(future), meta: { rev: 9, updatedAt: Date.now() } });
+  await sleep(150);
+  eq(w.P().name, nameBefore, '新しいスキーマは取り込まない(理解できないものを混ぜない)');
+  ok(w.syncStatusLine().includes('アプリが古いため'), '止めている理由が画面に出る');
+  eq(w.syncBadge(), '要更新', 'バッジでも気づける');
+  await sleep(300);
+  eq(mock.pushes, before, '押し戻さない(古い版でクラウドを上書きしない)');
+  // 送信経路でも、新しいスキーマのクラウドには触れない
+  const kept = w.syncMergeRemoteStr(w.stableStr(future));
+  eq(kept, w.stableStr(future), 'トランザクション側も新しいデータをそのまま残す');
+  // 同じ版なら今までどおり動く
+  const same = JSON.parse(mock.node.state); same.v = 5;
+  same.profiles.sora.sessions.unshift({ id: 's-ok', base: 'home', plannedMin: 25, startTs: 1, endTs: 2, minutes: 25,
+    subjects: [], memo: '', photoId: null, boards: [], focus: null, status: 'pending', spin: null, mt: 9 });
+  mock.onRemote({ state: w.stableStr(same), meta: { rev: 10, updatedAt: Date.now() } });
+  await sleep(150);
+  ok(w.P().sessions.some(s => s.id === 's-ok'), '同じ版のデータは今までどおり取り込む');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+
 /* ---------- 6. リリース規約(6ファイル構成 + バージョン同時更新) ---------- */
 console.log('\n[6] リリース規約');
 {

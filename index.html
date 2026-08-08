@@ -300,7 +300,7 @@ body.has-fab #shell{padding-bottom:124px} /* FABが最後のカードに かぶ�
    データはこの端末の中だけに保存されます（localStorage / IndexedDB）
    ============================================================ */
 /* ---------- マスタ ---------- */
-const APP_VER='v28'; // せってい表示とフィードバックの共通バージョン。sw.js の CACHE と同時に上げること
+const APP_VER='v29'; // せってい表示とフィードバックの共通バージョン。sw.js の CACHE と同時に上げること
 /* 汎用サンプル(配布用)。既存端末の保存済みデータは上書きされない */
 const DEFAULT_BASES=[
  {id:'lib',name:'としょかん',em:'📚'},
@@ -357,6 +357,7 @@ function mkProfile(name,em,grade){return{
    ・同期ペイロードとバックアップJSONから base64 が消える(実測 89KB→12KB)
    ・idはメッセージid由来で決定的。2端末が同じ旧データを移行しても同じ結果に収束する
    ・移送はmigrate(同期)から呼ばれるため、書き込みだけ非同期キューに逃がす */
+const SCHEMA_V=5; // 同期データのスキーマ版。これより新しいものは触らない(前方互換)
 var _imgQueue=[]; // migrate()はload()内=この行より前に走るので、巻き上げされるvarで宣言する
 function stripInlineImages(pr){
  const one=m=>{if(!m||!m.img)return;
@@ -368,7 +369,7 @@ function flushInlineImages(){if(!_imgQueue.length)return;
  const q=_imgQueue;_imgQueue=[];
  q.forEach(([id,d])=>{putPhoto(id,d).catch(()=>{});});}
 const DEFAULT_STATE={
-v:5, tab:'home', currentProfile:'sora', parentPin:null,
+v:SCHEMA_V, tab:'home', currentProfile:'sora', parentPin:null,
  bases:JSON.parse(JSON.stringify(DEFAULT_BASES)),
  gemini:{key:'',model:'gemini-3.5-flash'}, // ※Googleの現行モデル名。エラーになる場合は最新のモデル名に変更してください
  profiles:{ sora:mkProfile('そら','🌸','小5'), fuka:mkProfile('ふう','🍃','小3') },
@@ -439,7 +440,7 @@ function migrate(st){
  if(!Array.isArray(st.bases)||!st.bases.length)st.bases=JSON.parse(JSON.stringify(DEFAULT_BASES));
  if(!st.currentProfile||!st.profiles[st.currentProfile])st.currentProfile=Object.keys(st.profiles)[0];
  if(st.gemini&&(!st.gemini.model||st.gemini.model==='gemini-2.5-flash'))st.gemini.model='gemini-3.5-flash';
- st.v=5;
+ st.v=SCHEMA_V;
 }
 function save(){
  try{const now=Date.now(); // 古い墓標(90日)と使用済み/却下ボーナス(60日)の間引き
@@ -2225,7 +2226,12 @@ function metaSrc(id,pa,pb){ /* スカラー群の採用元: metaMt LWW。同点(
  return metaSnap(pa)>=metaSnap(pb)?pa:pb;}
 function mergeProfile(pa,pb,id){
  const dead=unionDead(pa.deleted,pb.deleted);
- const p=JSON.parse(JSON.stringify(metaSrc(id,pa,pb))); // スカラー群(name/em/grade/pin/aiName/examTarget/bigGoals/pool/books/theme)はmetaMt LWWで丸ごと
+ const src=metaSrc(id,pa,pb);
+ const p=JSON.parse(JSON.stringify(src)); // スカラー群(name/em/grade/pin/aiName/examTarget/bigGoals/pool/books/theme)はmetaMt LWWで丸ごと
+ /* 前方互換: 新しい版だけが持つフィールドを、古い版が知らないという理由で消さない。
+    srcは決定的に選ばれるので、引き継ぎも引数順に依らない */
+ const other=(src===pa)?pb:pa;
+ Object.keys(other).forEach(k=>{if(!(k in p))p[k]=JSON.parse(JSON.stringify(other[k]));});
  const A=JSON.parse(JSON.stringify(pa)),B=JSON.parse(JSON.stringify(pb));
  p.metaMt=Math.max(pa.metaMt||0,pb.metaMt||0);
  p.deleted=dead;
@@ -2273,6 +2279,9 @@ function mergeState(a,b){
   const pa=m.profiles[id],pb=(B.profiles||{})[id];
   if(!pa&&pb){m.profiles[id]=pb;return;}
   if(pa&&pb)m.profiles[id]=mergeProfile(pa,pb,id);});
+ /* 前方互換: 相手(新しい版)だけが持つ直下のフィールドを落とさない。
+    落とすと、古い端末が押し戻したときにクラウドから消えてしまう */
+ Object.keys(B).forEach(k=>{if(!(k in m))m[k]=JSON.parse(JSON.stringify(B[k]));});
  if(!m.profiles[m.currentProfile])m.currentProfile=Object.keys(m.profiles)[0];
  /* gemini/tab/currentProfile/activeSession はローカル維持(mはaのコピーなのでそのまま) */
  return m;}
@@ -2363,7 +2372,9 @@ function syncPushNow(){if(syncTimer){clearTimeout(syncTimer);syncTimer=null;}
 function syncMergeRemoteStr(remoteStr){ // クラウド現在値とローカルをマージした文字列を返す(トランザクション内で使用)
  const local=syncable(S);
  if(!remoteStr)return stableStr(local);
- try{const inc=Object.assign(JSON.parse(JSON.stringify(DEFAULT_STATE)),JSON.parse(remoteStr));
+ try{const _r=JSON.parse(remoteStr);
+  if(Number((_r&&_r.v)||0)>SCHEMA_V)return remoteStr; // 新しい版のデータには触れずそのまま残す
+  const inc=Object.assign(JSON.parse(JSON.stringify(DEFAULT_STATE)),_r);
   migrate(inc); // クラウド側が旧スキーマでも安全に
   delete inc.parentPin;delete inc.pinMt; // 旧バージョンのクラウドに残った親PINも取り込まない
   return stableStr(syncable(mergeState(inc,local)));
@@ -2373,6 +2384,8 @@ function syncOnRemote(node){ // Pull: onValue受信
  if(!remoteStr||typeof remoteStr!=='string')return;
  let rem;try{rem=JSON.parse(remoteStr);}catch(e){return;}
  if(!rem||!rem.profiles)return;
+ if(Number(rem.v||0)>SCHEMA_V){ // アプリが古い。取り込みも押し戻しもせず、更新をうながす
+  syncStatus='oldver';syncStatusRefresh();return;}
  const inc=Object.assign(JSON.parse(JSON.stringify(DEFAULT_STATE)),rem);
  migrate(inc);
  delete inc.parentPin;delete inc.pinMt; // 旧バージョンのクラウドに残った親PINも取り込まない(この端末のPINを維持)
@@ -2403,9 +2416,10 @@ async function syncConnect(){
 /* --- ☁️UI(パパ・ママモード内) --- */
 function syncBadge(){if(!syncConfigured()||!sync.code)return'';
  return syncStatus==='on'?'接続中':syncStatus==='connecting'?'接続中…':
-  syncStatus==='toobig'?'停止中':syncStatus==='error'?'エラー':'未接続';}
+  syncStatus==='oldver'?'要更新':syncStatus==='toobig'?'停止中':syncStatus==='error'?'エラー':'未接続';}
 function syncStatusLine(){
  const st=syncStatus==='on'?'🟢 接続中':syncStatus==='connecting'?'🟡 接続中…':
+  syncStatus==='oldver'?'🟠 アプリが古いため同期を止めています(アプリを開き直すと新しくなります。記録は端末に残っています)':
   syncStatus==='toobig'?'🟠 データが大きくなりすぎて同期を止めています(記録は端末に残っています。開発者にご連絡ください)':
   syncStatus==='error'?'🔴 エラー(電波とFirebase設定を確認して、開き直してください)':'⚪ 未接続';
  if(!sync.lastTs)return st;

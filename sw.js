@@ -4,7 +4,7 @@
    ・アプリ本体(index.html)はネット優先→オフライン時はキャッシュ(更新がすぐ届く)
    ・アイコンやフォントはキャッシュ優先(サクサク起動)
    ・Gemini APIへの通信には一切さわらない */
-const CACHE = 'studykichi-v28';
+const CACHE = 'studykichi-v29';
 const ASSETS = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './icon-maskable-512.png'];
 
 self.addEventListener('install', e => {
