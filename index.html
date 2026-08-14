@@ -300,7 +300,7 @@ body.has-fab #shell{padding-bottom:124px} /* FABが最後のカードに かぶ�
    データはこの端末の中だけに保存されます（localStorage / IndexedDB）
    ============================================================ */
 /* ---------- マスタ ---------- */
-const APP_VER='v30'; // せってい表示とフィードバックの共通バージョン。sw.js の CACHE と同時に上げること
+const APP_VER='v31'; // せってい表示とフィードバックの共通バージョン。sw.js の CACHE と同時に上げること
 /* 汎用サンプル(配布用)。既存端末の保存済みデータは上書きされない */
 const DEFAULT_BASES=[
  {id:'lib',name:'としょかん',em:'📚'},
@@ -582,7 +582,9 @@ function missionClaim(id){const p=P();const ms=(p.missions||[]).find(m=>m.id===i
  ms.status='claimed';ms.claimedTs=Date.now();ms.mt=Date.now();save();render();}
 function missionAck(id){const p=P();const ms=(p.missions||[]).find(m=>m.id===id);
  if(!ms)return;ms.ack=true;ms.mt=Date.now();save();render();}
-function judgeMission(id,ok){const p=P();const ms=(p.missions||[]).find(m=>m.id===id);
+/* 承認・却下はパパ・ママモードからしか呼ばれない。対象は「親モードで見ている子」(PT)であって、
+   子どもモードで立っている子(P)ではない。ここをP()にすると切替後に別の子へ加点する */
+function judgeMission(id,ok){const p=PT();const ms=(p.missions||[]).find(m=>m.id===id);
  if(!ms||ms.status!=='claimed')return;
  if(ok){ms.status='approved';ms.approvedTs=Date.now();ms.ack=false;
   addLedger(p,ms.pts,'mission',ms.title,'tx-ms-'+ms.id); // 決定的ID=マージで二重付与しない
@@ -635,19 +637,22 @@ function renderHeader(){const p=P();
   '<span class="em">'+pr.em+'</span><span>'+esc(pr.name)+'<div class="g">'+esc(pr.grade)+'</div></span></div>').join('');}
 function switchProfile(id){const pr=S.profiles[id];
  if(!pr||id===S.currentProfile)return;
- parentAuthed=false; // つかう人が変わったら入室許可は切れる
+ parentAuthed=false;parentPid=null; // つかう人が変わったら入室許可も、見ていた子も切れる
  if(pr.pin){whoPick(id);return;}
  S.currentProfile=id;save();render();maybeNudge();}
 /* --- 起動時の「だれがつかう?」ゲート --- */
 function launchGate(){
  if(!Object.values(S.profiles).some(pr=>pr.pin))return; // だれもPINなし→今までどおり
  showWhoModal();}
+/* 主役は子ども。子どものボタンを大きく塗りつぶしで出し、おうちの人は下に小さく分ける(v31) */
 function showWhoModal(){
  openModal('<h3>👋 だれが つかう?</h3>'+
  Object.entries(S.profiles).map(([id,pr])=>
-  '<button class="btn ghost" style="margin-top:8px;display:flex;align-items:center;gap:12px;text-align:left" onclick="whoPick(\''+id+'\')">'+
-  '<span style="font-size:28px">'+pr.em+'</span><span>'+esc(pr.name)+' <span class="muted">'+esc(pr.grade)+'</span>'+(pr.pin?' 🔒':'')+'</span></button>').join('')+
- (S.parentPin?'<button class="btn ghost sm" style="margin-top:12px" onclick="whoParent()">👨 おうちの人(親のPINでひらく)</button>':''),false);}
+  '<button class="btn" style="margin-top:10px;display:flex;align-items:center;gap:12px;text-align:left" onclick="whoPick(\''+id+'\')">'+
+  '<span style="font-size:34px">'+esc(pr.em)+'</span><span style="font-size:19px">'+esc(pr.name)+
+  ' <span style="font-size:13px;opacity:.85">'+esc(pr.grade)+'</span>'+(pr.pin?' 🔒':'')+'</span></button>').join('')+
+ (S.parentPin?'<div style="margin-top:18px;padding-top:12px;border-top:2px dashed var(--line)">'+
+  '<button class="btn ghost sm" onclick="whoParent()">👨 おうちの人(親のPINでひらく)</button></div>':''),false);}
 function whoPick(id){const pr=S.profiles[id];if(!pr)return;
  if(!pr.pin){S.currentProfile=id;save();closeModal();render();maybeNudge();return;}
  openModal('<h3>'+pr.em+' '+esc(pr.name)+'のPIN</h3>'+
@@ -660,13 +665,19 @@ function whoPinOk(id){const pr=S.profiles[id];
  else alert('ちがうみたい…');}
 function whoParent(){
  openModal('<h3>👨 親のPIN</h3>'+
+ '<div class="muted">そのままパパ・ママモードがひらきます。</div>'+
  pinInput('who-ppin','font-size:24px;text-align:center;letter-spacing:10px')+
- '<button class="btn" style="margin-top:12px" onclick="if(document.getElementById(\'who-ppin\').value===S.parentPin){closeModal();render();}else alert(\'ちがうみたい…\')">ひらく</button>'+
+ '<button class="btn" style="margin-top:12px" onclick="whoParentOk()">ひらく</button>'+
  '<button class="btn ghost sm" style="margin-top:8px" onclick="showWhoModal()">← もどる</button>',false);
  setTimeout(()=>{const el=$('#who-ppin');if(el)el.focus();},60);}
+/* 起動ゲートで親PINが通ったら、そのまま入室させる(せってい→ひらく→親PIN再入力の二度手間をなくす/v31) */
+function whoParentOk(){
+ if($('#who-ppin').value!==S.parentPin){alert('ちがうみたい…');return;}
+ parentAuthed=true;parentPid=S.currentProfile;
+ closeModal();render();openParent();}
 function renderNav(){$('#nav').innerHTML=NAV.map(([id,i,l])=>
  '<button class="'+(S.tab===id?'on':'')+'" onclick="go(\''+id+'\')"><span class="i">'+i+'</span>'+l+'</button>').join('');}
-function go(t){if(recOn)try{recog.stop();}catch(e){} parentAuthed=false; // タブを移ったら入室許可は切れる
+function go(t){if(recOn)try{recog.stop();}catch(e){} parentAuthed=false;parentPid=null; // タブを移ったら入室許可も、見ていた子も切れる
  S.tab=t;syncRenderPending=false;save();render();}
 /* 🚀FAB: ホーム以外のタブに出す近道。タイマーはホームでしか描画されないので、
    しゅつげき中に他タブへ行くと見えなくなる問題もこれで埋める(コア動線は変えない) */
@@ -1819,6 +1830,7 @@ function delProfile(id){const pr=S.profiles[id];if(!pr)return;
  S.deleted['pf-'+id]=Date.now(); // 墓標=マージで蘇らない
  delete S.profiles[id];
  if(S.currentProfile===id)S.currentProfile=Object.keys(S.profiles)[0];
+ if(parentPid===id)parentPid=S.currentProfile; // 見ていた子を消したら、残った子に戻す
  save();openParent();}
 /* --- きち編集(パパ・ママモード内) --- */
 function addBase(){S.bases.push({id:'b'+Date.now(),name:'あたらしい基地',em:'📍'});S.basesMt=Date.now();save();openParent();}
@@ -1848,8 +1860,10 @@ function parentGate(){
  '<button class="btn" style="margin-top:12px" onclick="checkPin()">ひらく</button>');}
 function setPin(){const v=$('#pin-new').value;
  if(!/^\d{4}$/.test(v)){alert('4けたの数字で!');return;}
- S.parentPin=v;S.pinMt=Date.now();save();parentAuthed=true;closeModal();openParent();}
-function checkPin(){if($('#pin-in').value===S.parentPin){parentAuthed=true;closeModal();openParent();}
+ S.parentPin=v;S.pinMt=Date.now();save();parentAuthed=true;parentPid=S.currentProfile;closeModal();openParent();}
+function checkPin(){if($('#pin-in').value===S.parentPin){
+  parentAuthed=true;parentPid=S.currentProfile; // PINを入れ直した=入り直し。今の子から始める
+  closeModal();openParent();}
  else alert('ちがうみたい…');}
 /* 折りたたみセクション(パパ・ママモード整理用) */
 function pdSec(id,title,badge,body,open2,hint){
@@ -1872,10 +1886,37 @@ function pdRestore(snap,focusId){
 /* パパ・ママモードの入室許可(この画面を開いているあいだだけ有効。保存しない)。
    openParent()を直接呼ぶ導線がPINを素通りしないよう、画面側ではなくここで守る */
 var parentAuthed=false;
+/* 👨パパ・ママモードで「いま見ている子」。子どもモードの S.currentProfile とは別に持つ(v31)。
+   一緒にしてしまうと、モーダルを閉じた瞬間に子ども側の画面まで別の子に変わり、
+   こどもPIN(きょうだいのスロット回し防止)を素通りする抜け道になる。
+   親モードの中だけで切り替え、子どもの画面はさわらない */
+var parentPid=null;
+function PT(){return S.profiles[parentPid]||P();} // 無効ID(削除ずみ等)なら安全に今の子へ
+/* 承認まちの件数。切替タブに出して「もう一人にたまっている」を気づけるようにする */
+function pendCount(pr){return (pr.sessions||[]).filter(s=>s.status==='pending').length+
+ pendingBonus(pr).length+claimedMissions(pr).length;}
+/* 子どもの切替タブ。ひとりっ子の家庭には出さない(不要な情報を増やさない) */
+function parentSwitchHTML(){const ids=Object.keys(S.profiles);
+ if(ids.length<2)return '';
+ return '<div class="chips" style="margin-bottom:10px">'+ids.map(id=>{const pr=S.profiles[id];
+  const n=pendCount(pr);
+  return '<div class="chip'+(id===parentPid?' on':'')+'" onclick="parentSwitchChild(\''+id+'\')">'+
+   esc(pr.em)+' '+esc(pr.name)+(n?' <span class="badge b-pend">'+n+'</span>':'')+'</div>';}).join('')+
+  '</div><div class="muted" style="margin-top:-4px;margin-bottom:10px">'+
+  'タブでお子さんを切りかえられます(こどもPINは不要)。入力中の内容は切りかえる前に保存されます。</div>';}
+/* 切替。未保存の入力を落とさないため、切りかえる前に今の子へ書き戻してから移る */
+function parentSwitchChild(id){
+ if(!S.profiles[id]||id===parentPid)return;
+ collectParentInputs();save();
+ parentPid=id;openParent();}
 function openParent(focusId){
  if(!parentAuthed){parentGate();return;} // ← PINを通っていなければ必ずゲートへ
  if(!conceptSeen()){showConcept(true);return;} // 初回だけ: 何をする道具かを先に伝える
- const p=P();const pend=p.sessions.filter(s=>s.status==='pending');
+ if(!S.profiles[parentPid])parentPid=S.currentProfile; // 初回・削除ずみIDのときは今の子から
+ const multi=Object.keys(S.profiles).length>1;
+ const forChild=multi?'この子だけ／':''; // 共通項目との取りちがえ防止(2人以上のときだけ)
+ const forAll=multi?'かぞく共通／':'';
+ const p=PT();const pend=p.sessions.filter(s=>s.status==='pending');
  const _snap=pdSnapshot();
  const nApprove=pend.length+pendingBonus(p).length+claimedMissions(p).length;
  /* ① 承認センター */
@@ -1907,6 +1948,13 @@ function openParent(focusId){
   '<select id="ms-due" onchange="var d=document.getElementById(\'ms-date\');if(d)d.style.display=this.value===\'date\'?\'\':\'none\'">'+
    '<option value="today">きょう中</option><option value="week">こんしゅう中(週の土曜まで)</option><option value="date">日付指定</option></select>'+
   '<input id="ms-date" type="date" style="display:none"></div>'+
+  /* きょうだいに同じ課題を出したいときの近道(v31)。既定はOFF=今までどおりこの子だけ。
+     子ごとに独立した1件が作られるので、達成・承認・却下はそれぞれ別に動く */
+  (multi?'<div class="chips" style="margin-top:8px">'+Object.entries(S.profiles)
+   .filter(([id])=>id!==parentPid)
+   .map(([id,pr])=>'<label class="chip" style="cursor:pointer">'+
+    '<input type="checkbox" data-ms-also="'+id+'" style="width:auto;margin:0 6px 0 0;vertical-align:middle">'+
+    esc(pr.em)+' '+esc(pr.name)+'にも出す</label>').join('')+'</div>':'')+
   '<button class="btn blue sm" style="margin-top:8px" onclick="addMission()">🎯 ミッションを出す</button>';
  /* ③ ごほうび設定 */
  const secReward=
@@ -1940,7 +1988,8 @@ function openParent(focusId){
   '<div class="muted">「もくひょう」タブの成績グラフに、目標の線が引かれます。</div>'+
   '<div class="row" style="margin-top:6px"><input id="tgt-label" placeholder="例:○○模試 偏差値" value="'+esc(p.examTarget.label)+'">'+
   '<input id="tgt-value" type="number" placeholder="60" value="'+esc(p.examTarget.value)+'" style="flex:0 0 90px"></div>'+
-  '<h2 style="margin-top:14px">📅 さくせん会議リマインダー</h2>';
+  '<h2 style="margin-top:14px">📅 さくせん会議リマインダー'+
+   (multi?' <span class="badge b-pend">かぞく共通</span>':'')+'</h2>';
  /* ④-2 さくせん会議リマインダー(v17。がくしゅうの設定の中に置く) */
  const rm=S.planRemind||{on:1,day:0,max:3};
  const DOW=['日','月','火','水','木','金','土'];
@@ -2025,24 +2074,25 @@ function openParent(focusId){
   feedbackSectionHTML();
  const secStudyAll=secStudy+secRemind;
  openModal('<h3>👨 パパ・ママモード('+esc(p.name)+')</h3>'+
+  parentSwitchHTML()+
   '<button class="btn ghost sm" style="margin-bottom:10px" onclick="showParentGuide()">📖 はじめての方へ(つかいかた・こまったとき)</button>'+
   bkNoticeHTML()+
   pdSec('approve','✅ 承認センター',nApprove?('承認まち '+nApprove):'',secApprove,true,
-   'きろく・ボーナス・ミッションの承認と却下')+
+   forChild+'きろく・ボーナス・ミッションの承認と却下')+
   pdSec('mission','🎯 特別ミッションを出す','',secMission,false,
-   'お手伝いなど臨時の課題を出す(承認で加点)')+
+   forChild+'お手伝いなど臨時の課題を出す(承認で加点)')+
   pdSec('study','📚 がくしゅうの設定',(S.planRemind&&S.planRemind.on)?'':'リマインダーOFF',secStudyAll,false,
-   'テキストの登録・模試の目標・さくせん会議リマインダー')+
+   forChild+'テキストの登録・模試の目標・さくせん会議リマインダー')+
   pdSec('reward','🎁 ごほうび設定','',secReward,false,
-   'ごほうび券と価格・大きなごほうび・ポイントちょうせい')+
+   forChild+'ごほうび券と価格・大きなごほうび・ポイントちょうせい')+
   pdSec('ctx','🤖 AI相棒に おしえておくこと',(p.context&&(p.context.about||p.context.now))?'設定ずみ':'',secCtx,false,
-   'お子さんのことをAIに伝える(会話とレポートに反映)')+
+   forChild+'お子さんのことをAIに伝える(会話とレポートに反映)')+
   pdSec('member','👥 メンバーときち','',secMember,false,
-   'なまえ・学年・こどもPIN／きちの追加と編集')+
+   forAll+'なまえ・学年・こどもPIN／きちの追加と編集')+
   pdSec('sync','☁️ かぞく同期',syncBadge(),syncSectionHTML(),false,
-   '家族コードで複数の端末をつなぐ')+
+   forAll+'家族コードで複数の端末をつなぐ')+
   pdSec('sys','🔧 データとシステム','',secSys,false,
-   'APIキー・親PIN・バックアップ・初期化')+
+   forAll+'APIキー・親PIN・バックアップ・初期化')+
   '<button class="btn" style="margin-top:16px" onclick="saveParent()">まとめて保存</button>');
  pdRestore(_snap,focusId);
  loadThumbs();}
@@ -2054,10 +2104,10 @@ function parentSessRow(s){const b=S.bases.find(x=>x.id===s.base)||{em:"📍",nam
  (s.boards||[]).map(b=>'<img class="thumb" data-photo="'+b+'" onclick="viewPhotoInline(\''+b+'\')" alt="メモ">').join('')+
  '<button class="btn blue sm" style="width:56px;flex:0 0 auto" onclick="judge(\''+s.id+'\',\'approved\')">承認</button>'+
  '<button class="btn ghost sm" style="width:60px;flex:0 0 auto;color:#B04040" onclick="judge(\''+s.id+'\',\'rejected\')">却下</button></div>';}
-function judge(id,st){const s=P().sessions.find(x=>x.id===id);if(!s)return;
+function judge(id,st){const s=PT().sessions.find(x=>x.id===id);if(!s)return;
  s.status=st;s.mt=Date.now();save();
  const row=$('#ps-'+id);if(row)row.remove();}
-function judgeBonus(id,ok){const p=P();const b=p.bonusSpins.find(x=>x.id===id);
+function judgeBonus(id,ok){const p=PT();const b=p.bonusSpins.find(x=>x.id===id);
  if(!b)return;
  b.status=ok?'approved':'rejected'; // 削除でなく状態マーク(マージでの蘇り防止)
  b.mt=Date.now();
@@ -2074,7 +2124,7 @@ function missionAdminRows(p){checkMissionExpiry(p);
   '<span class="muted">'+missionDueLabel(ms)+'</span> '+st+'</span>'+
   (ms.status!=='claimed'?'<button style="background:#EEF4FA;color:#2F6FB0" onclick="missionDueModal(\''+ms.id+'\')">🗓️期限</button>':'')+
   '<button onclick="delMission(\''+ms.id+'\')">削除</button></div>';}).join('');}
-function addMission(){const p=P();
+function addMission(){const p=PT();
  const t=($('#ms-title')?$('#ms-title').value.trim():'');
  const pts=Math.floor(Number($('#ms-pts')?$('#ms-pts').value:0));
  const type=($('#ms-due')?$('#ms-due').value:'today');
@@ -2082,16 +2132,24 @@ function addMission(){const p=P();
  if(!t){alert('ミッションのタイトルを入れてください');return;}
  if(!(pts>=1)){alert('ポイントは1以上の数字にしてください');return;}
  if(type==='date'&&!/^\d{4}-\d{2}-\d{2}$/.test(date)){alert('期限の日付を選んでください');return;}
- const ms={id:'ms'+Date.now()+Math.floor(Math.random()*1e4),title:t,pts:pts,
+ let _n=0; // 同じミリ秒に2件作るときのID衝突よけ
+ const mk=()=>({id:'ms'+Date.now()+Math.floor(Math.random()*1e4)+(_n++?'-'+_n:''),title:t,pts:pts,
   due:{type:type,date:type==='date'?date:null},
-  status:'open',createdTs:Date.now(),claimedTs:null,approvedTs:null,ack:false,mt:Date.now()};
+  status:'open',createdTs:Date.now(),claimedTs:null,approvedTs:null,ack:false,mt:Date.now()});
+ const ms=mk();
  if(type==='date'&&missionDueTs(ms)<Date.now()){alert('期限がすでに過ぎています。日付を確認してください');return;}
- (p.missions=p.missions||[]).push(ms);save();openParent('ms-title');}
-function delMission(id){const p=P();const i=(p.missions||[]).findIndex(m=>m.id===id);
+ (p.missions=p.missions||[]).push(ms);
+ /* 「◯◯にも出す」にチェックがあれば、その子にも同じ内容で1件ずつ作る(v31)。
+    IDは子ごとに別なので、達成・承認・却下・削除はそれぞれ独立して動く */
+ document.querySelectorAll('[data-ms-also]').forEach(cb=>{if(!cb.checked)return;
+  const o=S.profiles[cb.dataset.msAlso];if(!o||o===p)return;
+  (o.missions=o.missions||[]).push(mk());});
+ save();openParent('ms-title');}
+function delMission(id){const p=PT();const i=(p.missions||[]).findIndex(m=>m.id===id);
  if(i<0)return;
  if(!confirm('「'+p.missions[i].title+'」を削除しますか?'))return;
  p.missions.splice(i,1);p.deleted[id]=Date.now();save();openParent();} // 墓標=マージで蘇らない
-function missionDueModal(id){const p=P();const ms=(p.missions||[]).find(m=>m.id===id);if(!ms)return;
+function missionDueModal(id){const p=PT();const ms=(p.missions||[]).find(m=>m.id===id);if(!ms)return;
  const cur=(ms.due&&ms.due.type)||'today';
  openModal('<h3>🗓️ 期限の変更('+esc(ms.title)+')</h3>'+
  '<div class="muted">期限を延ばすと、期限切れのミッションも復活します。「きょう中」「こんしゅう中」は今日を起点にします。</div>'+
@@ -2102,7 +2160,7 @@ function missionDueModal(id){const p=P();const ms=(p.missions||[]).find(m=>m.id=
  '<input id="msd-date" type="date" value="'+esc((ms.due&&ms.due.date)||'')+'" style="margin-top:6px;'+(cur==='date'?'':'display:none')+'">'+
  '<button class="btn blue sm" style="margin-top:12px" onclick="missionDueSave(\''+id+'\')">決定</button>'+
  '<button class="btn ghost sm" style="margin-top:8px" onclick="openParent()">← もどる</button>');}
-function missionDueSave(id){const p=P();const ms=(p.missions||[]).find(m=>m.id===id);if(!ms)return;
+function missionDueSave(id){const p=PT();const ms=(p.missions||[]).find(m=>m.id===id);if(!ms)return;
  const type=$('#msd-type').value;const date=$('#msd-date').value;
  if(type==='date'&&!/^\d{4}-\d{2}-\d{2}$/.test(date)){alert('日付を選んでください');return;}
  // きょう中/こんしゅう中は「今日起点」で判定し直す。検証OKになってから本体へ反映
@@ -2113,12 +2171,12 @@ function missionDueSave(id){const p=P();const ms=(p.missions||[]).find(m=>m.id==
  ms.mt=Date.now();
  save();openParent();}
 function addBook(){const v=$('#book-new').value.trim();if(!v)return;
- P().books.push(v);P().metaMt=Date.now();save();openParent('book-new');}
-function delBook(i){P().books.splice(i,1);P().metaMt=Date.now();save();openParent();}
+ PT().books.push(v);PT().metaMt=Date.now();save();openParent('book-new');}
+function delBook(i){PT().books.splice(i,1);PT().metaMt=Date.now();save();openParent();}
 function addPool(){const v=$('#pool-new').value.trim();if(!v)return;
  const pr=Math.max(0,Number($('#pool-price').value)||500);
- P().pool.push({name:v,price:pr});P().metaMt=Date.now();save();openParent('pool-new');}
-function delPool(i){P().pool.splice(i,1);P().metaMt=Date.now();save();openParent();}
+ PT().pool.push({name:v,price:pr});PT().metaMt=Date.now();save();openParent('pool-new');}
+function delPool(i){PT().pool.splice(i,1);PT().metaMt=Date.now();save();openParent();}
 function changePin(){const v=$('#pin-chg').value;
  if(!/^\d{4}$/.test(v)){alert('4けたの数字で!');return;}
  S.parentPin=v;S.pinMt=Date.now();save();$('#pin-chg').value='';alert('PINを変更しました🔐');}
@@ -2138,8 +2196,11 @@ function keyGuide(){openModal('<h3>🔑 AI相棒のカギ(APIキー)のもらい
    名前・きち・ごほうび・目標・テキストを上書きする事故になる(v15で実際に発生) */
 function metaSnap(pr){return stableStr({name:pr.name,em:pr.em,grade:pr.grade,pin:pr.pin,aiName:pr.aiName,
  examTarget:pr.examTarget,bigGoals:pr.bigGoals,pool:pr.pool,books:pr.books,theme:pr.theme,context:pr.context});}
-function saveParent(){
- const p=P();
+/* 入力欄→S への書き戻しだけを行う(保存・閉じるはしない)。
+   「まとめて保存」と、子どもタブの切替(v31)の両方から同じ経路を通すための分離。
+   切替のたびにここを通すので、未保存の入力が黙って消えることがない */
+function collectParentInputs(){
+ const p=PT();
  // 保存前スナップショット(実際に変わったプロフィール・きちだけmetaMt/basesMtを打つため)
  const _snap={};Object.entries(S.profiles).forEach(([id,pr])=>{_snap[id]=metaSnap(pr);});
  const _bSnap=stableStr(S.bases);
@@ -2182,7 +2243,9 @@ function saveParent(){
  const _mt=Date.now();
  Object.entries(S.profiles).forEach(([id,pr])=>{if(metaSnap(pr)!==_snap[id])pr.metaMt=_mt;});
  if(stableStr(S.bases)!==_bSnap)S.basesMt=_mt;
-
+}
+function saveParent(){
+ collectParentInputs();
  save();      // localStorageへ保存
  closeModal(); // モーダルを閉じる
  render();     // 画面を再描画
@@ -2598,7 +2661,7 @@ function applyMerge(){if(!pendingMerge)return;
  save();closeModal();render();
  alert('合体しました🔀 ポイントは通帳(台帳)の合計に再計算されています');}
 /* ---------- ⭐親の手動ポイント調整(A-4) ---------- */
-function adjustPoints(){const p=P();
+function adjustPoints(){const p=PT();
  const d=Math.round(Number($('#adj-delta').value));
  if(!d){alert('プラスかマイナスの数字を入れてください(例: 50 / -30)');return;}
  const memo=$('#adj-memo').value.trim();
