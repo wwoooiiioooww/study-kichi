@@ -1545,6 +1545,200 @@ console.log('\n[27] 🔁コード作り直し・💾バックアップ催促');
   w.close();
 }
 
+/* ---------- 28. 👨 パパ・ママモード内での子ども切替(v31) ----------
+   実要望: 子2の設定を変えるのに「子2のこどもPIN → 子2モード → 親PIN → パパ・ママモード」の
+   往復が必要で面倒。親モードの中だけで見る子を切り替えられるようにする。
+   S.currentProfile を書き換える実装にすると、モーダルを閉じた瞬間に子ども画面まで子2に変わり、
+   こどもPIN(きょうだいのスロット回し防止)を素通りできてしまう。親モード専用の parentPid で持つこと */
+console.log('\n[28] 👨親モード内の子ども切替');
+{
+  const { w, errors } = boot(undefined, { studykichi_guide: '1' });
+  const doc = w.document;
+  const St = w.eval('S');
+  const mr = () => doc.querySelector('#modal-root').innerHTML;
+  const tabs = () => [...doc.querySelectorAll('#modal-root .chip')]
+    .filter(c => (c.getAttribute('onclick') || '').includes('parentSwitchChild'));
+  w.closeModal();
+  w.openParent();
+  eq(tabs().length, 2, '2人ぶんの切替タブが出る');
+  ok(tabs()[0].className.includes('on'), 'いま見ている子のタブが選択状態');
+  ok(mr().includes('パパ・ママモード(そら)'), '見出しはいま見ている子');
+
+  // 切替: こどもPINを求められない(これが今回の本丸)
+  St.profiles.fuka.pin = '4321';
+  w.parentSwitchChild('fuka');
+  ok(!mr().includes('who-pin'), '切替でこどもPINを聞かれない');
+  ok(mr().includes('承認センター'), 'パパ・ママモードから出ない');
+  ok(mr().includes('パパ・ママモード(ふう)'), '見出しが切替先の子になる');
+  eq(w.eval('parentPid'), 'fuka', '親モードの対象だけが移る');
+  eq(St.currentProfile, 'sora', '子ども画面(currentProfile)は入る前のまま=こどもPINを迂回しない');
+  w.closeModal();
+  eq(St.currentProfile, 'sora', '閉じても子ども画面は元の子のまま');
+
+  // 承認・ミッション・券・ポイント調整が「切替先の子」だけに効く
+  w.openParent();
+  const mkSess = id => ({ id, base: 'home', startTs: Date.now(), minutes: 30, subjects: ['算数'],
+    memo: '', photoId: null, boards: [], status: 'pending', spin: null, mt: 1 });
+  St.profiles.fuka.sessions.push(mkSess('s-fuka'));
+  St.profiles.sora.sessions.push(mkSess('s-sora'));
+  w.openParent();
+  w.judge('s-fuka', 'approved');
+  eq(St.profiles.fuka.sessions.find(s => s.id === 's-fuka').status, 'approved', '切替先の子のきろくを承認できる');
+  w.judge('s-sora', 'approved');
+  eq(St.profiles.sora.sessions.find(s => s.id === 's-sora').status, 'pending', 'もう一人のきろくには手が届かない(取りちがえ防止)');
+
+  doc.querySelector('#pool-new').value = 'ふうだけの券 🍩';
+  doc.querySelector('#pool-price').value = '300';
+  w.addPool();
+  ok(St.profiles.fuka.pool.some(t => t.name === 'ふうだけの券 🍩'), 'ごほうび券は切替先の子に追加される');
+  ok(!St.profiles.sora.pool.some(t => t.name === 'ふうだけの券 🍩'), 'もう一人の券カタログは汚れない');
+
+  doc.querySelector('#book-new').value = '予習シリーズ 算数(下)';
+  w.addBook();
+  eq(St.profiles.fuka.books.length, 1, 'テキストも切替先の子に入る');
+  eq(St.profiles.sora.books.length, 0, 'もう一人のテキストは増えない');
+
+  // ミッション/ボーナスの承認も切替先の子に効く(judgeMission は子ども側の関数群の中にあり見落としやすい)
+  St.profiles.fuka.missions.push({ id: 'ms-f', title: 'お皿ならべ', pts: 30, due: { type: 'today', date: null },
+    status: 'claimed', createdTs: Date.now(), claimedTs: Date.now(), approvedTs: null, ack: false, mt: 1 });
+  St.profiles.sora.missions.push({ id: 'ms-s', title: 'お皿ならべ', pts: 30, due: { type: 'today', date: null },
+    status: 'claimed', createdTs: Date.now(), claimedTs: Date.now(), approvedTs: null, ack: false, mt: 1 });
+  w.openParent();
+  w.judgeMission('ms-f', 1);
+  eq(St.profiles.fuka.missions[0].status, 'approved', '切替先の子のミッションを承認できる');
+  eq(St.profiles.fuka.points, 30, 'ポイントは切替先の子に入る');
+  w.judgeMission('ms-s', 1);
+  eq(St.profiles.sora.missions[0].status, 'claimed', 'もう一人のミッションには手が届かない');
+  eq(St.profiles.sora.points, 0, 'もう一人にポイントが入らない(誤加点しない)');
+  St.profiles.fuka.bonusSpins.push({ id: 'bs-f', reason: 'さくせん会議', golden: false, status: 'pending', mt: 1 });
+  St.profiles.sora.bonusSpins.push({ id: 'bs-s', reason: 'さくせん会議', golden: false, status: 'pending', mt: 1 });
+  w.openParent();
+  w.judgeBonus('bs-f', 1);
+  eq(St.profiles.fuka.bonusSpins[0].status, 'approved', '切替先の子のボーナスを承認できる');
+  w.judgeBonus('bs-s', 1);
+  eq(St.profiles.sora.bonusSpins[0].status, 'pending', 'もう一人のボーナスには手が届かない');
+
+  const soraPts = St.profiles.sora.points;
+  doc.querySelector('#adj-delta').value = '50';
+  doc.querySelector('#adj-memo').value = 'テスト';
+  w.adjustPoints();
+  eq(St.profiles.fuka.points, 80, 'ポイントちょうせいも切替先の子に効く(30+50)');
+  eq(St.profiles.sora.points, soraPts, 'もう一人のポイントは動かない');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  // 未保存の入力は切替時に保存される(黙って消えない) / 未編集のmetaMtは進めない(同期の上書き事故)
+  const { w, errors } = boot(undefined, { studykichi_guide: '1' });
+  const doc = w.document;
+  const St = w.eval('S');
+  w.closeModal();
+  w.openParent();
+  doc.querySelector('#tgt-value').value = '58';
+  doc.querySelector('[data-pf-nm="sora"]').value = '空花';
+  doc.querySelector('#ctx-about').value = '負けずぎらい';
+  w.parentSwitchChild('fuka');
+  eq(St.profiles.sora.examTarget.value, '58', '切替前の入力(模試の目標)が保存されている');
+  eq(St.profiles.sora.name, '空花', '切替前の入力(なまえ)が保存されている');
+  eq(St.profiles.sora.context.about, '負けずぎらい', '切替前の入力(AIコンテキスト)が保存されている');
+  ok(doc.querySelector('#tgt-value').value !== '58', '切替先には切替先の値が出る(引きずらない)');
+  // 何も編集せずに切り替えても、未編集プロフィールのmetaMtは進めない
+  St.profiles.sora.metaMt = 111; St.profiles.fuka.metaMt = 222; St.basesMt = 333;
+  w.parentSwitchChild('sora');
+  eq(St.profiles.fuka.metaMt, 222, '切替だけでは未編集のmetaMtを進めない(家族同期の上書き事故を再発させない)');
+  eq(St.profiles.sora.metaMt, 111, '切替だけでは自分のmetaMtも進めない');
+  eq(St.basesMt, 333, '切替だけではbasesMtも進めない');
+  // 入室許可が切れたら、見ていた子もリセットされる
+  w.parentSwitchChild('fuka');
+  w.go('home');
+  eq(w.eval('parentPid'), null, 'タブを移ると見ていた子もリセット');
+  w.parentAuthed = true; w.parentPid = 'fuka';
+  w.switchProfile('fuka');
+  eq(w.eval('parentPid'), null, 'つかう人が変わると見ていた子もリセット');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  // 🎯 ミッションの「もう一人にも出す」(既定OFF)
+  const { w, errors } = boot(undefined, { studykichi_guide: '1' });
+  const doc = w.document;
+  const St = w.eval('S');
+  w.closeModal();
+  w.openParent();
+  ok(!doc.querySelector('[data-ms-also="sora"]'), 'いま見ている子ぶんのチェックは出ない');
+  const also = doc.querySelector('[data-ms-also="fuka"]');
+  ok(also && !also.checked, '「もう一人にも出す」は既定OFF(今までどおりこの子だけ)');
+  doc.querySelector('#ms-title').value = '音読 10分';
+  doc.querySelector('#ms-pts').value = '10';
+  w.addMission();
+  eq(St.profiles.sora.missions.length, 1, 'チェックなし: この子だけに1件');
+  eq(St.profiles.fuka.missions.length, 0, 'チェックなし: もう一人には出ない');
+  doc.querySelector('#ms-title').value = '漢字ドリル1ページ';
+  doc.querySelector('#ms-pts').value = '20';
+  doc.querySelector('[data-ms-also="fuka"]').checked = true;
+  w.addMission();
+  eq(St.profiles.sora.missions.length, 2, 'チェックあり: この子にも出る');
+  eq(St.profiles.fuka.missions.length, 1, 'チェックあり: もう一人にも同時に出る');
+  eq(St.profiles.fuka.missions[0].title, '漢字ドリル1ページ', '内容(タイトル)は同じ');
+  eq(St.profiles.fuka.missions[0].pts, 20, '内容(ポイント)も同じ');
+  ok(St.profiles.sora.missions[1].id !== St.profiles.fuka.missions[0].id,
+    'IDは子ごとに別(達成・承認・削除はそれぞれ独立して動く)');
+  // 承認まちの件数が切替タブに出る
+  St.profiles.fuka.missions[0].status = 'claimed';
+  w.openParent();
+  const fukaTab = [...doc.querySelectorAll('#modal-root .chip')]
+    .find(c => (c.getAttribute('onclick') || '').includes("'fuka'"));
+  ok(fukaTab && fukaTab.querySelector('.b-pend'), 'もう一人に承認まちがあると切替タブにバッジが出る');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  // ひとりっ子の家庭では、切替タブも共通ラベルも出さない(情報を増やさない)
+  const { w, errors } = boot(undefined, { studykichi_guide: '1' });
+  const doc = w.document;
+  const St = w.eval('S');
+  const mr = () => doc.querySelector('#modal-root').innerHTML;
+  w.closeModal();
+  w.openParent();
+  ok(mr().includes('かぞく共通') && mr().includes('この子だけ'), '2人以上なら共通/この子だけのラベルが出る');
+  delete St.profiles.fuka; St.currentProfile = 'sora'; w.parentPid = 'sora';
+  w.openParent();
+  ok(!mr().includes('parentSwitchChild'), 'ひとりっ子なら切替タブを出さない');
+  ok(!mr().includes('かぞく共通'), 'ひとりっ子なら「かぞく共通」ラベルを出さない');
+  ok(!mr().includes('この子だけ'), 'ひとりっ子なら「この子だけ」ラベルを出さない');
+  ok(!mr().includes('data-ms-also'), 'ひとりっ子なら「もう一人にも出す」も出さない');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+{
+  // 👋 起動ゲート: 主役は子ども / 親PINはそのままパパ・ママモードへ(二度入力しない)
+  const { w, errors } = boot(undefined, { studykichi_guide: '1' });
+  const doc = w.document;
+  const St = w.eval('S');
+  const mr = () => doc.querySelector('#modal-root').innerHTML;
+  w.closeModal();
+  St.parentPin = '1975'; St.profiles.sora.pin = '1234';
+  w.parentAuthed = false;
+  w.showWhoModal();
+  const btns = () => [...doc.querySelectorAll('#modal-root button')];
+  const kid = btns().filter(b => (b.getAttribute('onclick') || '').includes('whoPick'));
+  eq(kid.length, 2, '子どものボタンが人数ぶん出る');
+  ok(kid.every(b => b.className === 'btn'), '子どもは塗りつぶしの大きいボタン(主役として目立たせる)');
+  const par = btns().find(b => (b.getAttribute('onclick') || '').includes('whoParent'));
+  ok(par && par.className.includes('ghost') && par.className.includes('sm'), 'おうちの人は小さく控えめ');
+  w.whoParent();
+  doc.querySelector('#who-ppin').value = '0000';
+  w.whoParentOk();
+  ok(!w.parentAuthed, 'ちがう親PINでは入室許可が立たない');
+  ok(!mr().includes('承認センター'), 'ちがう親PINではパパ・ママモードが開かない');
+  doc.querySelector('#who-ppin').value = '1975';
+  w.whoParentOk();
+  ok(w.parentAuthed, '正しい親PINで入室許可が立つ');
+  ok(mr().includes('承認センター'), '起動ゲートからそのままパパ・ママモードがひらく(親PINは1回だけ)');
+  eq(errors.length, 0, 'runtime errors: none');
+  w.close();
+}
+
 /* ---------- 6. リリース規約(6ファイル構成 + バージョン同時更新) ---------- */
 console.log('\n[6] リリース規約');
 {
