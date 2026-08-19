@@ -1,0 +1,1135 @@
+{
+ "v": 5,
+ "tab": "home",
+ "currentProfile": "sora",
+ "parentPin": "1234",
+ "bases": [
+  {
+   "id": "lib",
+   "name": "としょかん",
+   "em": "📚"
+  },
+  {
+   "id": "school",
+   "name": "図書室",
+   "em": "🏫"
+  },
+  {
+   "id": "jido",
+   "name": "じどうかん",
+   "em": "🎨"
+  },
+  {
+   "id": "home",
+   "name": "おうち机",
+   "em": "🏠"
+  },
+  {
+   "id": "cafe",
+   "name": "きちカフェ",
+   "em": "☕"
+  }
+ ],
+ "profiles": {
+  "sora": {
+   "name": "そら",
+   "em": "🌸",
+   "grade": "小5",
+   "points": 0,
+   "sessions": [
+    {
+     "id": "s-so-01",
+     "base": "home",
+     "plannedMin": 5,
+     "startTs": 1787124000000,
+     "endTs": 1787124300000,
+     "minutes": 5,
+     "subjects": [
+      "算数"
+     ],
+     "memo": "家を出る前に計算だけ",
+     "photoId": null,
+     "boards": [],
+     "focus": null,
+     "status": "pending",
+     "spin": null,
+     "mt": 1787124000000
+    },
+    {
+     "id": "s-so-02",
+     "base": "lib",
+     "plannedMin": 75,
+     "startTs": 1787155800000,
+     "endTs": 1787160300000,
+     "minutes": 75,
+     "subjects": [
+      "算数",
+      "国語"
+     ],
+     "memo": "図書館。速さの問題がわかってきた",
+     "photoId": null,
+     "boards": [],
+     "focus": null,
+     "status": "pending",
+     "spin": null,
+     "mt": 1787155800000
+    },
+    {
+     "id": "s-so-03",
+     "base": "cafe",
+     "plannedMin": 60,
+     "startTs": 1787067000000,
+     "endTs": 1787070600000,
+     "minutes": 60,
+     "subjects": [
+      "理科"
+     ],
+     "memo": "きちカフェでてこの問題",
+     "photoId": null,
+     "boards": [],
+     "focus": null,
+     "status": "approved",
+     "spin": "🍰🍰🍰 +120pt!",
+     "mt": 1787067000000
+    },
+    {
+     "id": "s-so-04",
+     "base": "lib",
+     "plannedMin": 90,
+     "startTs": 1786982400000,
+     "endTs": 1786987800000,
+     "minutes": 90,
+     "subjects": [
+      "算数"
+     ],
+     "memo": "予習シリーズ 練習問題",
+     "photoId": null,
+     "boards": [],
+     "focus": null,
+     "status": "approved",
+     "spin": "🔥⭐⭐⭐ +260pt!",
+     "mt": 1786982400000
+    },
+    {
+     "id": "s-so-05",
+     "base": "home",
+     "plannedMin": 25,
+     "startTs": 1786909200000,
+     "endTs": 1786910700000,
+     "minutes": 25,
+     "subjects": [
+      "社会"
+     ],
+     "memo": "",
+     "photoId": null,
+     "boards": [],
+     "focus": null,
+     "status": "approved",
+     "spin": "🍩🍩🌸 +40pt",
+     "mt": 1786909200000
+    },
+    {
+     "id": "s-so-06",
+     "base": "school",
+     "plannedMin": 45,
+     "startTs": 1786810800000,
+     "endTs": 1786813500000,
+     "minutes": 45,
+     "subjects": [
+      "国語"
+     ],
+     "memo": "記述の練習",
+     "photoId": null,
+     "boards": [],
+     "focus": null,
+     "status": "approved",
+     "spin": "🎁 券があたった!",
+     "mt": 1786810800000
+    },
+    {
+     "id": "s-so-07",
+     "base": "lib",
+     "plannedMin": 110,
+     "startTs": 1786716000000,
+     "endTs": 1786722600000,
+     "minutes": 110,
+     "subjects": [
+      "算数",
+      "理科"
+     ],
+     "memo": "土曜は長め",
+     "photoId": null,
+     "boards": [],
+     "focus": null,
+     "status": "approved",
+     "spin": "⭐⭐⭐ +150pt!",
+     "mt": 1786716000000
+    },
+    {
+     "id": "s-so-08",
+     "base": "cafe",
+     "plannedMin": 55,
+     "startTs": 1786633200000,
+     "endTs": 1786636500000,
+     "minutes": 55,
+     "subjects": [
+      "国語"
+     ],
+     "memo": "",
+     "photoId": null,
+     "boards": [],
+     "focus": null,
+     "status": "approved",
+     "spin": "🍰🌸🍩 +30pt",
+     "mt": 1786633200000
+    },
+    {
+     "id": "s-so-09",
+     "base": "home",
+     "plannedMin": 30,
+     "startTs": 1786564800000,
+     "endTs": 1786566600000,
+     "minutes": 30,
+     "subjects": [
+      "算数"
+     ],
+     "memo": "",
+     "photoId": null,
+     "boards": [],
+     "focus": null,
+     "status": "approved",
+     "spin": "🌸🌸🍩 +25pt",
+     "mt": 1786564800000
+    },
+    {
+     "id": "s-so-10",
+     "base": "lib",
+     "plannedMin": 80,
+     "startTs": 1786465800000,
+     "endTs": 1786470600000,
+     "minutes": 80,
+     "subjects": [
+      "算数",
+      "社会"
+     ],
+     "memo": "",
+     "photoId": null,
+     "boards": [],
+     "focus": null,
+     "status": "approved",
+     "spin": "⭐⭐🍰 +90pt",
+     "mt": 1786465800000
+    },
+    {
+     "id": "s-so-11",
+     "base": "jido",
+     "plannedMin": 40,
+     "startTs": 1786381200000,
+     "endTs": 1786383600000,
+     "minutes": 40,
+     "subjects": [
+      "理科"
+     ],
+     "memo": "",
+     "photoId": null,
+     "boards": [],
+     "focus": null,
+     "status": "approved",
+     "spin": "🍩🍰🌸 +35pt",
+     "mt": 1786381200000
+    },
+    {
+     "id": "s-so-12",
+     "base": "home",
+     "plannedMin": 20,
+     "startTs": 1786302000000,
+     "endTs": 1786303200000,
+     "minutes": 20,
+     "subjects": [
+      "国語"
+     ],
+     "memo": "",
+     "photoId": null,
+     "boards": [],
+     "focus": null,
+     "status": "approved",
+     "spin": "🌸🍩🍰 +20pt",
+     "mt": 1786302000000
+    },
+    {
+     "id": "s-so-13",
+     "base": "lib",
+     "plannedMin": 95,
+     "startTs": 1786203000000,
+     "endTs": 1786208700000,
+     "minutes": 95,
+     "subjects": [
+      "算数"
+     ],
+     "memo": "",
+     "photoId": null,
+     "boards": [],
+     "focus": null,
+     "status": "approved",
+     "spin": "⭐⭐⭐ +150pt!",
+     "mt": 1786203000000
+    },
+    {
+     "id": "s-so-14",
+     "base": "cafe",
+     "plannedMin": 65,
+     "startTs": 1786028400000,
+     "endTs": 1786032300000,
+     "minutes": 65,
+     "subjects": [
+      "国語"
+     ],
+     "memo": "",
+     "photoId": null,
+     "boards": [],
+     "focus": null,
+     "status": "approved",
+     "spin": "🍰⭐🍩 +80pt",
+     "mt": 1786028400000
+    },
+    {
+     "id": "s-so-15",
+     "base": "lib",
+     "plannedMin": 100,
+     "startTs": 1785940200000,
+     "endTs": 1785946200000,
+     "minutes": 100,
+     "subjects": [
+      "算数",
+      "理科"
+     ],
+     "memo": "",
+     "photoId": null,
+     "boards": [],
+     "focus": null,
+     "status": "approved",
+     "spin": "⭐⭐⭐ +200pt!",
+     "mt": 1785940200000
+    },
+    {
+     "id": "s-so-16",
+     "base": "home",
+     "plannedMin": 30,
+     "startTs": 1785871200000,
+     "endTs": 1785873000000,
+     "minutes": 30,
+     "subjects": [
+      "社会"
+     ],
+     "memo": "",
+     "photoId": null,
+     "boards": [],
+     "focus": null,
+     "status": "approved",
+     "spin": "🌸🍰🍩 +45pt",
+     "mt": 1785871200000
+    },
+    {
+     "id": "s-so-17",
+     "base": "school",
+     "plannedMin": 50,
+     "startTs": 1785773400000,
+     "endTs": 1785776400000,
+     "minutes": 50,
+     "subjects": [
+      "国語"
+     ],
+     "memo": "",
+     "photoId": null,
+     "boards": [],
+     "focus": null,
+     "status": "approved",
+     "spin": "🍰🍰⭐ +120pt",
+     "mt": 1785773400000
+    },
+    {
+     "id": "s-so-18",
+     "base": "lib",
+     "plannedMin": 70,
+     "startTs": 1785598800000,
+     "endTs": 1785603000000,
+     "minutes": 70,
+     "subjects": [
+      "算数"
+     ],
+     "memo": "",
+     "photoId": null,
+     "boards": [],
+     "focus": null,
+     "status": "approved",
+     "spin": "⭐🍩🍰 +90pt",
+     "mt": 1785598800000
+    },
+    {
+     "id": "s-so-19",
+     "base": "jido",
+     "plannedMin": 45,
+     "startTs": 1785429600000,
+     "endTs": 1785432300000,
+     "minutes": 45,
+     "subjects": [
+      "理科"
+     ],
+     "memo": "",
+     "photoId": null,
+     "boards": [],
+     "focus": null,
+     "status": "approved",
+     "spin": "🍰⭐⭐ +145pt",
+     "mt": 1785429600000
+    }
+   ],
+   "exams": [
+    {
+     "id": "ex-so-1",
+     "name": "○○模試",
+     "date": "2026-05-13",
+     "scores": {
+      "算数": 48,
+      "国語": 55,
+      "理科": 51,
+      "社会": 53,
+      "総合": 51
+     },
+     "memo": "",
+     "mt": 1778674448855
+    },
+    {
+     "id": "ex-so-2",
+     "name": "○○模試",
+     "date": "2026-06-17",
+     "scores": {
+      "算数": 52,
+      "国語": 54,
+      "理科": 53,
+      "社会": 55,
+      "総合": 53
+     },
+     "memo": "算数がすこし上がった",
+     "mt": 1781698448855
+    },
+    {
+     "id": "ex-so-3",
+     "name": "○○模試",
+     "date": "2026-07-15",
+     "scores": {
+      "算数": 55,
+      "国語": 53,
+      "理科": 57,
+      "社会": 56,
+      "総合": 55
+     },
+     "memo": "",
+     "mt": 1784117648855
+    },
+    {
+     "id": "ex-so-4",
+     "name": "○○模試",
+     "date": "2026-08-07",
+     "scores": {
+      "算数": 59,
+      "国語": 54,
+      "理科": 58,
+      "社会": 57,
+      "総合": 57
+     },
+     "memo": "目標まであと1",
+     "mt": 1786104848855
+    }
+   ],
+   "chat": [],
+   "chatArchive": [],
+   "aiName": "そらとも",
+   "examTarget": {
+    "label": "○○模試 総合",
+    "value": "58"
+   },
+   "bigGoals": [
+    {
+     "title": "模試で偏差値58!",
+     "reward": "すきなレストランへGO 🍽️"
+    },
+    {
+     "title": "第一志望に ごうかく!!",
+     "reward": "スペシャル旅行 ✈️🌟"
+    }
+   ],
+   "pool": [
+    {
+     "name": "蜂蜜＆ゴルゴンゾーラクッキー券 🧀",
+     "price": 700
+    },
+    {
+     "name": "すきなおやつリクエスト券 🍩",
+     "price": 400
+    },
+    {
+     "name": "パパ・ママと30分あそぶ券 🎮",
+     "price": 300
+    },
+    {
+     "name": "すきなレストランでディナー券 🍽️",
+     "price": 800
+    }
+   ],
+   "tickets": [
+    {
+     "id": "tk-so-cookie-1",
+     "name": "蜂蜜＆ゴルゴンゾーラクッキー券 🧀",
+     "ts": 1786478400000,
+     "usedTs": 1786644000000,
+     "mt": 1786644000000
+    },
+    {
+     "id": "tk-so-cookie-2",
+     "name": "蜂蜜＆ゴルゴンゾーラクッキー券 🧀",
+     "ts": 1786825800000,
+     "usedTs": null,
+     "mt": 1786825800000
+    },
+    {
+     "id": "tk-so-spin-1",
+     "name": "パパ・ママと30分あそぶ券 🎮",
+     "ts": 1786813200000,
+     "usedTs": null,
+     "mt": 1786813200000
+    }
+   ],
+   "lastGoldenMilestone": 3,
+   "pin": "1111",
+   "weeks": {
+    "2026-8-22": {
+     "subjects": [
+      "算数",
+      "国語",
+      "理科"
+     ],
+     "range": "",
+     "items": [
+      {
+       "subj": "算数",
+       "text": "予習シリーズ 算数(上)",
+       "from": 42,
+       "to": 51
+      },
+      {
+       "subj": "国語",
+       "text": "漢字の要",
+       "from": 12,
+       "to": 18
+      },
+      {
+       "subj": "理科",
+       "text": "理科メモリーチェック",
+       "from": 30,
+       "to": 36
+      }
+     ],
+     "goal": "",
+     "planTs": 1786615200000,
+     "planMt": 1786615200000,
+     "test": null,
+     "reviews": [],
+     "granted": {
+      "plan": true
+     },
+     "testMt": 0
+    },
+    "2026-8-15": {
+     "subjects": [
+      "算数",
+      "国語",
+      "理科"
+     ],
+     "range": "",
+     "items": [
+      {
+       "subj": "算数",
+       "text": "予習シリーズ 算数(上)",
+       "from": 32,
+       "to": 41
+      },
+      {
+       "subj": "国語",
+       "text": "漢字の要",
+       "from": 5,
+       "to": 11
+      },
+      {
+       "subj": "理科",
+       "text": "理科メモリーチェック",
+       "from": 24,
+       "to": 29
+      }
+     ],
+     "goal": "",
+     "planTs": 1786010400000,
+     "planMt": 1786010400000,
+     "test": {
+      "total": 30,
+      "correct": 26,
+      "ts": 1786532400000,
+      "items": [
+       {
+        "subj": "算数",
+        "total": 10,
+        "correct": 8
+       },
+       {
+        "subj": "国語",
+        "total": 10,
+        "correct": 10
+       },
+       {
+        "subj": "理科",
+        "total": 10,
+        "correct": 8
+       }
+      ]
+     },
+     "reviews": [
+      {
+       "text": "算数",
+       "done": true
+      },
+      {
+       "text": "理科",
+       "done": false
+      }
+     ],
+     "granted": {
+      "plan": true,
+      "test": true
+     },
+     "testMt": 1786532400000
+    }
+   },
+   "bonusSpins": [
+    {
+     "id": "bs-2026-8-22-plan",
+     "reason": "📅作戦けってい ボーナス",
+     "golden": false,
+     "status": "pending",
+     "mt": 1786615200000
+    },
+    {
+     "id": "bs-2026-8-15-plan",
+     "reason": "📅作戦けってい ボーナス",
+     "golden": false,
+     "status": "approved",
+     "mt": 1786010400000
+    },
+    {
+     "id": "bs-2026-8-15-test",
+     "reason": "⚔️ボスバトル ボーナス",
+     "golden": false,
+     "status": "approved",
+     "mt": 1786532400000
+    }
+   ],
+   "books": [
+    "予習シリーズ 算数(上)",
+    "漢字の要",
+    "理科メモリーチェック"
+   ],
+   "theme": "sakura",
+   "ownedThemes": [
+    "sky",
+    "sakura"
+   ],
+   "missions": [
+    {
+     "id": "ms-so-open",
+     "title": "理科メモリーチェック 2ページ",
+     "pts": 20,
+     "due": {
+      "type": "week",
+      "date": null
+     },
+     "status": "open",
+     "createdTs": 1786957200000,
+     "claimedTs": null,
+     "approvedTs": null,
+     "ack": false,
+     "mt": 1786957200000
+    },
+    {
+     "id": "ms-so-claimed",
+     "title": "お皿ならべ 1週間",
+     "pts": 30,
+     "due": {
+      "type": "week",
+      "date": null
+     },
+     "status": "claimed",
+     "createdTs": 1786611600000,
+     "claimedTs": 1787164200000,
+     "approvedTs": null,
+     "ack": false,
+     "mt": 1787164200000
+    },
+    {
+     "id": "ms-so-done",
+     "title": "漢字ドリル 1ページ",
+     "pts": 20,
+     "due": {
+      "type": "today",
+      "date": null
+     },
+     "status": "approved",
+     "createdTs": 1786698000000,
+     "claimedTs": 1786737600000,
+     "approvedTs": 1786741200000,
+     "ack": true,
+     "mt": 1786741200000
+    }
+   ],
+   "ledger": [
+    {
+     "id": "tx-spin-s-so-19",
+     "ts": 1785432600000,
+     "delta": 145,
+     "reason": "slot",
+     "ref": null
+    },
+    {
+     "id": "tx-spin-s-so-18",
+     "ts": 1785603600000,
+     "delta": 90,
+     "reason": "slot",
+     "ref": null
+    },
+    {
+     "id": "tx-spin-s-so-17",
+     "ts": 1785777000000,
+     "delta": 120,
+     "reason": "slot",
+     "ref": null
+    },
+    {
+     "id": "tx-spin-s-so-16",
+     "ts": 1785873600000,
+     "delta": 45,
+     "reason": "slot",
+     "ref": null
+    },
+    {
+     "id": "tx-spin-s-so-15",
+     "ts": 1785946800000,
+     "delta": 200,
+     "reason": "slot",
+     "ref": null
+    },
+    {
+     "id": "tx-spin-s-so-14",
+     "ts": 1786033200000,
+     "delta": 80,
+     "reason": "slot",
+     "ref": null
+    },
+    {
+     "id": "tx-spin-s-so-13",
+     "ts": 1786204800000,
+     "delta": 150,
+     "reason": "slot",
+     "ref": null
+    },
+    {
+     "id": "tx-spin-s-so-12",
+     "ts": 1786303800000,
+     "delta": 20,
+     "reason": "slot",
+     "ref": null
+    },
+    {
+     "id": "tx-spin-s-so-11",
+     "ts": 1786383900000,
+     "delta": 35,
+     "reason": "slot",
+     "ref": null
+    },
+    {
+     "id": "tx-spin-s-so-10",
+     "ts": 1786471200000,
+     "delta": 90,
+     "reason": "slot",
+     "ref": null
+    },
+    {
+     "id": "tx-shop-cookie-1",
+     "ts": 1786478400000,
+     "delta": -500,
+     "reason": "shop",
+     "ref": "蜂蜜＆ゴルゴンゾーラクッキー券 🧀"
+    },
+    {
+     "id": "tx-spin-s-so-09",
+     "ts": 1786567200000,
+     "delta": 25,
+     "reason": "slot",
+     "ref": null
+    },
+    {
+     "id": "tx-spin-s-so-08",
+     "ts": 1786636800000,
+     "delta": 30,
+     "reason": "slot",
+     "ref": null
+    },
+    {
+     "id": "tx-spin-s-so-07",
+     "ts": 1786723200000,
+     "delta": 150,
+     "reason": "slot",
+     "ref": null
+    },
+    {
+     "id": "tx-ms-ms-so-done",
+     "ts": 1786741200000,
+     "delta": 20,
+     "reason": "mission",
+     "ref": "漢字ドリル 1ページ"
+    },
+    {
+     "id": "tx-shop-cookie-2",
+     "ts": 1786825800000,
+     "delta": -600,
+     "reason": "shop",
+     "ref": "蜂蜜＆ゴルゴンゾーラクッキー券 🧀"
+    },
+    {
+     "id": "tx-spin-s-so-05",
+     "ts": 1786911000000,
+     "delta": 40,
+     "reason": "slot",
+     "ref": null
+    },
+    {
+     "id": "tx-spin-s-so-04",
+     "ts": 1786988400000,
+     "delta": 260,
+     "reason": "slot",
+     "ref": null
+    },
+    {
+     "id": "tx-spin-s-so-03",
+     "ts": 1787071200000,
+     "delta": 120,
+     "reason": "slot",
+     "ref": null
+    }
+   ],
+   "context": {
+    "about": "負けずぎらい。算数のひらめき問題が好き。国語の記述に苦手意識がある。ほめられるとぐんと伸びる。",
+    "now": "",
+    "nowUntil": ""
+   },
+   "deleted": {},
+   "metaMt": 1786615200000
+  },
+  "fuka": {
+   "name": "ふう",
+   "em": "🍃",
+   "grade": "小3",
+   "points": 0,
+   "sessions": [
+    {
+     "id": "s-fu-01",
+     "base": "home",
+     "plannedMin": 20,
+     "startTs": 1787158800000,
+     "endTs": 1787160000000,
+     "minutes": 20,
+     "subjects": [
+      "算数"
+     ],
+     "memo": "けいさんドリル",
+     "photoId": null,
+     "boards": [],
+     "focus": null,
+     "status": "pending",
+     "spin": null,
+     "mt": 1787158800000
+    },
+    {
+     "id": "s-fu-02",
+     "base": "jido",
+     "plannedMin": 30,
+     "startTs": 1787068800000,
+     "endTs": 1787070600000,
+     "minutes": 30,
+     "subjects": [
+      "国語"
+     ],
+     "memo": "じどうかんで音読",
+     "photoId": null,
+     "boards": [],
+     "focus": null,
+     "status": "approved",
+     "spin": "🍩🍩🍩 +60pt!",
+     "mt": 1787068800000
+    },
+    {
+     "id": "s-fu-03",
+     "base": "home",
+     "plannedMin": 15,
+     "startTs": 1786990800000,
+     "endTs": 1786991700000,
+     "minutes": 15,
+     "subjects": [
+      "算数"
+     ],
+     "memo": "",
+     "photoId": null,
+     "boards": [],
+     "focus": null,
+     "status": "approved",
+     "spin": "🌸🍰🍩 +15pt",
+     "mt": 1786990800000
+    },
+    {
+     "id": "s-fu-04",
+     "base": "lib",
+     "plannedMin": 35,
+     "startTs": 1786806000000,
+     "endTs": 1786808100000,
+     "minutes": 35,
+     "subjects": [
+      "国語",
+      "算数"
+     ],
+     "memo": "おねえちゃんといっしょ",
+     "photoId": null,
+     "boards": [],
+     "focus": null,
+     "status": "approved",
+     "spin": "⭐⭐🍩 +70pt",
+     "mt": 1786806000000
+    },
+    {
+     "id": "s-fu-05",
+     "base": "home",
+     "plannedMin": 25,
+     "startTs": 1786642200000,
+     "endTs": 1786643700000,
+     "minutes": 25,
+     "subjects": [
+      "算数"
+     ],
+     "memo": "",
+     "photoId": null,
+     "boards": [],
+     "focus": null,
+     "status": "approved",
+     "spin": "🍰🍰🌸 +30pt",
+     "mt": 1786642200000
+    },
+    {
+     "id": "s-fu-06",
+     "base": "jido",
+     "plannedMin": 30,
+     "startTs": 1786465800000,
+     "endTs": 1786467600000,
+     "minutes": 30,
+     "subjects": [
+      "国語"
+     ],
+     "memo": "",
+     "photoId": null,
+     "boards": [],
+     "focus": null,
+     "status": "approved",
+     "spin": "🍩⭐🌸 +55pt",
+     "mt": 1786465800000
+    },
+    {
+     "id": "s-fu-07",
+     "base": "lib",
+     "plannedMin": 40,
+     "startTs": 1786288800000,
+     "endTs": 1786291200000,
+     "minutes": 40,
+     "subjects": [
+      "算数"
+     ],
+     "memo": "おねえちゃんといっしょ",
+     "photoId": null,
+     "boards": [],
+     "focus": null,
+     "status": "approved",
+     "spin": "⭐⭐🍰 +80pt",
+     "mt": 1786288800000
+    },
+    {
+     "id": "s-fu-08",
+     "base": "home",
+     "plannedMin": 20,
+     "startTs": 1786125600000,
+     "endTs": 1786126800000,
+     "minutes": 20,
+     "subjects": [
+      "国語"
+     ],
+     "memo": "",
+     "photoId": null,
+     "boards": [],
+     "focus": null,
+     "status": "approved",
+     "spin": "🍰🍩⭐ +70pt",
+     "mt": 1786125600000
+    }
+   ],
+   "exams": [],
+   "chat": [],
+   "chatArchive": [],
+   "aiName": "ふうとも",
+   "examTarget": {
+    "label": "次のテストの目標",
+    "value": ""
+   },
+   "bigGoals": [
+    {
+     "title": "けいさんドリルを さいごまで!",
+     "reward": "すきなおやつ 🍩"
+    },
+    {
+     "title": "かんじテストで まんてん!",
+     "reward": "ゲーム30分 🎮"
+    }
+   ],
+   "pool": [
+    {
+     "name": "すきなおやつリクエスト券 🍩",
+     "price": 200
+    },
+    {
+     "name": "パパ・ママと30分あそぶ券 🎮",
+     "price": 300
+    },
+    {
+     "name": "よみたい本を1さつ 📖",
+     "price": 500
+    }
+   ],
+   "tickets": [
+    {
+     "id": "tk-fu-1",
+     "name": "すきなおやつリクエスト券 🍩",
+     "ts": 1786993200000,
+     "usedTs": null,
+     "mt": 1786993200000
+    }
+   ],
+   "lastGoldenMilestone": 0,
+   "pin": "2222",
+   "weeks": {},
+   "bonusSpins": [],
+   "books": [
+    "けいさんドリル",
+    "かんじスキル"
+   ],
+   "theme": "sky",
+   "ownedThemes": [
+    "sky",
+    "sakura"
+   ],
+   "missions": [
+    {
+     "id": "ms-fu-claimed",
+     "title": "おんどく 3日つづける",
+     "pts": 15,
+     "due": {
+      "type": "week",
+      "date": null
+     },
+     "status": "claimed",
+     "createdTs": 1786698000000,
+     "claimedTs": 1787166000000,
+     "approvedTs": null,
+     "ack": false,
+     "mt": 1787166000000
+    }
+   ],
+   "ledger": [
+    {
+     "id": "tx-spin-s-fu-08",
+     "ts": 1786127400000,
+     "delta": 70,
+     "reason": "slot",
+     "ref": null
+    },
+    {
+     "id": "tx-spin-s-fu-07",
+     "ts": 1786291800000,
+     "delta": 80,
+     "reason": "slot",
+     "ref": null
+    },
+    {
+     "id": "tx-spin-s-fu-06",
+     "ts": 1786468200000,
+     "delta": 55,
+     "reason": "slot",
+     "ref": null
+    },
+    {
+     "id": "tx-spin-s-fu-05",
+     "ts": 1786644000000,
+     "delta": 30,
+     "reason": "slot",
+     "ref": null
+    },
+    {
+     "id": "tx-spin-s-fu-04",
+     "ts": 1786808400000,
+     "delta": 70,
+     "reason": "slot",
+     "ref": null
+    },
+    {
+     "id": "tx-spin-s-fu-03",
+     "ts": 1786992000000,
+     "delta": 15,
+     "reason": "slot",
+     "ref": null
+    },
+    {
+     "id": "tx-shop-oyatsu",
+     "ts": 1786993200000,
+     "delta": -200,
+     "reason": "shop",
+     "ref": "すきなおやつリクエスト券 🍩"
+    },
+    {
+     "id": "tx-spin-s-fu-02",
+     "ts": 1787071200000,
+     "delta": 60,
+     "reason": "slot",
+     "ref": null
+    }
+   ],
+   "context": {
+    "about": "おねえちゃんのまねをしたがる。ほめると照れるが、そのあとよくがんばる。",
+    "now": "",
+    "nowUntil": ""
+   },
+   "deleted": {},
+   "metaMt": 1786698000000
+  }
+ },
+ "activeSession": null,
+ "deleted": {},
+ "basesMt": 0,
+ "pinMt": 0,
+ "planRemind": {
+  "on": 1,
+  "day": 0,
+  "max": 3
+ },
+ "planRemindMt": 0
+}
